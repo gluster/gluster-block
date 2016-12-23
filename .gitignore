@@ -1,0 +1,6 @@
+gluster-block
+*.o
+cscope.*
+tags
+TAGS
+*~
