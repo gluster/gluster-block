@@ -19,12 +19,39 @@
 # include  <errno.h>
 
 
-#define ERROR(fmt, ...) \
-        fprintf(stderr, "Error: " fmt " [at %s+%d :<%s>]\n", \
-                __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__)
+/* Target Create */
+# define  FAILED_CREATE             "failed in create"
+# define  FAILED_CREATING_FILE      "failed while creating block file in gluster volume"
+# define  FAILED_CREATING_BACKEND   "failed while creating glfs backend"
+# define  FAILED_CREATING_IQN       "failed while creating IQN"
+# define  FAILED_CREATING_LUN       "failed while creating LUN"
+# define  FAILED_SETTING_ATTRIBUTES "failed while setting attributes"
+# define  FAILED_SAVEING_CONFIG     "failed while saving configuration"
 
-#define MSG(fmt, ...) \
-        fprintf(stdout, fmt "\n", __VA_ARGS__)
+/* Target List */
+# define  FAILED_LIST               "failed in list"
+# define  FAILED_LIST_BACKEND       "failed while listing glfs backends"
+
+/* Target Info */
+# define  FAILED_INFO               "failed in info"
+# define  FAILED_GATHERING_INFO     "failed while gathering target info"
+
+/* Target get cfgstring */
+# define  FAILED_GATHERING_CFGSTR   "failed while gathering backend cfgstring"
+
+/* Target Delete */
+# define  FAILED_DELETE             "failed in delete"
+# define  FAILED_DELETING_BACKEND   "failed while deleting glfs backend"
+# define  FAILED_DELETING_IQN       "failed while deleting IQN"
+# define  FAILED_DELETING_FILE      "failed while deleting block file from gluster volume"
+
+
+# define ERROR(fmt, ...) \
+         fprintf(stderr, "Error: " fmt " [at %s+%d :<%s>]\n", \
+                 __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__)
+
+# define MSG(fmt, ...) \
+         fprintf(stdout, fmt "\n", __VA_ARGS__)
 
 
 # define CALLOC(x)    calloc(1, x)

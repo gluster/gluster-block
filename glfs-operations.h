@@ -22,11 +22,11 @@
 
 
 typedef struct glusterBlockDef {
-    char   *volume;
-    char   *host;     /* TODO: use proper Transport Object */
-    char   *filename;
-    size_t size;
-    bool   status;
+  char   *volume;
+  char   *host;     /* TODO: use proper Transport Object */
+  char   *filename;
+  size_t size;
+  bool   status;
 } glusterBlockDef;
 typedef glusterBlockDef *glusterBlockDefPtr;
 

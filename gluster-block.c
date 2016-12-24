@@ -33,8 +33,9 @@
 # define  GLFS_PATH        "/backstores/user:glfs"
 # define  TARGETCLI_GLFS   "targetcli "GLFS_PATH
 # define  TARGETCLI_ISCSI  "targetcli /iscsi"
+# define  TARGETCLI_SAVE   "targetcli / saveconfig"
 # define  ATTRIBUTES       "generate_node_acls=1 demo_mode_write_protect=0"
-# define  LIST_CMD         "ls | grep ' %s ' | cut -d'[' -f2 | cut -d']' -f1"
+# define  BACKEND_CFGSTR   "ls | grep ' %s ' | cut -d'[' -f2 | cut -d']' -f1"
 # define  LUNS_LIST        "ls | grep -v user:glfs | cut -d'-' -f2 | cut -d' ' -f2"
 
 # define  IQN_PREFIX       "iqn.2016-12.org.gluster-block:"
@@ -64,7 +65,7 @@ glusterBlockHelp(void)
       "\n"
       " -i, --info        <name>          Details about gluster block\n"
       "\n"
-      " -m, --modify      <RESIZE|AUTH>   Modify the metadata\n"
+      " -m, --modify      <resize|auth>   Modify the metadata\n"
       "\n"
       " -d, --delete      <name>          Delete the gluster block\n"
       "\n"
@@ -237,7 +238,6 @@ glusterBlockCreate(int count, char **options, char *name)
   char *sshout;
   size_t i;
 
-
   if (GB_ALLOC(blk) < 0)
     return -1;
 
@@ -288,6 +288,11 @@ glusterBlockCreate(int count, char **options, char *name)
 
     case 's':
       blk->size = glusterBlockCreateParseSize(optarg);
+      if (blk->size < 0) {
+        ERROR("%s", "failed while parsing size");
+        ret = -1;
+        goto out;
+      }
       ret++;
       break;
 
@@ -326,8 +331,11 @@ glusterBlockCreate(int count, char **options, char *name)
   }
 
   ret = glusterBlockCreateEntry(blk);
-  if (ret)
+  if (ret) {
+    ERROR("%s volume: %s host: %s",
+          FAILED_CREATING_FILE, blk->volume, blk->host);
     goto out;
+  }
 
   if (asprintf(&cmd, "%s %s %s %zu %s@%s/%s", TARGETCLI_GLFS,
                CREATE, name, blk->size, blk->volume, blk->host,
@@ -339,6 +347,8 @@ glusterBlockCreate(int count, char **options, char *name)
     MSG("[OnHost: %s]", list->hosts[i]);
     sshout = glusterBlockSSHRun(list->hosts[i], cmd, true);
     if (!sshout) {
+      ERROR("%s on host: %s",
+            FAILED_CREATING_BACKEND, list->hosts[i]);
       ret = -1;
       goto out;
     }
@@ -348,31 +358,43 @@ glusterBlockCreate(int count, char **options, char *name)
     asprintf(&exec, "%s %s %s", TARGETCLI_ISCSI, CREATE, iqn);
     sshout = glusterBlockSSHRun(list->hosts[i], exec, true);
     if (!sshout) {
+      ERROR("%s on host: %s",
+            FAILED_CREATING_IQN, list->hosts[i]);
       ret = -1;
       goto out;
     }
     GB_FREE(exec);
-
 
     asprintf(&exec, "%s/%s/tpg1/luns %s %s/%s",
              TARGETCLI_ISCSI, iqn, CREATE, GLFS_PATH, name);
     sshout = glusterBlockSSHRun(list->hosts[i], exec, true);
     if (!sshout) {
+      ERROR("%s on host: %s",
+            FAILED_CREATING_LUN, list->hosts[i]);
       ret = -1;
       goto out;
     }
     GB_FREE(exec);
-
 
     asprintf(&exec, "%s/%s/tpg1 set attribute %s",
              TARGETCLI_ISCSI, iqn, ATTRIBUTES);
     sshout = glusterBlockSSHRun(list->hosts[i], exec, true);
     if (!sshout) {
+      ERROR("%s on host: %s",
+            FAILED_SETTING_ATTRIBUTES, list->hosts[i]);
       ret = -1;
       goto out;
     }
     GB_FREE(exec);
     GB_FREE(iqn);
+
+    sshout = glusterBlockSSHRun(list->hosts[i], TARGETCLI_SAVE, true);
+    if (!sshout) {
+      ERROR("%s on host: %s",
+            FAILED_SAVEING_CONFIG, list->hosts[i]);
+      ret = -1;
+      goto out;
+    }
     putchar('\n');
   }
 
@@ -447,6 +469,7 @@ glusterBlockParseCfgStringToDef(char* cfgstring,
   *sep = '\0';
   blk->size = glusterBlockCreateParseSize(p);
   if (blk->size < 0) {
+    ERROR("%s", "failed while parsing size");
     ret = -1;
     goto fail;
   }
@@ -482,11 +505,13 @@ getCfgstring(char* name, char *blkServer)
   char *sshout;
   char *buf = CALLOC(CFG_STRING_SIZE);
 
-  asprintf(&cmd, "%s %s", TARGETCLI_GLFS, LIST_CMD);
+  asprintf(&cmd, "%s %s", TARGETCLI_GLFS, BACKEND_CFGSTR);
   asprintf(&exec, cmd, name);
 
   sshout = glusterBlockSSHRun(blkServer, exec, false);
   if (!sshout) {
+    ERROR("%s on host: %s",
+          FAILED_GATHERING_CFGSTR, blkServer);
     GB_FREE(buf);
     buf = NULL;
     goto fail;
@@ -531,6 +556,8 @@ glusterBlockList(blockServerDefPtr blkServers)
     MSG("[OnHost: %s]", blkServers->hosts[i]);
     sshout = glusterBlockSSHRun(blkServers->hosts[i], cmd, false);
     if (!sshout) {
+      ERROR("%s on host: %s",
+            FAILED_LIST_BACKEND, blkServers->hosts[i]);
       ret = -1;
       goto fail;
     }
@@ -541,6 +568,7 @@ glusterBlockList(blockServerDefPtr blkServers)
 
       cfgstring = getCfgstring(pos, blkServers->hosts[i]);
       if (!cfgstring) {
+        ERROR("%s", "failed while gathering CfgString");
         ret = -1;
         goto fail;
       }
@@ -549,8 +577,10 @@ glusterBlockList(blockServerDefPtr blkServers)
         goto fail;
 
       ret = glusterBlockParseCfgStringToDef(cfgstring, blk);
-      if (ret)
+      if (ret) {
+        ERROR("%s", "failed while parsing CfgString to glusterBlockDef");
         goto fail;
+      }
 
       fprintf(stdout, " %s   %s   %s   %s   %s\n",
               pos, blk->volume, blk->host,
@@ -602,12 +632,15 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
       GB_FREE(cfgstring);
     cfgstring = getCfgstring(name, blkServers->hosts[i]);
     if (!cfgstring) {
+      ERROR("%s", "failed while gathering CfgString");
       ret = -1;
       goto fail;
     }
 
     sshout = glusterBlockSSHRun(blkServers->hosts[i], cmd, true);
     if (!sshout) {
+      ERROR("%s on host: %s",
+            FAILED_DELETING_BACKEND, blkServers->hosts[i]);
       ret = -1;
       goto fail;
     }
@@ -618,8 +651,10 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
         goto fail;
 
       ret = glusterBlockParseCfgStringToDef(cfgstring, blk);
-      if (ret)
+      if (ret) {
+        ERROR("%s", "failed while parsing CfgString to glusterBlockDef");
         goto fail;
+      }
     }
 
     asprintf(&iqn, "%s%s-%s",
@@ -627,6 +662,8 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
     asprintf(&exec, "%s %s %s", TARGETCLI_ISCSI, DELETE, iqn);
     sshout = glusterBlockSSHRun(blkServers->hosts[i], exec, true);
     if (!sshout) {
+      ERROR("%s on host: %s",
+            FAILED_DELETING_IQN, blkServers->hosts[i]);
       ret = -1;
       goto fail;
     }
@@ -635,6 +672,10 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
   }
 
   ret = glusterBlockDeleteEntry(blk);
+  if (ret) {
+    ERROR("%s volume: %s host: %s",
+          FAILED_DELETING_FILE, blk->volume, blk->host);
+  }
 
  fail:
   glusterBlockDefFree(blk);
@@ -660,12 +701,18 @@ glusterBlockInfo(char* name, blockServerDefPtr blkServers)
   for (i = 0; i < blkServers->nhosts; i++) {
     MSG("[OnHost: %s]", blkServers->hosts[i]);
     sshout = glusterBlockSSHRun(blkServers->hosts[i], cmd, true);
-    if (!sshout)
+    if (!sshout) {
       ret = -1;
+      ERROR("%s on host: %s",
+            FAILED_GATHERING_INFO, blkServers->hosts[i]);
+      goto fail;
+    }
     putchar('\n');
   }
 
+ fail:
   GB_FREE(cmd);
+
   return ret;
 }
 
@@ -711,6 +758,10 @@ glusterBlockParseArgs(int count, char **options)
 
     case 'c':
       ret = glusterBlockCreate(count, options, optarg);
+      if (ret) {
+        ERROR("%s", FAILED_CREATE);
+        goto out;
+      }
       break;
 
     case 'l':
@@ -748,12 +799,18 @@ glusterBlockParseArgs(int count, char **options)
   switch (optFlag) {
   case 'l':
     ret = glusterBlockList(list);
+    if (ret)
+        ERROR("%s", FAILED_LIST);
     break;
   case 'i':
     ret = glusterBlockInfo(block, list);
+    if (ret)
+        ERROR("%s", FAILED_INFO);
     break;
   case 'd':
     ret = glusterBlockDelete(block, list);
+    if (ret)
+        ERROR("%s", FAILED_DELETE);
     break;
   }
 
