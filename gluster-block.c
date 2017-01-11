@@ -337,9 +337,9 @@ glusterBlockCreate(int count, char **options, char *name)
     goto out;
   }
 
-  if (asprintf(&cmd, "%s %s %s %zu %s@%s/%s", TARGETCLI_GLFS,
+  if (asprintf(&cmd, "%s %s %s %zu %s@%s/%s %s", TARGETCLI_GLFS,
                CREATE, name, blk->size, blk->volume, blk->host,
-               blk->filename) < 0)
+               blk->filename, blk->filename) < 0)
     goto out;
 
   /* Created user-backed storage object LUN size 2147483648. */
@@ -353,8 +353,7 @@ glusterBlockCreate(int count, char **options, char *name)
       goto out;
     }
 
-    asprintf(&iqn, "%s%s-%s",
-             IQN_PREFIX, list->hosts[i], blk->filename);
+    asprintf(&iqn, "%s%s", IQN_PREFIX, blk->filename);
     asprintf(&exec, "%s %s %s", TARGETCLI_ISCSI, CREATE, iqn);
     sshout = glusterBlockSSHRun(list->hosts[i], exec, true);
     if (!sshout) {
@@ -591,6 +590,8 @@ glusterBlockList(blockServerDefPtr blkServers)
       glusterBlockDefFree(blk);
     }
 
+    putchar('\n');
+
     fclose(fd);
     remove(sshout);
     GB_FREE(sshout);
@@ -657,8 +658,7 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
       }
     }
 
-    asprintf(&iqn, "%s%s-%s",
-             IQN_PREFIX, blkServers->hosts[i], blk->filename);
+    asprintf(&iqn, "%s%s", IQN_PREFIX, blk->filename);
     asprintf(&exec, "%s %s %s", TARGETCLI_ISCSI, DELETE, iqn);
     sshout = glusterBlockSSHRun(blkServers->hosts[i], exec, true);
     if (!sshout) {
@@ -669,6 +669,16 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
     }
     GB_FREE(exec);
     GB_FREE(iqn);
+
+    sshout = glusterBlockSSHRun(blkServers->hosts[i], TARGETCLI_SAVE, true);
+    if (!sshout) {
+      ERROR("%s on host: %s",
+            FAILED_SAVEING_CONFIG, blkServers->hosts[i]);
+      ret = -1;
+      goto fail;
+    }
+
+    putchar('\n');
   }
 
   ret = glusterBlockDeleteEntry(blk);
