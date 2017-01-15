@@ -1,4 +1,5 @@
 gluster-block
+gluster-blockd
 *.o
 cscope.*
 tags

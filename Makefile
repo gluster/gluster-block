@@ -12,11 +12,14 @@
 
 CC = gcc
 
-BIN = gluster-block
-OBJS = glfs-operations.o ssh-common.o utils.o gluster-block.o
+CLIENT = gluster-block
+CDEP = glfs-operations.o utils.o rpc/block_clnt.c rpc/block_xdr.c gluster-block.o
 
-CFLAGS = -g -Wall
-LIBS := $(shell pkg-config --libs uuid glusterfs-api libssh)
+SERVER = gluster-blockd
+SDEP = rpc/block_svc.o rpc/block_xdr.o gluster-blockd.o utils.o
+
+CFLAGS = -g -ggdb -Wall
+LIBS := $(shell pkg-config --libs uuid glusterfs-api)
 
 DEPS_LIST = gcc tcmu-runner targetcli
 
@@ -25,11 +28,14 @@ MKDIR_P = mkdir -p
 LOGDIR = /var/log/
 
 
-all: $(BIN)
+all: $(CLIENT) $(SERVER)
 
-$(BIN): $(OBJS)
+$(CLIENT): $(CDEP)
 	@$(MKDIR_P) $(LOGDIR)$@
 	$(CC) $(CFLAGS) $(LIBS) $^ -o $@
+
+$(SERVER): $(SDEP)
+	$(CC) $(CFLAGS) $^ -o $@
 
 glfs-operations.o: glfs-operations.c glfs-operations.h
 	$(foreach x, $(DEPS_LIST),\
@@ -39,15 +45,15 @@ glfs-operations.o: glfs-operations.c glfs-operations.h
 		$(error "No $x in PATH, install '$x' and continue ..."))))
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BIN).o: $(BIN).c
+$(CLIENT).o: $(CLIENT).c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-install: $(BIN)
-	cp $< $(PREFIX)/
+install: $(CLIENT) $(SERVER)
+	cp $^ $(PREFIX)/
 
 .PHONY: clean distclean
 clean distclean:
-	rm -f ./*.o $(BIN)
+	rm -f ./*.o ./rpc/*.o $(CLIENT) $(SERVER)
 
 uninstall:
-	rm -f $(PREFIX)/$(BIN)
+	rm -f $(PREFIX)/$(CLIENT) $(PREFIX)/$(SERVER)

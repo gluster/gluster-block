@@ -46,9 +46,6 @@ gbFree(void *ptrptr)
 {
   int save_errno = errno;
 
-  if(*(void**)ptrptr)
-    return;
-
   free(*(void**)ptrptr);
   *(void**)ptrptr = NULL;
   errno = save_errno;
