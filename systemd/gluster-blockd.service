@@ -1,0 +1,12 @@
+[Unit]
+Description=Gluster block storage utility
+Requires=rpcbind.service target.service tcmu-runner.service
+After=rpcbind.service target.service tcmu-runner.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/gluster-blockd
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

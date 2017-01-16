@@ -25,6 +25,9 @@ DEPS_LIST = gcc tcmu-runner targetcli
 
 PREFIX ?= /usr/local/sbin
 MKDIR_P = mkdir -p
+INSTALL = /usr/bin/install -c
+INSTALLDATA = /usr/bin/install -c -m 644
+SYSTEMD_DIR = /usr/lib/systemd/system
 LOGDIR = /var/log/
 
 
@@ -49,11 +52,15 @@ $(CLIENT).o: $(CLIENT).c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 install: $(CLIENT) $(SERVER)
-	cp $^ $(PREFIX)/
+	$(INSTALL) $^ $(PREFIX)/
+	@if [ -d $(SYSTEMD_DIR) ]; then \
+		$(MKDIR_P) $(SYSTEMD_DIR); \
+		$(INSTALLDATA) systemd/$(SERVER).service $(SYSTEMD_DIR)/; \
+	fi
 
 .PHONY: clean distclean
 clean distclean:
-	rm -f ./*.o ./rpc/*.o $(CLIENT) $(SERVER)
+	$(RM) ./*.o ./rpc/*.o $(CLIENT) $(SERVER)
 
 uninstall:
-	rm -f $(PREFIX)/$(CLIENT) $(PREFIX)/$(SERVER)
+	$(RM) $(PREFIX)/$(CLIENT) $(PREFIX)/$(SERVER) $(SYSTEMD_DIR)/$(SERVER).service
