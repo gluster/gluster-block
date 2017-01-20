@@ -18,7 +18,7 @@
 
 
 int
-glusterBlockCreateEntry(glusterBlockDefPtr blk)
+glusterBlockCreateEntry(blockCreateCli *blk, char *gbid)
 {
   struct glfs *glfs;
   struct glfs_fd *fd;
@@ -30,7 +30,7 @@ glusterBlockCreateEntry(glusterBlockDefPtr blk)
     return -1;
   }
 
-  ret = glfs_set_volfile_server(glfs, "tcp", blk->host, 24007);
+  ret = glfs_set_volfile_server(glfs, "tcp", blk->volfileserver, 24007);
   if (ret) {
     ERROR("%s", "glfs_set_volfile_server: failed");
     goto out;
@@ -48,7 +48,7 @@ glusterBlockCreateEntry(glusterBlockDefPtr blk)
     goto out;
   }
 
-  fd = glfs_creat(glfs, blk->filename,
+  fd = glfs_creat(glfs, gbid,
                   O_WRONLY | O_CREAT | O_TRUNC,
                   S_IRUSR | S_IWUSR);
   if (!fd) {
@@ -74,7 +74,7 @@ glusterBlockCreateEntry(glusterBlockDefPtr blk)
 
 
 int
-glusterBlockDeleteEntry(glusterBlockDefPtr blk)
+glusterBlockDeleteEntry(blockCreateCli *blk, char *gbid)
 {
   struct glfs *glfs;
   int ret = 0;
@@ -85,7 +85,7 @@ glusterBlockDeleteEntry(glusterBlockDefPtr blk)
     return -1;
   }
 
-  ret = glfs_set_volfile_server(glfs, "tcp", blk->host, 24007);
+  ret = glfs_set_volfile_server(glfs, "tcp", blk->volfileserver, 24007);
   if (ret) {
     ERROR("%s", "glfs_set_volfile_server: failed");
     goto out;
@@ -103,7 +103,7 @@ glusterBlockDeleteEntry(glusterBlockDefPtr blk)
     goto out;
   }
 
-  ret = glfs_unlink(glfs, blk->filename);
+  ret = glfs_unlink(glfs, gbid);
   if (ret) {
     ERROR("%s", "glfs_unlink: failed");
     goto out;

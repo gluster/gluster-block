@@ -8,41 +8,85 @@
 
 #include <rpc/rpc.h>
 
+#define ADDRESS "/var/run/gluster-block.socket"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
-struct blockTrans {
+struct blockCreate {
+	char volume[255];
+	char volfileserver[255];
+	char gbid[127];
+	u_quad_t size;
+	char block_name[255];
+};
+typedef struct blockCreate blockCreate;
+
+struct blockCreateCli {
+	char volume[255];
+	char volfileserver[255];
+	u_quad_t size;
+	char block_name[255];
+	char *block_hosts;
+};
+typedef struct blockCreateCli blockCreateCli;
+
+struct blockResponse {
 	int exit;
 	char *out;
+	u_quad_t offset;
+	struct {
+		u_int xdata_len;
+		char *xdata_val;
+	} xdata;
 };
-typedef struct blockTrans blockTrans;
+typedef struct blockResponse blockResponse;
+
+#define GLUSTER_BLOCK_CLI 212153113
+#define GLUSTER_BLOCK_CLI_VERS 1
+
+#if defined(__STDC__) || defined(__cplusplus)
+#define BLOCK_CREATE_CLI 1
+extern  blockResponse * block_create_cli_1(blockCreateCli *, CLIENT *);
+extern  blockResponse * block_create_cli_1_svc(blockCreateCli *, struct svc_req *);
+extern int gluster_block_cli_1_freeresult (SVCXPRT *, xdrproc_t, caddr_t);
+
+#else /* K&R C */
+#define BLOCK_CREATE_CLI 1
+extern  blockResponse * block_create_cli_1();
+extern  blockResponse * block_create_cli_1_svc();
+extern int gluster_block_cli_1_freeresult ();
+#endif /* K&R C */
 
 #define GLUSTER_BLOCK 21215311
 #define GLUSTER_BLOCK_VERS 1
 
 #if defined(__STDC__) || defined(__cplusplus)
-#define BLOCK_EXEC 1
-extern  blockTrans * block_exec_1(char **, CLIENT *);
-extern  blockTrans * block_exec_1_svc(char **, struct svc_req *);
+#define BLOCK_CREATE 1
+extern  blockResponse * block_create_1(blockCreate *, CLIENT *);
+extern  blockResponse * block_create_1_svc(blockCreate *, struct svc_req *);
 extern int gluster_block_1_freeresult (SVCXPRT *, xdrproc_t, caddr_t);
 
 #else /* K&R C */
-#define BLOCK_EXEC 1
-extern  blockTrans * block_exec_1();
-extern  blockTrans * block_exec_1_svc();
+#define BLOCK_CREATE 1
+extern  blockResponse * block_create_1();
+extern  blockResponse * block_create_1_svc();
 extern int gluster_block_1_freeresult ();
 #endif /* K&R C */
 
 /* the xdr functions */
 
 #if defined(__STDC__) || defined(__cplusplus)
-extern  bool_t xdr_blockTrans (XDR *, blockTrans*);
+extern  bool_t xdr_blockCreate (XDR *, blockCreate*);
+extern  bool_t xdr_blockCreateCli (XDR *, blockCreateCli*);
+extern  bool_t xdr_blockResponse (XDR *, blockResponse*);
 
 #else /* K&R C */
-extern bool_t xdr_blockTrans ();
+extern bool_t xdr_blockCreate ();
+extern bool_t xdr_blockCreateCli ();
+extern bool_t xdr_blockResponse ();
 
 #endif /* K&R C */
 

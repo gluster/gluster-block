@@ -6,11 +6,54 @@
 #include "block.h"
 
 bool_t
-xdr_blockTrans (XDR *xdrs, blockTrans *objp)
+xdr_blockCreate (XDR *xdrs, blockCreate *objp)
+{
+	 if (!xdr_vector (xdrs, (char *)objp->volume, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	 if (!xdr_vector (xdrs, (char *)objp->volfileserver, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	 if (!xdr_vector (xdrs, (char *)objp->gbid, 127,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	 if (!xdr_u_quad_t (xdrs, &objp->size))
+		 return FALSE;
+	 if (!xdr_vector (xdrs, (char *)objp->block_name, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	return TRUE;
+}
+
+bool_t
+xdr_blockCreateCli (XDR *xdrs, blockCreateCli *objp)
+{
+	 if (!xdr_vector (xdrs, (char *)objp->volume, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	 if (!xdr_vector (xdrs, (char *)objp->volfileserver, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	 if (!xdr_u_quad_t (xdrs, &objp->size))
+		 return FALSE;
+	 if (!xdr_vector (xdrs, (char *)objp->block_name, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	 if (!xdr_string (xdrs, &objp->block_hosts, ~0))
+		 return FALSE;
+	return TRUE;
+}
+
+bool_t
+xdr_blockResponse (XDR *xdrs, blockResponse *objp)
 {
 	 if (!xdr_int (xdrs, &objp->exit))
 		 return FALSE;
 	 if (!xdr_string (xdrs, &objp->out, ~0))
+		 return FALSE;
+	 if (!xdr_u_quad_t (xdrs, &objp->offset))
+		 return FALSE;
+	 if (!xdr_bytes (xdrs, (char **)&objp->xdata.xdata_val, (u_int *) &objp->xdata.xdata_len, ~0))
 		 return FALSE;
 	return TRUE;
 }

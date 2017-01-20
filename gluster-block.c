@@ -12,6 +12,7 @@
 # define   _GNU_SOURCE         /* See feature_test_macros(7) */
 
 # include  <string.h>
+# include  <unistd.h>
 # include  <getopt.h>
 # include  <uuid/uuid.h>
 
@@ -53,20 +54,39 @@ typedef blockServerDef *blockServerDefPtr;
 
 
 static void
-gluster_block_1(char *host, char *cmd, blockTrans  **reply)
+gluster_block_cli_1(blockCreateCli cobj, blockResponse  **reply)
 {
   CLIENT *clnt;
+  int sockfd, len;
+  struct sockaddr_un saun;
 
-  clnt = clnt_create (host, GLUSTER_BLOCK, GLUSTER_BLOCK_VERS, "tcp");
+  if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+    perror("client: socket");
+    exit(1);
+  }
+
+  saun.sun_family = AF_UNIX;
+  strcpy(saun.sun_path, ADDRESS);
+
+  len = sizeof(saun.sun_family) + strlen(saun.sun_path);
+
+  if (connect(sockfd, (struct sockaddr *) &saun, len) < 0) {
+    perror("client: connect");
+    exit(1);
+  }
+
+  clnt = clntunix_create ((struct sockaddr_un *) &saun, GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS, &sockfd, 0, 0);
   if (clnt == NULL) {
-    clnt_pcreateerror (host);
+    clnt_pcreateerror ("localhost");
     exit (1);
   }
 
-  *reply = block_exec_1(&cmd, clnt);
+  *reply = block_create_cli_1(&cobj, clnt);
   if (*reply == NULL) {
-    clnt_perror (clnt, "call failed");
+    clnt_perror (clnt, "call failed gluster-block");
   }
+
+  printf("%s\n", (*reply)->out);
 
   clnt_destroy (clnt);
 }
@@ -249,16 +269,20 @@ glusterBlockCreate(int count, char **options, char *name)
 {
   int c;
   int ret = 0;
-  char *cmd = NULL;
-  char *exec = NULL;
-  char *iqn = NULL;
-  char *blkServers = NULL;
-  blockServerDefPtr list;
-  uuid_t out;
-  glusterBlockDefPtr blk;
-  blockTrans *reply;
-  size_t i;
+// char *cmd = NULL;
+//  char *exec = NULL;
+//  char *iqn = NULL;
+//  char *blkServers = NULL;
+//  blockServerDefPtr list;
+//  uuid_t out;
+//  glusterBlockDefPtr blk;
+  blockResponse *reply;
+  static blockCreateCli cobj;
+//  size_t i;
 
+/*
+  if (GB_ALLOC(&cobj) < 0)
+    return -1;
   if (GB_ALLOC(blk) < 0)
     return -1;
 
@@ -266,6 +290,7 @@ glusterBlockCreate(int count, char **options, char *name)
 
   uuid_generate(out);
   uuid_unparse(out, blk->filename);
+*/
 
   if (!name) {
     ERROR("%s", "Insufficient arguments supplied for"
@@ -273,6 +298,8 @@ glusterBlockCreate(int count, char **options, char *name)
     ret = -1;
     goto out;
   }
+
+  strcpy(cobj.block_name, name);
 
   while (1) {
     static const struct option long_options[] = {
@@ -294,22 +321,23 @@ glusterBlockCreate(int count, char **options, char *name)
 
     switch (c) {
     case 'b':
-      blkServers = optarg;
+      //blkServers = optarg;
+      GB_STRDUP(cobj.block_hosts, optarg);
       break;
 
     case 'v':
-      GB_STRDUP(blk->volume, optarg);
+      strcpy(cobj.volume, optarg);
       ret++;
       break;
 
     case 'h':
-      GB_STRDUP(blk->host, optarg);
+      strcpy(cobj.volfileserver, optarg);
       ret++;
       break;
 
     case 's':
-      blk->size = glusterBlockCreateParseSize(optarg);
-      if (blk->size < 0) {
+      cobj.size = glusterBlockCreateParseSize(optarg);
+      if (cobj.size < 0) {
         ERROR("%s", "failed while parsing size");
         ret = -1;
         goto out;
@@ -326,13 +354,13 @@ glusterBlockCreate(int count, char **options, char *name)
       break;
     }
   }
-
+/*
   if (blkServers) {
     list = blockServerParse(blkServers);
   } else {
     list = blockServerParse("localhost");
   }
-
+*/
   /* Print any remaining command line arguments (not options). */
   if (optind < count) {
     ERROR("%s", "non-option ARGV-elements: ");
@@ -351,6 +379,13 @@ glusterBlockCreate(int count, char **options, char *name)
     goto out;
   }
 
+  gluster_block_cli_1(cobj, &reply);
+
+
+
+
+
+/*
   ret = glusterBlockCreateEntry(blk);
   if (ret) {
     ERROR("%s volume: %s host: %s",
@@ -363,7 +398,6 @@ glusterBlockCreate(int count, char **options, char *name)
                blk->filename, blk->filename) < 0)
     goto out;
 
-  /* Created user-backed storage object LUN size 2147483648. */
   for (i = 0; i < list->nhosts; i++) {
     MSG("[OnHost: %s]", list->hosts[i]);
     gluster_block_1(list->hosts[i], cmd, &reply);
@@ -429,8 +463,10 @@ glusterBlockCreate(int count, char **options, char *name)
   GB_FREE(iqn);
   glusterBlockDefFree(blk);
   blockServerDefFree(list);
+*/
 
-  return ret;
+  out:
+  return 0;
 }
 
 
@@ -527,12 +563,12 @@ getCfgstring(char* name, char *blkServer)
   char *cmd;
   char *exec;
   char *buf = NULL;
-  blockTrans *reply;
+  blockResponse *reply = NULL;
 
   asprintf(&cmd, "%s %s", TARGETCLI_GLFS, BACKEND_CFGSTR);
   asprintf(&exec, cmd, name);
 
-  gluster_block_1(blkServer, exec, &reply);
+  //gluster_block_1(blkServer, exec, &reply);
   if (!reply || reply->exit) {
     ERROR("%s on host: %s",
           FAILED_GATHERING_CFGSTR, blkServer);
@@ -559,7 +595,7 @@ glusterBlockList(blockServerDefPtr blkServers)
   char *size;
   char *cfgstring = NULL;
   glusterBlockDefPtr blk = NULL;
-  blockTrans *reply;
+  blockResponse *reply = NULL;
 
   MSG("%s", "BlockName      Volname      Host      Size      Status");
 
@@ -567,7 +603,7 @@ glusterBlockList(blockServerDefPtr blkServers)
 
   for (i = 0; i < blkServers->nhosts; i++) {
     MSG("[OnHost: %s]", blkServers->hosts[i]);
-    gluster_block_1(blkServers->hosts[i], cmd, &reply);
+    //gluster_block_1(blkServers->hosts[i], cmd, &reply);
     if (!reply || reply->exit) {
       ERROR("%s on host: %s",
             FAILED_LIST_BACKEND, blkServers->hosts[i]);
@@ -632,7 +668,7 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
   char *cfgstring = NULL;
   char *iqn = NULL;
   glusterBlockDefPtr blk = NULL;
-  blockTrans *reply;
+  blockResponse *reply = NULL;
 
   asprintf(&cmd, "%s %s %s", TARGETCLI_GLFS, DELETE, name);
 
@@ -647,7 +683,7 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
       goto fail;
     }
 
-    gluster_block_1(blkServers->hosts[i], cmd, &reply);
+    //gluster_block_1(blkServers->hosts[i], cmd, &reply);
     if (!reply || reply->exit) {
       ERROR("%s on host: %s",
             FAILED_DELETING_BACKEND, blkServers->hosts[i]);
@@ -669,7 +705,7 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
 
     asprintf(&iqn, "%s%s", IQN_PREFIX, blk->filename);
     asprintf(&exec, "%s %s %s", TARGETCLI_ISCSI, DELETE, iqn);
-    gluster_block_1(blkServers->hosts[i], exec, &reply);
+    //gluster_block_1(blkServers->hosts[i], exec, &reply);
     if (!reply || reply->exit) {
       ERROR("%s on host: %s",
             FAILED_DELETING_IQN, blkServers->hosts[i]);
@@ -680,7 +716,7 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
     GB_FREE(exec);
     GB_FREE(iqn);
 
-    gluster_block_1(blkServers->hosts[i], TARGETCLI_SAVE, &reply);
+    //gluster_block_1(blkServers->hosts[i], TARGETCLI_SAVE, &reply);
     if (!reply || reply->exit) {
       ERROR("%s on host: %s",
             FAILED_SAVEING_CONFIG, blkServers->hosts[i]);
@@ -691,7 +727,7 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
     putchar('\n');
   }
 
-  ret = glusterBlockDeleteEntry(blk);
+  //ret = glusterBlockDeleteEntry(blk);
   if (ret) {
     ERROR("%s volume: %s host: %s",
           FAILED_DELETING_FILE, blk->volume, blk->host);
@@ -713,13 +749,13 @@ glusterBlockInfo(char* name, blockServerDefPtr blkServers)
   size_t i;
   int ret = 0;
   char *cmd;
-  blockTrans *reply;
+  blockResponse *reply = NULL;
 
   asprintf(&cmd, "%s/%s %s", TARGETCLI_GLFS, name, INFO);
 
   for (i = 0; i < blkServers->nhosts; i++) {
     MSG("[OnHost: %s]", blkServers->hosts[i]);
-    gluster_block_1(blkServers->hosts[i], cmd, &reply);
+    //gluster_block_1(blkServers->hosts[i], cmd, &reply);
     if (!reply || reply->exit) {
       ret = -1;
       ERROR("%s on host: %s",

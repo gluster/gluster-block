@@ -16,9 +16,9 @@ CLIENT = gluster-block
 CDEP = glfs-operations.o utils.o rpc/block_clnt.c rpc/block_xdr.c gluster-block.o
 
 SERVER = gluster-blockd
-SDEP = rpc/block_svc.o rpc/block_xdr.o gluster-blockd.o utils.o
+SDEP = rpc/block_svc.o rpc/block_clnt.c rpc/block_xdr.o gluster-blockd.o utils.o glfs-operations.o
 
-CFLAGS = -g -ggdb -Wall
+CFLAGS = -g -ggdb -Wall -lpthread
 LIBS := $(shell pkg-config --libs uuid glusterfs-api)
 
 DEPS_LIST = gcc tcmu-runner targetcli
@@ -38,7 +38,7 @@ $(CLIENT): $(CDEP)
 	$(CC) $(CFLAGS) $(LIBS) $^ -o $@
 
 $(SERVER): $(SDEP)
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $(LIBS) $^ -o $@
 
 glfs-operations.o: glfs-operations.c glfs-operations.h
 	$(foreach x, $(DEPS_LIST),\

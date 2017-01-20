@@ -19,6 +19,8 @@
 
 # include  <glusterfs/api/glfs.h>
 
+# include  "rpc/block.h"
+
 
 
 typedef struct glusterBlockDef {
@@ -31,8 +33,8 @@ typedef struct glusterBlockDef {
 typedef glusterBlockDef *glusterBlockDefPtr;
 
 
-int glusterBlockCreateEntry(glusterBlockDefPtr blk);
+int glusterBlockCreateEntry(blockCreateCli *blk, char *gbid);
 
-int glusterBlockDeleteEntry(glusterBlockDefPtr blk);
+int glusterBlockDeleteEntry(blockCreateCli *blk, char *gbid);
 
 #endif /* _GLFS_OPERATIONS_H */
