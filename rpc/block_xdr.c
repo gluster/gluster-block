@@ -45,6 +45,52 @@ xdr_blockCreateCli (XDR *xdrs, blockCreateCli *objp)
 }
 
 bool_t
+xdr_blockDeleteCli (XDR *xdrs, blockDeleteCli *objp)
+{
+	 if (!xdr_vector (xdrs, (char *)objp->block_name, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	 if (!xdr_string (xdrs, &objp->block_hosts, ~0))
+		 return FALSE;
+	return TRUE;
+}
+
+bool_t
+xdr_blockDelete (XDR *xdrs, blockDelete *objp)
+{
+	 if (!xdr_vector (xdrs, (char *)objp->block_name, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	 if (!xdr_vector (xdrs, (char *)objp->gbid, 127,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	return TRUE;
+}
+
+bool_t
+xdr_blockInfoCli (XDR *xdrs, blockInfoCli *objp)
+{
+	 if (!xdr_vector (xdrs, (char *)objp->block_name, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	 if (!xdr_vector (xdrs, (char *)objp->volume, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	return TRUE;
+}
+
+bool_t
+xdr_blockListCli (XDR *xdrs, blockListCli *objp)
+{
+	 if (!xdr_vector (xdrs, (char *)objp->volume, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
+	 if (!xdr_u_quad_t (xdrs, &objp->offset))
+		 return FALSE;
+	return TRUE;
+}
+
+bool_t
 xdr_blockResponse (XDR *xdrs, blockResponse *objp)
 {
 	 if (!xdr_int (xdrs, &objp->exit))

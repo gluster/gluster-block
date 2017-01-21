@@ -74,7 +74,7 @@ glusterBlockCreateEntry(blockCreateCli *blk, char *gbid)
 
 
 int
-glusterBlockDeleteEntry(blockCreateCli *blk, char *gbid)
+glusterBlockDeleteEntry(blockCreate *blk)
 {
   struct glfs *glfs;
   int ret = 0;
@@ -103,7 +103,7 @@ glusterBlockDeleteEntry(blockCreateCli *blk, char *gbid)
     goto out;
   }
 
-  ret = glfs_unlink(glfs, gbid);
+  ret = glfs_unlink(glfs, blk->gbid);
   if (ret) {
     ERROR("%s", "glfs_unlink: failed");
     goto out;

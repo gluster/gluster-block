@@ -33,6 +33,30 @@ struct blockCreateCli {
 };
 typedef struct blockCreateCli blockCreateCli;
 
+struct blockDeleteCli {
+	char block_name[255];
+	char *block_hosts;
+};
+typedef struct blockDeleteCli blockDeleteCli;
+
+struct blockDelete {
+	char block_name[255];
+	char gbid[127];
+};
+typedef struct blockDelete blockDelete;
+
+struct blockInfoCli {
+	char block_name[255];
+	char volume[255];
+};
+typedef struct blockInfoCli blockInfoCli;
+
+struct blockListCli {
+	char volume[255];
+	u_quad_t offset;
+};
+typedef struct blockListCli blockListCli;
+
 struct blockResponse {
 	int exit;
 	char *out;
@@ -51,12 +75,30 @@ typedef struct blockResponse blockResponse;
 #define BLOCK_CREATE_CLI 1
 extern  blockResponse * block_create_cli_1(blockCreateCli *, CLIENT *);
 extern  blockResponse * block_create_cli_1_svc(blockCreateCli *, struct svc_req *);
+#define BLOCK_LIST_CLI 2
+extern  blockResponse * block_list_cli_1(blockListCli *, CLIENT *);
+extern  blockResponse * block_list_cli_1_svc(blockListCli *, struct svc_req *);
+#define BLOCK_INFO_CLI 3
+extern  blockResponse * block_info_cli_1(blockInfoCli *, CLIENT *);
+extern  blockResponse * block_info_cli_1_svc(blockInfoCli *, struct svc_req *);
+#define BLOCK_DELETE_CLI 4
+extern  blockResponse * block_delete_cli_1(blockDeleteCli *, CLIENT *);
+extern  blockResponse * block_delete_cli_1_svc(blockDeleteCli *, struct svc_req *);
 extern int gluster_block_cli_1_freeresult (SVCXPRT *, xdrproc_t, caddr_t);
 
 #else /* K&R C */
 #define BLOCK_CREATE_CLI 1
 extern  blockResponse * block_create_cli_1();
 extern  blockResponse * block_create_cli_1_svc();
+#define BLOCK_LIST_CLI 2
+extern  blockResponse * block_list_cli_1();
+extern  blockResponse * block_list_cli_1_svc();
+#define BLOCK_INFO_CLI 3
+extern  blockResponse * block_info_cli_1();
+extern  blockResponse * block_info_cli_1_svc();
+#define BLOCK_DELETE_CLI 4
+extern  blockResponse * block_delete_cli_1();
+extern  blockResponse * block_delete_cli_1_svc();
 extern int gluster_block_cli_1_freeresult ();
 #endif /* K&R C */
 
@@ -67,12 +109,24 @@ extern int gluster_block_cli_1_freeresult ();
 #define BLOCK_CREATE 1
 extern  blockResponse * block_create_1(blockCreate *, CLIENT *);
 extern  blockResponse * block_create_1_svc(blockCreate *, struct svc_req *);
+#define BLOCK_DELETE 2
+extern  blockResponse * block_delete_1(blockDelete *, CLIENT *);
+extern  blockResponse * block_delete_1_svc(blockDelete *, struct svc_req *);
+#define BLOCK_EXEC 3
+extern  blockResponse * block_exec_1(char **, CLIENT *);
+extern  blockResponse * block_exec_1_svc(char **, struct svc_req *);
 extern int gluster_block_1_freeresult (SVCXPRT *, xdrproc_t, caddr_t);
 
 #else /* K&R C */
 #define BLOCK_CREATE 1
 extern  blockResponse * block_create_1();
 extern  blockResponse * block_create_1_svc();
+#define BLOCK_DELETE 2
+extern  blockResponse * block_delete_1();
+extern  blockResponse * block_delete_1_svc();
+#define BLOCK_EXEC 3
+extern  blockResponse * block_exec_1();
+extern  blockResponse * block_exec_1_svc();
 extern int gluster_block_1_freeresult ();
 #endif /* K&R C */
 
@@ -81,11 +135,19 @@ extern int gluster_block_1_freeresult ();
 #if defined(__STDC__) || defined(__cplusplus)
 extern  bool_t xdr_blockCreate (XDR *, blockCreate*);
 extern  bool_t xdr_blockCreateCli (XDR *, blockCreateCli*);
+extern  bool_t xdr_blockDeleteCli (XDR *, blockDeleteCli*);
+extern  bool_t xdr_blockDelete (XDR *, blockDelete*);
+extern  bool_t xdr_blockInfoCli (XDR *, blockInfoCli*);
+extern  bool_t xdr_blockListCli (XDR *, blockListCli*);
 extern  bool_t xdr_blockResponse (XDR *, blockResponse*);
 
 #else /* K&R C */
 extern bool_t xdr_blockCreate ();
 extern bool_t xdr_blockCreateCli ();
+extern bool_t xdr_blockDeleteCli ();
+extern bool_t xdr_blockDelete ();
+extern bool_t xdr_blockInfoCli ();
+extern bool_t xdr_blockListCli ();
 extern bool_t xdr_blockResponse ();
 
 #endif /* K&R C */

@@ -44,7 +44,12 @@
 
 # define MSERVER_DELIMITER ","
 
-
+typedef enum opterations {
+  CREATE_CLI = 1,
+  LIST_CLI   = 2,
+  INFO_CLI   = 3,
+  DELETE_CLI = 4
+} opterations;
 
 typedef struct blockServerDef {
   size_t nhosts;
@@ -54,7 +59,7 @@ typedef blockServerDef *blockServerDefPtr;
 
 
 static void
-gluster_block_cli_1(blockCreateCli cobj, blockResponse  **reply)
+gluster_block_cli_1(void *cobj, opterations opt, blockResponse  **reply)
 {
   CLIENT *clnt;
   int sockfd, len;
@@ -80,12 +85,23 @@ gluster_block_cli_1(blockCreateCli cobj, blockResponse  **reply)
     clnt_pcreateerror ("localhost");
     exit (1);
   }
-
-  *reply = block_create_cli_1(&cobj, clnt);
-  if (*reply == NULL) {
-    clnt_perror (clnt, "call failed gluster-block");
-  }
-
+switch(opt) {
+  case CREATE_CLI:
+    *reply = block_create_cli_1((blockCreateCli *)cobj, clnt);
+    if (*reply == NULL) {
+      clnt_perror (clnt, "call failed gluster-block");
+    }
+    break;
+  case DELETE_CLI:
+    *reply = block_delete_cli_1((blockDeleteCli *)cobj, clnt);
+    if (*reply == NULL) {
+      clnt_perror (clnt, "call failed gluster-block");
+    }
+    break;
+  case LIST_CLI:
+  case INFO_CLI:
+    break;
+}
   printf("%s\n", (*reply)->out);
 
   clnt_destroy (clnt);
@@ -379,7 +395,7 @@ glusterBlockCreate(int count, char **options, char *name)
     goto out;
   }
 
-  gluster_block_cli_1(cobj, &reply);
+  gluster_block_cli_1(&cobj, CREATE_CLI, &reply);
 
 
 
@@ -466,7 +482,7 @@ glusterBlockCreate(int count, char **options, char *name)
 */
 
   out:
-  return 0;
+  return reply->exit;
 }
 
 
@@ -659,16 +675,17 @@ glusterBlockList(blockServerDefPtr blkServers)
 
 
 static int
-glusterBlockDelete(char* name, blockServerDefPtr blkServers)
+glusterBlockDelete(char* name, char *blkServers)
 {
-  size_t i;
-  int ret;
-  char *cmd;
-  char *exec = NULL;
-  char *cfgstring = NULL;
-  char *iqn = NULL;
-  glusterBlockDefPtr blk = NULL;
-  blockResponse *reply = NULL;
+  static blockDeleteCli cobj;
+  blockResponse *reply;
+
+  strcpy(cobj.block_name, name);
+  GB_STRDUP(cobj.block_hosts, blkServers);
+
+  gluster_block_cli_1(&cobj, DELETE_CLI, &reply);
+
+  /*
 
   asprintf(&cmd, "%s %s %s", TARGETCLI_GLFS, DELETE, name);
 
@@ -691,7 +708,6 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
       goto fail;
     }
     MSG("%s", reply->out);
-    /* cfgstring is constant across all tcmu nodes */
     if (!blk) {
       if (GB_ALLOC(blk) < 0)
         goto fail;
@@ -738,8 +754,8 @@ glusterBlockDelete(char* name, blockServerDefPtr blkServers)
   GB_FREE(cfgstring);
   GB_FREE(exec);
   GB_FREE(cmd);
-
-  return ret;
+*/
+  return reply->exit;
 }
 
 
@@ -782,6 +798,7 @@ glusterBlockParseArgs(int count, char **options)
   char *block = NULL;
   char *blkServers = NULL;
   blockServerDefPtr list = NULL;
+  char *liststr;
 
   while (1) {
     static const struct option long_options[] = {
@@ -848,8 +865,10 @@ glusterBlockParseArgs(int count, char **options)
  opt:
   if (blkServers) {
     list = blockServerParse(blkServers);
+    liststr = blkServers;
   } else {
     list = blockServerParse("localhost");
+    liststr = "localhost";
   }
 
   switch (optFlag) {
@@ -864,7 +883,7 @@ glusterBlockParseArgs(int count, char **options)
         ERROR("%s", FAILED_INFO);
     break;
   case 'd':
-    ret = glusterBlockDelete(block, list);
+    ret = glusterBlockDelete(block, liststr);
     if (ret)
         ERROR("%s", FAILED_DELETE);
     break;

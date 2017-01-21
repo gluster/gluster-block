@@ -35,6 +35,6 @@ typedef glusterBlockDef *glusterBlockDefPtr;
 
 int glusterBlockCreateEntry(blockCreateCli *blk, char *gbid);
 
-int glusterBlockDeleteEntry(blockCreateCli *blk, char *gbid);
+int glusterBlockDeleteEntry(blockCreate *blk);
 
 #endif /* _GLFS_OPERATIONS_H */
