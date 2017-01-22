@@ -469,15 +469,34 @@ block_exec_1_svc(char **cmd, struct svc_req *rqstp)
 blockResponse *
 block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 {
+  char *cmd;
+  blockResponse *reply;
 
+  asprintf(&cmd, "%s %s", TARGETCLI_GLFS, LUNS_LIST);
 
-  return NULL;
+  gluster_block_1(blk->block_hosts, cmd, EXEC_SRV, &reply);
+  if (!reply || reply->exit) {
+    ERROR("%s on host: %s",
+        FAILED_GATHERING_CFGSTR, blk->block_hosts);
+  }
+
+  return reply;
 }
 
 blockResponse *
 block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
 {
+  char *cmd;
+  blockResponse *reply;
 
+  asprintf(&cmd, "%s/%s %s", TARGETCLI_GLFS, blk->block_name, INFO);
 
-  return NULL;
+  //for
+  gluster_block_1(blk->block_hosts, cmd, EXEC_SRV, &reply);
+  if (!reply || reply->exit) {
+    ERROR("%s on host: %s",
+        FAILED_GATHERING_CFGSTR, blk->block_hosts);
+  }
+
+  return reply;
 }

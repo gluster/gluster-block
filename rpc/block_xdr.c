@@ -76,6 +76,8 @@ xdr_blockInfoCli (XDR *xdrs, blockInfoCli *objp)
 	 if (!xdr_vector (xdrs, (char *)objp->volume, 255,
 		sizeof (char), (xdrproc_t) xdr_char))
 		 return FALSE;
+	 if (!xdr_string (xdrs, &objp->block_hosts, ~0))
+		 return FALSE;
 	return TRUE;
 }
 
@@ -86,6 +88,8 @@ xdr_blockListCli (XDR *xdrs, blockListCli *objp)
 		sizeof (char), (xdrproc_t) xdr_char))
 		 return FALSE;
 	 if (!xdr_u_quad_t (xdrs, &objp->offset))
+		 return FALSE;
+	 if (!xdr_string (xdrs, &objp->block_hosts, ~0))
 		 return FALSE;
 	return TRUE;
 }

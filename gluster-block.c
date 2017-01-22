@@ -98,8 +98,17 @@ switch(opt) {
       clnt_perror (clnt, "call failed gluster-block");
     }
     break;
-  case LIST_CLI:
   case INFO_CLI:
+    *reply = block_info_cli_1((blockInfoCli *)cobj, clnt);
+    if (*reply == NULL) {
+      clnt_perror (clnt, "call failed gluster-block");
+    }
+    break;
+  case LIST_CLI:
+    *reply = block_list_cli_1((blockListCli *)cobj, clnt);
+    if (*reply == NULL) {
+      clnt_perror (clnt, "call failed gluster-block");
+    }
     break;
 }
   printf("%s\n", (*reply)->out);
@@ -144,7 +153,7 @@ blockServerDefFree(blockServerDefPtr blkServers)
    GB_FREE(blkServers);
 }
 
-
+/*
 static void
 glusterBlockDefFree(glusterBlockDefPtr blk)
 {
@@ -156,7 +165,7 @@ glusterBlockDefFree(glusterBlockDefPtr blk)
   GB_FREE(blk->filename);
   GB_FREE(blk);
 }
-
+*/
 
 static blockServerDefPtr
 blockServerParse(char *blkServers)
@@ -254,7 +263,7 @@ glusterBlockCreateParseSize(char *value)
   }
 }
 
-
+/*
 static char *
 glusterBlockListGetHumanReadableSize(size_t bytes)
 {
@@ -278,7 +287,7 @@ glusterBlockListGetHumanReadableSize(size_t bytes)
 
   return NULL;
 }
-
+*/
 
 static int
 glusterBlockCreate(int count, char **options, char *name)
@@ -485,7 +494,7 @@ glusterBlockCreate(int count, char **options, char *name)
   return reply->exit;
 }
 
-
+/*
 static int
 glusterBlockParseCfgStringToDef(char* cfgstring,
                                 glusterBlockDefPtr blk)
@@ -493,7 +502,7 @@ glusterBlockParseCfgStringToDef(char* cfgstring,
   int ret = 0;
   char *p, *sep;
 
-  /* part before '@' is the volume name */
+ // part before '@' is the volume name
   p = cfgstring;
   sep = strchr(p, '@');
   if (!sep) {
@@ -507,7 +516,7 @@ glusterBlockParseCfgStringToDef(char* cfgstring,
     goto fail;
   }
 
-  /* part between '@' and '/' is the server name */
+  // part between '@' and '/' is the server name
   p = sep + 1;
   sep = strchr(p, '/');
   if (!sep) {
@@ -521,7 +530,7 @@ glusterBlockParseCfgStringToDef(char* cfgstring,
     goto fail;
   }
 
-  /* part between '/' and '(' is the filename */
+  // part between '/' and '(' is the filename
   p = sep + 1;
   sep = strchr(p, '(');
   if (!sep) {
@@ -529,13 +538,13 @@ glusterBlockParseCfgStringToDef(char* cfgstring,
     goto fail;
   }
 
-  *(sep - 1) = '\0';  /* discard extra space at end of filename */
+  *(sep - 1) = '\0';  // discard extra space at end of filename
   if (GB_STRDUP(blk->filename, p) < 0) {
     ret = -1;
     goto fail;
   }
 
-  /* part between '(' and ')' is the size */
+  // part between '(' and ')' is the size
   p = sep + 1;
   sep = strchr(p, ')');
   if (!sep) {
@@ -552,7 +561,7 @@ glusterBlockParseCfgStringToDef(char* cfgstring,
   }
 
 
-  /* part between ')' and '\n' is the status */
+  // part between ')' and '\n' is the status
   p = sep + 1;
   sep = strchr(p, '\n');
   if (!sep) {
@@ -571,8 +580,9 @@ glusterBlockParseCfgStringToDef(char* cfgstring,
 
   return ret;
 }
+*/
 
-
+/*
 static char *
 getCfgstring(char* name, char *blkServer)
 {
@@ -598,21 +608,28 @@ getCfgstring(char* name, char *blkServer)
 
   return buf;
 }
-
+*/
 
 /* TODO: need to implement sessions [ list | detail ] [sid] */
 static int
-glusterBlockList(blockServerDefPtr blkServers)
+glusterBlockList(char *blkServers)
 {
-  size_t i;
+  /*size_t i;
   int ret;
   char *cmd;
   char *pos;
   char *size;
   char *cfgstring = NULL;
-  glusterBlockDefPtr blk = NULL;
+  glusterBlockDefPtr blk = NULL;*/
+
+  static blockListCli cobj;
   blockResponse *reply = NULL;
 
+  GB_STRDUP(cobj.block_hosts, blkServers);
+
+  gluster_block_cli_1(&cobj, LIST_CLI, &reply);
+
+  /*
   MSG("%s", "BlockName      Volname      Host      Size      Status");
 
   asprintf(&cmd, "%s %s", TARGETCLI_GLFS, LUNS_LIST);
@@ -671,6 +688,8 @@ glusterBlockList(blockServerDefPtr blkServers)
   GB_FREE(cmd);
 
   return -1;
+  */
+  return 0;
 }
 
 
@@ -760,18 +779,21 @@ glusterBlockDelete(char* name, char *blkServers)
 
 
 static int
-glusterBlockInfo(char* name, blockServerDefPtr blkServers)
+glusterBlockInfo(char* name, char *blkServers)
 {
-  size_t i;
-  int ret = 0;
-  char *cmd;
-  blockResponse *reply = NULL;
+  static blockInfoCli cobj;
+  blockResponse *reply;
 
-  asprintf(&cmd, "%s/%s %s", TARGETCLI_GLFS, name, INFO);
+  strcpy(cobj.block_name, name);
+  GB_STRDUP(cobj.block_hosts, blkServers);
+
+  gluster_block_cli_1(&cobj, INFO_CLI, &reply);
+
+  /*asprintf(&cmd, "%s/%s %s", TARGETCLI_GLFS, name, INFO);
 
   for (i = 0; i < blkServers->nhosts; i++) {
     MSG("[OnHost: %s]", blkServers->hosts[i]);
-    //gluster_block_1(blkServers->hosts[i], cmd, &reply);
+  gluster_block_1(blkServers->hosts[i], cmd, &reply);
     if (!reply || reply->exit) {
       ret = -1;
       ERROR("%s on host: %s",
@@ -784,8 +806,8 @@ glusterBlockInfo(char* name, blockServerDefPtr blkServers)
 
  fail:
   GB_FREE(cmd);
-
-  return ret;
+*/
+  return 0;
 }
 
 
@@ -873,12 +895,12 @@ glusterBlockParseArgs(int count, char **options)
 
   switch (optFlag) {
   case 'l':
-    ret = glusterBlockList(list);
+    ret = glusterBlockList(liststr);
     if (ret)
         ERROR("%s", FAILED_LIST);
     break;
   case 'i':
-    ret = glusterBlockInfo(block, list);
+    ret = glusterBlockInfo(block, liststr);
     if (ret)
         ERROR("%s", FAILED_INFO);
     break;
