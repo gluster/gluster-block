@@ -819,7 +819,7 @@ glusterBlockParseArgs(int count, char **options)
   int optFlag = 0;
   char *block = NULL;
   char *blkServers = NULL;
-  blockServerDefPtr list = NULL;
+  //blockServerDefPtr list = NULL;
   char *liststr;
 
   while (1) {
@@ -886,10 +886,10 @@ glusterBlockParseArgs(int count, char **options)
 
  opt:
   if (blkServers) {
-    list = blockServerParse(blkServers);
+    //list = blockServerParse(blkServers);
     liststr = blkServers;
   } else {
-    list = blockServerParse("localhost");
+    //list = blockServerParse("localhost");
     liststr = "localhost";
   }
 
@@ -920,7 +920,7 @@ glusterBlockParseArgs(int count, char **options)
     MSG("Hint: %s --help", options[0]);
   }
 
-  blockServerDefFree(list);
+  //blockServerDefFree(list);
   return ret;
 }
 

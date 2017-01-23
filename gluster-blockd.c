@@ -39,6 +39,12 @@ typedef enum opterations {
   EXEC_SRV   = 5
 } opterations;
 
+typedef struct blockServerDef {
+  size_t nhosts;
+  char   **hosts;
+} blockServerDef;
+typedef blockServerDef *blockServerDefPtr;
+
 static void
 gluster_block_1(char *host, void *cobj, opterations opt, blockResponse  **reply)
 {
@@ -99,6 +105,58 @@ gluster_block_1(char *host, void *cobj, opterations opt, blockResponse  **reply)
   clnt_destroy (clnt);
 }
 
+void
+blockServerDefFree(blockServerDefPtr blkServers)
+{
+  size_t i;
+
+  if (!blkServers)
+    return;
+
+  for (i = 0; i < blkServers->nhosts; i++)
+     GB_FREE(blkServers->hosts[i]);
+   GB_FREE(blkServers->hosts);
+   GB_FREE(blkServers);
+}
+
+static blockServerDefPtr
+blockServerParse(char *blkServers)
+{
+  blockServerDefPtr list;
+  char *tmp = blkServers;
+  size_t i = 0;
+
+  if (!blkServers)
+    blkServers = "localhost";
+
+  if (GB_ALLOC(list) < 0)
+    return NULL;
+
+  /* count number of servers */
+  while (*tmp) {
+    if (*tmp == ',')
+      list->nhosts++;
+    tmp++;
+  }
+  list->nhosts++;
+  tmp = blkServers; /* reset addr */
+
+
+  if (GB_ALLOC_N(list->hosts, list->nhosts) < 0)
+    goto fail;
+
+  for (i = 0; tmp != NULL; i++) {
+    if (GB_STRDUP(list->hosts[i], strsep(&tmp, MSERVER_DELIMITER)) < 0)
+      goto fail;
+  }
+
+  return list;
+
+fail:
+  blockServerDefFree(list);
+  return NULL;
+}
+
 static char *
 getCfgstring(char* name, char *blkServer)
 {
@@ -129,9 +187,12 @@ blockResponse *
 block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 {
   int ret;
+  size_t i = 0;
+  char savereply[8096] = {0,};
   uuid_t out;
   static blockCreate *cobj;
-  static blockResponse *reply;
+  static blockResponse *reply = NULL;
+  blockServerDefPtr list = NULL;
   char *gbid = CALLOC(UUID_BUF_SIZE);
 
   uuid_generate(out);
@@ -153,10 +214,20 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   cobj->size = blk->size;
   strcpy(cobj->gbid, gbid);
 
-  //for
+  list = blockServerParse(blk->block_hosts);
 
-  gluster_block_1(blk->block_hosts, cobj, CREATE_SRV, &reply);
+  for (i = 0; i < list->nhosts; i++) {
+    gluster_block_1(list->hosts[i], cobj, CREATE_SRV, &reply);
+    if (!reply || reply->exit) {
+      ERROR("%s on host: %s",
+            FAILED_GATHERING_INFO, list->hosts[i]);
+      goto out;
+    }
+    /* TODO: aggrigate the result */
+    strcat(savereply, reply->out);
+  }
 
+  strcpy(reply->out, savereply);
 out:
   return reply;
 }
@@ -363,10 +434,13 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
 blockResponse *
 block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 {
+  size_t i = 0;
+  char savereply[8096] = {0,};
+  blockServerDefPtr list = NULL;
   char *cfgstring;
   static blockCreate *blkcfg;
   static blockDelete *cobj;
-  static blockResponse *reply;
+  static blockResponse *reply = NULL;
 
   if(GB_ALLOC(cobj) < 0)
     goto out;
@@ -389,7 +463,21 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
   }
 
   strcpy(cobj->gbid, blkcfg->gbid);
-  gluster_block_1(blk->block_hosts, cobj, DELETE_SRV, &reply);
+
+
+  list = blockServerParse(blk->block_hosts);
+
+  for (i = 0; i < list->nhosts; i++) {
+    gluster_block_1(list->hosts[i], cobj, DELETE_SRV, &reply);
+    if (!reply || reply->exit) {
+      ERROR("%s on host: %s",
+            FAILED_GATHERING_INFO, list->hosts[i]);
+      goto out;
+    }
+    /* TODO: aggrigate the result */
+    strcat(savereply, reply->out);
+  }
+  strcpy(reply->out, savereply);
 
   if (glusterBlockDeleteEntry(blkcfg)) {
     ERROR("%s volume: %s host: %s",
@@ -470,16 +558,28 @@ blockResponse *
 block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 {
   char *cmd;
-  blockResponse *reply;
+  blockResponse *reply = NULL;
+  size_t i = 0;
+  char savereply[8096] = {0,};
+  blockServerDefPtr list = NULL;
 
   asprintf(&cmd, "%s %s", TARGETCLI_GLFS, LUNS_LIST);
 
-  gluster_block_1(blk->block_hosts, cmd, EXEC_SRV, &reply);
-  if (!reply || reply->exit) {
-    ERROR("%s on host: %s",
-        FAILED_GATHERING_CFGSTR, blk->block_hosts);
+  list = blockServerParse(blk->block_hosts);
+
+  for (i = 0; i < list->nhosts; i++) {
+    gluster_block_1(list->hosts[i], cmd, EXEC_SRV, &reply);
+    if (!reply || reply->exit) {
+      ERROR("%s on host: %s",
+            FAILED_GATHERING_INFO, list->hosts[i]);
+      goto out;
+    }
+    /* TODO: aggrigate the result */
+    strcat(savereply, reply->out);
   }
 
+  strcpy(reply->out, savereply);
+out:
   return reply;
 }
 
@@ -487,16 +587,28 @@ blockResponse *
 block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
 {
   char *cmd;
-  blockResponse *reply;
+  blockResponse *reply = NULL;
+  size_t i = 0;
+  char savereply[8096] = {0,};
+  blockServerDefPtr list = NULL;
 
   asprintf(&cmd, "%s/%s %s", TARGETCLI_GLFS, blk->block_name, INFO);
 
   //for
-  gluster_block_1(blk->block_hosts, cmd, EXEC_SRV, &reply);
-  if (!reply || reply->exit) {
-    ERROR("%s on host: %s",
-        FAILED_GATHERING_CFGSTR, blk->block_hosts);
+  list = blockServerParse(blk->block_hosts);
+
+  for (i = 0; i < list->nhosts; i++) {
+    gluster_block_1(list->hosts[i], cmd, EXEC_SRV, &reply);
+    if (!reply || reply->exit) {
+      ERROR("%s on host: %s",
+            FAILED_GATHERING_INFO, list->hosts[i]);
+      goto out;
+    }
+    /* TODO: aggrigate the result */
+    strcat(savereply, reply->out);
   }
 
+  strcpy(reply->out, savereply);
+out:
   return reply;
 }
