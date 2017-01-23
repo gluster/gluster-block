@@ -13,10 +13,10 @@
 CC = gcc
 
 CLIENT = gluster-block
-CDEP = glfs-operations.o utils.o rpc/block_clnt.c rpc/block_xdr.c gluster-block.o
+CDEP = glfs-operations.o utils.o common.o rpc/block_clnt.c rpc/block_xdr.c gluster-block.o
 
 SERVER = gluster-blockd
-SDEP = rpc/block_svc.o rpc/block_clnt.c rpc/block_xdr.o gluster-blockd.o utils.o glfs-operations.o
+SDEP = rpc/block_svc.o rpc/block_clnt.c rpc/block_xdr.o gluster-blockd.o utils.o common.o glfs-operations.o
 
 CFLAGS = -g -ggdb -Wall -lpthread
 LIBS := $(shell pkg-config --libs uuid glusterfs-api)

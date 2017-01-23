@@ -1,35 +1,49 @@
-#define _GNU_SOURCE         /* See feature_test_macros(7) */
-#include   <stdio.h>
-#include   <netdb.h>
-#include   <sys/socket.h>
+/*
+  Copyright (c) 2016 Red Hat, Inc. <http://www.redhat.com>
+  This file is part of gluster-block.
+
+  This file is licensed to you under your choice of the GNU Lesser
+  General Public License, version 3 or any later version (LGPLv3 or
+  later), or the GNU General Public License, version 2 (GPLv2), in all
+  cases as published by the Free Software Foundation.
+*/
+
+# define _GNU_SOURCE         /* See feature_test_macros(7) */
+
+# include  <stdio.h>
+# include  <netdb.h>
+# include  <sys/socket.h>
 # include  <uuid/uuid.h>
 
-#include "rpc/block.h"
-#include "utils.h"
-#include "glfs-operations.h"
-# define UUID_BUF_SIZE 256
+# include  "rpc/block.h"
+# include  "common.h"
+# include  "glfs-operations.h"
 
-# define  CFG_STRING_SIZE  256
 
-# define  LIST             "list"
-# define  CREATE           "create"
-# define  DELETE           "delete"
-# define  INFO             "info"
-# define  MODIFY           "modify"
-# define  BLOCKHOST        "block-host"
-# define  HELP             "help"
+# define   UUID_BUF_SIZE    256
 
-# define  GLFS_PATH        "/backstores/user:glfs"
-# define  TARGETCLI_GLFS   "targetcli "GLFS_PATH
-# define  TARGETCLI_ISCSI  "targetcli /iscsi"
-# define  TARGETCLI_SAVE   "targetcli / saveconfig"
-# define  ATTRIBUTES       "generate_node_acls=1 demo_mode_write_protect=0"
-# define  BACKEND_CFGSTR   "ls | grep ' %s ' | cut -d'[' -f2 | cut -d']' -f1"
-# define  LUNS_LIST        "ls | grep -v user:glfs | cut -d'-' -f2 | cut -d' ' -f2"
+# define   CREATE            "create"
+# define   LIST              "list"
+# define   INFO              "info"
+# define   DELETE            "delete"
 
-# define  IQN_PREFIX       "iqn.2016-12.org.gluster-block:"
+# define   GLFS_PATH         "/backstores/user:glfs"
+# define   TARGETCLI_GLFS    "targetcli "GLFS_PATH
+# define   TARGETCLI_ISCSI   "targetcli /iscsi"
+# define   TARGETCLI_SAVE    "targetcli / saveconfig"
+# define   ATTRIBUTES        "generate_node_acls=1 demo_mode_write_protect=0"
+# define   BACKEND_CFGSTR    "ls | grep ' %s ' | cut -d'[' -f2 | cut -d']' -f1"
+# define   LUNS_LIST         "ls | grep -v user:glfs | cut -d'-' -f2 | cut -d' ' -f2"
+# define   IQN_PREFIX        "iqn.2016-12.org.gluster-block:"
 
-# define MSERVER_DELIMITER ","
+# define   MSERVER_DELIMITER ","
+
+
+typedef struct blockServerDef {
+  size_t nhosts;
+  char   **hosts;
+} blockServerDef;
+typedef blockServerDef *blockServerDefPtr;
 
 typedef enum opterations {
   CREATE_SRV = 1,
@@ -39,11 +53,6 @@ typedef enum opterations {
   EXEC_SRV   = 5
 } opterations;
 
-typedef struct blockServerDef {
-  size_t nhosts;
-  char   **hosts;
-} blockServerDef;
-typedef blockServerDef *blockServerDefPtr;
 
 static void
 gluster_block_1(char *host, void *cobj, opterations opt, blockResponse  **reply)
@@ -57,6 +66,7 @@ gluster_block_1(char *host, void *cobj, opterations opt, blockResponse  **reply)
     perror("gluster-blockd: socket");
     exit(1);
   }
+
   server = gethostbyname(host);
   if (server == NULL) {
     fprintf(stderr,"ERROR, no such host\n");
@@ -80,30 +90,36 @@ gluster_block_1(char *host, void *cobj, opterations opt, blockResponse  **reply)
   }
 
   switch(opt) {
-    case CREATE_SRV:
-      *reply = block_create_1((blockCreate *)cobj, clnt);
-      if (*reply == NULL) {
-        clnt_perror (clnt, "call failed gluster-block");
-      }
-      break;
-    case DELETE_SRV:
-      *reply = block_delete_1((blockDelete *)cobj, clnt);
-      if (*reply == NULL) {
-        clnt_perror (clnt, "call failed gluster-block");
-      }
-      break;
-    case INFO_SRV:
-    case LIST_SRV:
-      break;
-    case EXEC_SRV:
-      *reply = block_exec_1((char **)&cobj, clnt);
-      if (*reply == NULL) {
-        clnt_perror (clnt, "call failed gluster-block");
-      }
-      break;
+  case CREATE_SRV:
+    *reply = block_create_1((blockCreate *)cobj, clnt);
+    if (*reply == NULL) {
+      clnt_perror (clnt, "call failed gluster-block");
+    }
+    break;
+  case DELETE_SRV:
+    *reply = block_delete_1((blockDelete *)cobj, clnt);
+    if (*reply == NULL) {
+      clnt_perror (clnt, "call failed gluster-block");
+    }
+    break;
+  case INFO_SRV:
+  case LIST_SRV:
+    break;
+  case EXEC_SRV:
+    *reply = block_exec_1((char **)&cobj, clnt);
+    if (*reply == NULL) {
+      clnt_perror (clnt, "call failed gluster-block");
+    }
+    break;
   }
+
+/*
+  if (!clnt_freeres(clnt, (xdrproc_t) xdr_blockResponse, (char *) reply))
+    clnt_perror (clnt, "clnt_freeres failed");
+*/
   clnt_destroy (clnt);
 }
+
 
 void
 blockServerDefFree(blockServerDefPtr blkServers)
@@ -119,6 +135,7 @@ blockServerDefFree(blockServerDefPtr blkServers)
    GB_FREE(blkServers);
 }
 
+
 static blockServerDefPtr
 blockServerParse(char *blkServers)
 {
@@ -126,11 +143,11 @@ blockServerParse(char *blkServers)
   char *tmp = blkServers;
   size_t i = 0;
 
-  if (!blkServers)
-    blkServers = "localhost";
-
   if (GB_ALLOC(list) < 0)
     return NULL;
+
+  if (!blkServers)
+    blkServers = "localhost";
 
   /* count number of servers */
   while (*tmp) {
@@ -157,6 +174,7 @@ fail:
   return NULL;
 }
 
+
 static char *
 getCfgstring(char* name, char *blkServer)
 {
@@ -177,11 +195,14 @@ getCfgstring(char* name, char *blkServer)
   GB_FREE(cmd);
   GB_FREE(exec);
 
-  if(reply->out)
-    buf = strdup(reply->out);
+  if(reply->out) {
+    if (GB_STRDUP(buf, reply->out) < 0)
+      return NULL;
+  }
 
   return buf;
 }
+
 
 blockResponse *
 block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
@@ -228,66 +249,14 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   }
 
   strcpy(reply->out, savereply);
+
 out:
+  blockServerDefFree(list);
+  GB_FREE(cobj);
+
   return reply;
 }
 
-static size_t
-glusterBlockCreateParseSize(char *value)
-{
-  char *postfix;
-  char *tmp;
-  size_t sizef;
-
-  if (!value)
-    return -1;
-
-  sizef = strtod(value, &postfix);
-  if (sizef < 0) {
-    ERROR("%s", "size cannot be negative number\n");
-    return -1;
-  }
-
-  tmp = postfix;
-  if (*postfix == ' ')
-    tmp = tmp + 1;
-
-  switch (*tmp) {
-  case 'Y':
-    sizef *= 1024;
-    /* fall through */
-  case 'Z':
-    sizef *= 1024;
-    /* fall through */
-  case 'E':
-    sizef *= 1024;
-    /* fall through */
-  case 'P':
-    sizef *= 1024;
-    /* fall through */
-  case 'T':
-    sizef *= 1024;
-    /* fall through */
-  case 'G':
-    sizef *= 1024;
-    /* fall through */
-  case 'M':
-    sizef *= 1024;
-    /* fall through */
-  case 'K':
-  case 'k':
-    sizef *= 1024;
-    /* fall through */
-  case 'b':
-  case '\0':
-    return sizef;
-    break;
-  default:
-    ERROR("%s", "You may use k/K, M, G or T suffixes for "
-                "kilobytes, megabytes, gigabytes and terabytes.");
-    return -1;
-  }
-}
 
 static int
 glusterBlockParseCfgStringToDef(char* cfgstring,
@@ -305,11 +274,6 @@ glusterBlockParseCfgStringToDef(char* cfgstring,
   }
 
   *sep = '\0';
-  /*if (GB_STRDUP(blk->volume, p) < 0) {
-    ret = -1;
-    goto fail;
-  }
-  */
   strcpy(blk->volume, p);
 
   /* part between '@' and '/' is the server name */
@@ -321,11 +285,6 @@ glusterBlockParseCfgStringToDef(char* cfgstring,
   }
 
   *sep = '\0';
-  /*if (GB_STRDUP(blk->volfileserver, p) < 0) {
-    ret = -1;
-    goto fail;
-  }
-  */
   strcpy(blk->volfileserver, p);
 
   /* part between '/' and '(' is the filename */
@@ -337,11 +296,6 @@ glusterBlockParseCfgStringToDef(char* cfgstring,
   }
 
   *(sep - 1) = '\0';  /* discard extra space at end of filename */
-  /*if (GB_STRDUP(blk->gbid, p) < 0) {
-    ret = -1;
-    goto fail;
-  }
-  */
   strcpy(blk->gbid, p);
 
   /* part between '(' and ')' is the size */
@@ -360,27 +314,10 @@ glusterBlockParseCfgStringToDef(char* cfgstring,
     goto fail;
   }
 
-
-  /* part between ')' and '\n' is the status */
-/*
-  p = sep + 1;
-  sep = strchr(p, '\n');
-  if (!sep) {
-    ret = -1;
-    goto fail;
-  }
-
-  *sep = '\0';
-  if (!strcmp(p, " activated"))
-    blk->status = true;
-*/
-  return 0;
-
  fail:
-//  glusterBlockDefFree(blk);
-
   return ret;
 }
+
 
 blockResponse *
 block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
@@ -410,11 +347,11 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   asprintf(&exec, "%s && %s && %s && %s && %s", backstore, iqn, lun, attr, TARGETCLI_SAVE);
 
   if(GB_ALLOC(obj) < 0)
-    return NULL;
+    goto out;
 
   if (GB_ALLOC_N(obj->out, 4096) < 0) {
     GB_FREE(obj);
-    return NULL;
+    goto out;
   }
 
   fp = popen(exec, "r");
@@ -428,8 +365,17 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
     obj->exit = WEXITSTATUS(pclose(fp));
   }
 
+ out:
+  GB_FREE(exec);
+  GB_FREE(attr);
+  GB_FREE(lun);
+  GB_FREE(iqn);
+  GB_FREE(backstore);
+
   return obj;
+
 }
+
 
 blockResponse *
 block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
@@ -483,7 +429,13 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
     ERROR("%s volume: %s host: %s",
           FAILED_DELETING_FILE, blkcfg->volume, blkcfg->volfileserver);
   }
+
 out:
+  blockServerDefFree(list);
+  GB_FREE(cfgstring);
+  GB_FREE(blkcfg);
+  GB_FREE(cobj);
+
   return reply;
 }
 
@@ -492,8 +444,8 @@ blockResponse *
 block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
 {
   FILE *fp;
-  char *backstore = NULL;
   char *iqn = NULL;
+  char *backstore = NULL;
   char *exec = NULL;
   blockResponse *obj = NULL;
 
@@ -505,11 +457,11 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
   asprintf(&exec, "%s && %s", backstore, iqn);
 
   if(GB_ALLOC(obj) < 0)
-    return NULL;
+    goto out;
 
   if (GB_ALLOC_N(obj->out, 4096) < 0) {
     GB_FREE(obj);
-    return NULL;
+    goto out;
   }
 
   fp = popen(exec, "r");
@@ -523,8 +475,14 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
     obj->exit = WEXITSTATUS(pclose(fp));
   }
 
+out:
+  GB_FREE(exec);
+  GB_FREE(backstore);
+  GB_FREE(iqn);
+
   return obj;
 }
+
 
 blockResponse *
 block_exec_1_svc(char **cmd, struct svc_req *rqstp)
@@ -554,6 +512,7 @@ block_exec_1_svc(char **cmd, struct svc_req *rqstp)
   return obj;
 }
 
+
 blockResponse *
 block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 {
@@ -579,9 +538,14 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
   }
 
   strcpy(reply->out, savereply);
-out:
+
+ out:
+  blockServerDefFree(list);
+  GB_FREE(cmd);
+
   return reply;
 }
+
 
 blockResponse *
 block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
@@ -609,6 +573,9 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
   }
 
   strcpy(reply->out, savereply);
-out:
+
+ out:
+  blockServerDefFree(list);
+
   return reply;
 }
