@@ -16,6 +16,7 @@ struct blockCreateCli {
 
 struct blockDeleteCli {
   char      block_name[255];
+  char      volume[255];
   string    block_hosts<>;
 };
 

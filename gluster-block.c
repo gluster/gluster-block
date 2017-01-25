@@ -23,6 +23,7 @@
 # define  INFO             "info"
 # define  MODIFY           "modify"
 # define  BLOCKHOST        "block-host"
+# define  VOLUME           "volume"
 # define  HELP             "help"
 
 
@@ -112,7 +113,6 @@ glusterBlockHelp(void)
   MSG("%s",
       "gluster-block (Version 0.1) \n"
       " -c, --create      <name>          Create the gluster block\n"
-      "     -v, --volume       <vol>            gluster volume name\n"
       "     -h, --host         <gluster-node>   node addr from gluster pool\n"
       "     -s, --size         <size>           block storage size in KiB|MiB|GiB|TiB..\n"
       "\n"
@@ -124,7 +124,8 @@ glusterBlockHelp(void)
       "\n"
       " -d, --delete      <name>          Delete the gluster block\n"
       "\n"
-      "     [-b, --block-host <IP1,IP2,IP3...>]  block servers, clubbed with any option\n");
+      "     -v, --volume       <vol>            gluster volume name\n"
+      "    [-b, --block-host   <IP1,IP2,IP3...>]  block servers, clubbed with any option\n");
 }
 
 
@@ -230,12 +231,13 @@ glusterBlockCreate(int count, char **options, char *name)
 
 
 static int
-glusterBlockList(char *blkServers)
+glusterBlockList(char *volume, char *blkServers)
 {
   static blockListCli cobj;
   char *out = NULL;
   int ret = -1;
 
+  strcpy(cobj.volume, volume);
   if (GB_STRDUP(cobj.block_hosts, blkServers) < 0) {
     return -1;
   }
@@ -251,13 +253,14 @@ glusterBlockList(char *blkServers)
 
 
 static int
-glusterBlockDelete(char* name, char *blkServers)
+glusterBlockDelete(char* name, char* volume, char *blkServers)
 {
   static blockDeleteCli cobj;
   char *out = NULL;
   int ret = -1;
 
   strcpy(cobj.block_name, name);
+  strcpy(cobj.volume, volume);
   if (GB_STRDUP(cobj.block_hosts, blkServers) < 0) {
     return -1;
   }
@@ -273,13 +276,14 @@ glusterBlockDelete(char* name, char *blkServers)
 
 
 static int
-glusterBlockInfo(char* name, char *blkServers)
+glusterBlockInfo(char* name, char* volume, char *blkServers)
 {
   static blockInfoCli cobj;
   char *out = NULL;
   int ret = -1;
 
   strcpy(cobj.block_name, name);
+  strcpy(cobj.volume, volume);
   if (GB_STRDUP(cobj.block_hosts, blkServers) < 0) {
     return -1;
   }
@@ -302,6 +306,7 @@ glusterBlockParseArgs(int count, char **options)
   int optFlag = 0;
   char *block = NULL;
   char *blkServers = NULL;
+  char *volume = NULL;
 
   while (1) {
     static const struct option long_options[] = {
@@ -311,6 +316,7 @@ glusterBlockParseArgs(int count, char **options)
       {LIST,      no_argument,       0, 'l'},
       {INFO,      required_argument, 0, 'i'},
       {MODIFY,    required_argument, 0, 'm'},
+      {VOLUME,    required_argument, 0, 'v'},
       {BLOCKHOST, required_argument, 0, 'b'},
       {0, 0, 0, 0}
     };
@@ -332,9 +338,13 @@ glusterBlockParseArgs(int count, char **options)
         goto opt;
       break;
 
+    case 'v':
+      volume = optarg;
+      break;
+
     case 'c':
       ret = glusterBlockCreate(count, options, optarg);
-      if (ret) {
+      if (ret && ret != EEXIST) {
         ERROR("%s", FAILED_CREATE);
         goto out;
       }
@@ -368,17 +378,17 @@ glusterBlockParseArgs(int count, char **options)
  opt:
   switch (optFlag) {
   case 'l':
-    ret = glusterBlockList(blkServers);
+    ret = glusterBlockList(volume, blkServers);
     if (ret)
         ERROR("%s", FAILED_LIST);
     break;
   case 'i':
-    ret = glusterBlockInfo(block, blkServers);
+    ret = glusterBlockInfo(block, volume, blkServers);
     if (ret)
         ERROR("%s", FAILED_INFO);
     break;
   case 'd':
-    ret = glusterBlockDelete(block, blkServers);
+    ret = glusterBlockDelete(block, volume, blkServers);
     if (ret)
         ERROR("%s", FAILED_DELETE);
     break;

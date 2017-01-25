@@ -22,19 +22,56 @@
 # include  "rpc/block.h"
 
 
+typedef enum Metakey {
+  GBID = 0,
+  SIZE = 1,
+  HA   = 2,
+  ENTRYCREATE = 3,
 
-typedef struct glusterBlockDef {
-  char   *volume;
-  char   *host;     /* TODO: use proper Transport Object */
-  char   *filename;
+  METAKEY__MAX = 4      /* Updata this when add new Key */
+} Metakey;
+
+
+typedef struct NodeInfo {
+  char addr[255];
+  char status[16];
+} NodeInfo;
+
+typedef struct MetaInfo {
+  char   gbid[38];
   size_t size;
-  bool   status;
-} glusterBlockDef;
-typedef glusterBlockDef *glusterBlockDefPtr;
+  size_t mpath;
+  char   entry[16];
+
+  size_t nhosts;
+  NodeInfo **list;
+} MetaInfo;
+
+static const char *const MetakeyLookup[] = {
+    [GBID] = "GBID",
+    [SIZE] = "SIZE",
+    [HA] = "HA",
+    [ENTRYCREATE] = "ENTRYCREATE",
+    [METAKEY__MAX] = NULL,
+};
 
 
-int glusterBlockCreateEntry(blockCreateCli *blk, char *gbid);
+struct glfs *
+glusterBlockVolumeInit(char *volume, char *volfileserver);
 
-int glusterBlockDeleteEntry(blockCreate *blk);
+int
+glusterBlockCreateEntry(blockCreateCli *blk, char *gbid);
+
+int
+glusterBlockDeleteEntry(blockCreate *blk);
+
+struct glfs_fd *
+glusterBlockCreateMetaLockFile(struct glfs *glfs);
+
+void
+blockGetMetaInfo(struct glfs *glfs, char *metafile, MetaInfo *info);
+
+void
+blockFreeMetaInfo(MetaInfo *info);
 
 #endif /* _GLFS_OPERATIONS_H */

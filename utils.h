@@ -54,6 +54,30 @@
          fprintf(stdout, fmt "\n", __VA_ARGS__)
 
 
+# define  METALOCK(a, b) {\
+                            memset (&a, 0, sizeof(a)); \
+                            a.l_type = F_WRLCK;        \
+                            if (glfs_posix_lock (b, F_SETLKW, &a)) {\
+                              ERROR("%s", "glfs_posix_lock: failed");\
+                              goto out;\
+                            }\
+                         }
+
+# define  METAUPDATE(a, b, ...) {\
+                              asprintf(&b, __VA_ARGS__);\
+                              if(glfs_write (a, b, strlen(b), 0) < 0) {\
+                                ERROR("%s", "glfs_write: failed");\
+                                goto out;\
+                              }\
+                              GB_FREE(b); \
+                           }
+
+# define METAUNLOCK(a, b)   {\
+                              a.l_type = F_UNLCK; \
+                              glfs_posix_lock(b, F_SETLKW, &a); \
+                            }
+
+
 # define CALLOC(x)    calloc(1, x)
 
 # define GB_ALLOC_N(ptr, count) gbAllocN(&(ptr), sizeof(*(ptr)), (count), \

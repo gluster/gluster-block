@@ -50,6 +50,9 @@ xdr_blockDeleteCli (XDR *xdrs, blockDeleteCli *objp)
 	 if (!xdr_vector (xdrs, (char *)objp->block_name, 255,
 		sizeof (char), (xdrproc_t) xdr_char))
 		 return FALSE;
+	 if (!xdr_vector (xdrs, (char *)objp->volume, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
 	 if (!xdr_string (xdrs, &objp->block_hosts, ~0))
 		 return FALSE;
 	return TRUE;

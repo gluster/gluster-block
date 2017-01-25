@@ -35,6 +35,7 @@ typedef struct blockCreateCli blockCreateCli;
 
 struct blockDeleteCli {
 	char block_name[255];
+	char volume[255];
 	char *block_hosts;
 };
 typedef struct blockDeleteCli blockDeleteCli;

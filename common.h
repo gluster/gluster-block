@@ -14,6 +14,8 @@
 
 # include "utils.h"
 
+# define  LOG_FILE         "/var/log/gluster-block/block.log"
+# define  LOG_LEVEL        7
 
 size_t glusterBlockCreateParseSize(char *value);
 
