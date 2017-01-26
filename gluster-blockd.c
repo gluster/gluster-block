@@ -216,7 +216,8 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   int ret = -1;
   size_t i = 0;
   char *out = NULL;
-  char savereply[8096] = {0,};
+  char *savereply = NULL;
+  char *tmp = NULL;
   uuid_t uuid;
   static blockCreate *cobj;
   static blockResponse *reply = NULL;
@@ -297,12 +298,14 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 
     METAUPDATE(tgfd, write, "%s: SUCCESS\n", list->hosts[i]);
 
-    strcpy(savereply, out);
+    asprintf(&savereply, "%s%s\n", (tmp==NULL?"":tmp), out);
+    if (tmp)
+      GB_FREE(tmp);
+    tmp = savereply;
     GB_FREE(out);
   }
 
-  if (GB_STRDUP(reply->out, savereply) < 0)
-    goto out;
+  reply->out = savereply;
   reply->exit = ret;
 
 out:
@@ -447,7 +450,8 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
   size_t i = 0;
   int ret = -1;
   char *out = NULL;
-  char savereply[8096] = {0,};
+  char *savereply = NULL;
+  char *tmp = NULL;
   blockServerDefPtr list = NULL;
   char *cfgstring;
   static blockCreate *blkcfg;
@@ -520,22 +524,24 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
       goto out;
     }
     METAUPDATE(tgfd, write, "%s: CLEANUPSUCCESS\n", list->hosts[i]);
-    /* TODO: aggrigate the result */
-    strcpy(savereply, out);
+
+    asprintf(&savereply, "%s%s\n", (tmp==NULL?"":tmp), out);
+    if (tmp)
+      GB_FREE(tmp);
+    tmp = savereply;
     GB_FREE(out);
   }
-
-  if (GB_ALLOC(reply) < 0)
-    goto out;
-
-  if (GB_STRDUP(reply->out, savereply) < 0)
-    goto out;
-  reply->exit = ret;
 
   if (glusterBlockDeleteEntry(blkcfg)) {
     ERROR("%s volume: %s host: %s",
           FAILED_DELETING_FILE, blkcfg->volume, blkcfg->volfileserver);
   }
+
+  if (GB_ALLOC(reply) < 0)
+    goto out;
+
+  reply->out = savereply;
+  reply->exit = ret;
 
 out:
   if (glfs_close(tgfd) != 0)
@@ -639,16 +645,16 @@ block_exec_1_svc(char **cmd, struct svc_req *rqstp)
 blockResponse *
 block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 {
-  char *cmd;
-  char *out = NULL;
   blockResponse *reply = NULL;
-  size_t i = 0;
-  int ret = -1;
-  char savereply[8096] = {0,};
-  blockServerDefPtr list = NULL;
   struct glfs *glfs;
   struct glfs_fd *lkfd;
+  struct glfs_fd *tgfd;
   struct flock lock = {0, };
+  struct dirent *entry = NULL;
+  char *tmp = NULL;
+  char *filelist = NULL;
+  int ret = -1;
+
 
   glfs = glusterBlockVolumeInit(blk->volume, "localhost");
   if (!glfs) {
@@ -664,30 +670,32 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 
   METALOCK(lock, lkfd);
 
-  asprintf(&cmd, "%s %s", TARGETCLI_GLFS, LUNS_LIST);
+  tgfd = glfs_opendir (glfs, "/block-meta");
+  if (!tgfd) {
+    ERROR("%s", "glusterBlockVolumeInit failed");
+    goto out;
+  }
 
-  list = blockServerParse(blk->block_hosts);
-
-  for (i = 0; i < list->nhosts; i++) {
-    ret = gluster_block_1(list->hosts[i], cmd, EXEC_SRV, &out);
-    if (ret) {
-      ERROR("%s on host: %s",
-            FAILED_LIST, list->hosts[i]);
-      goto out;
+  while ((entry = glfs_readdir (tgfd))) {
+    if(strcmp(entry->d_name, ".") &&
+       strcmp(entry->d_name, "..") &&
+       strcmp(entry->d_name, "meta.lock")) {
+      asprintf(&filelist, "%s%s\n", (tmp==NULL?"":tmp),  entry->d_name);
+      if (tmp)
+        GB_FREE(tmp);
+      tmp = filelist;
     }
-    /* TODO: aggrigate the result */
-    strcpy(savereply, out);
-    GB_FREE(out);
   }
 
   if (GB_ALLOC(reply) < 0)
     goto out;
 
-  if (GB_STRDUP(reply->out, savereply) < 0)
-    goto out;
-  reply->exit = ret;
+  reply->out = filelist;
+  ret = 0;
 
- out:
+out:
+
+  glfs_closedir (tgfd);
 
   METAUNLOCK(lock, lkfd);
 
@@ -696,8 +704,7 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 
   glfs_fini(glfs);
 
-  blockServerDefFree(list);
-  GB_FREE(cmd);
+  reply->exit = ret;
 
   return reply;
 }
@@ -707,10 +714,11 @@ blockResponse *
 block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
 {
   blockResponse *reply = NULL;
-  static struct glfs *glfs;
-  static struct glfs_fd *lkfd;
-  static struct flock lock = {0, };
+  struct glfs *glfs;
+  struct glfs_fd *lkfd;
+  struct flock lock = {0, };
   MetaInfo *info = NULL;
+  int ret = -1;
 
   glfs = glusterBlockVolumeInit(blk->volume, "localhost");
   if (!glfs) {
@@ -737,7 +745,7 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
   asprintf(&reply->out, "NAME: %s\nVOLUME: %s\nGBID: %s\nSIZE: %zu\nMULTIPATH: %zu",
            blk->block_name, blk->volume, info->gbid, info->size, info->mpath);
 
-  reply->exit = 0;
+  ret = 0;
 
  out:
   METAUNLOCK(lock, lkfd);
@@ -748,6 +756,8 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
   glfs_fini(glfs);
 
   blockFreeMetaInfo(info);
+
+  reply->exit = ret;
 
   return reply;
 }
