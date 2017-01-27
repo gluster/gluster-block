@@ -63,7 +63,7 @@ int
 glusterBlockCreateEntry(blockCreateCli *blk, char *gbid);
 
 int
-glusterBlockDeleteEntry(blockCreate *blk);
+glusterBlockDeleteEntry(char *volume, char *gbid);
 
 struct glfs_fd *
 glusterBlockCreateMetaLockFile(struct glfs *glfs);

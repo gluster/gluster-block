@@ -48,10 +48,7 @@ typedef blockServerDef *blockServerDefPtr;
 
 typedef enum opterations {
   CREATE_SRV = 1,
-  LIST_SRV   = 2,
-  INFO_SRV   = 3,
-  DELETE_SRV = 4,
-  EXEC_SRV   = 5
+  DELETE_SRV = 2,
 } opterations;
 
 
@@ -101,15 +98,6 @@ gluster_block_1(char *host, void *cobj, opterations opt, char **out)
     break;
   case DELETE_SRV:
     reply = block_delete_1((blockDelete *)cobj, clnt);
-    if (reply == NULL) {
-      clnt_perror (clnt, "call failed gluster-block");
-    }
-    break;
-  case INFO_SRV:
-  case LIST_SRV:
-    break;
-  case EXEC_SRV:
-    reply = block_exec_1((char **)&cobj, clnt);
     if (reply == NULL) {
       clnt_perror (clnt, "call failed gluster-block");
     }
@@ -183,30 +171,6 @@ blockServerParse(char *blkServers)
 fail:
   blockServerDefFree(list);
   return NULL;
-}
-
-
-static char *
-getCfgstring(char* name, char *blkServer)
-{
-  char *cmd;
-  char *exec;
-  char *out = NULL;
-  int ret = -1;
-
-  asprintf(&cmd, "%s %s", TARGETCLI_GLFS, BACKEND_CFGSTR);
-  asprintf(&exec, cmd, name);
-
-  ret = gluster_block_1(blkServer, exec, EXEC_SRV, &out);
-  if (ret) {
-    ERROR("%s on host: %s",
-          FAILED_GATHERING_CFGSTR, blkServer);
-  }
-
-  GB_FREE(cmd);
-  GB_FREE(exec);
-
-  return out;
 }
 
 
@@ -325,67 +289,6 @@ out:
 }
 
 
-static int
-glusterBlockParseCfgStringToDef(char* cfgstring,
-                                blockCreate *blk)
-{
-  int ret = 0;
-  char *p, *sep;
-
-  /* part before '@' is the volume name */
-  p = cfgstring;
-  sep = strchr(p, '@');
-  if (!sep) {
-    ret = -1;
-    goto fail;
-  }
-
-  *sep = '\0';
-  strcpy(blk->volume, p);
-
-  /* part between '@' and '/' is the server name */
-  p = sep + 1;
-  sep = strchr(p, '/');
-  if (!sep) {
-    ret = -1;
-    goto fail;
-  }
-
-  *sep = '\0';
-  strcpy(blk->volfileserver, p);
-
-  /* part between '/' and '(' is the filename */
-  p = sep + 1;
-  sep = strchr(p, '(');
-  if (!sep) {
-    ret = -1;
-    goto fail;
-  }
-
-  *(sep - 1) = '\0';  /* discard extra space at end of filename */
-  strcpy(blk->gbid, p);
-
-  /* part between '(' and ')' is the size */
-  p = sep + 1;
-  sep = strchr(p, ')');
-  if (!sep) {
-    ret = -1;
-    goto fail;
-  }
-
-  *sep = '\0';
-  blk->size = glusterBlockCreateParseSize(p);
-  if (blk->size < 0) {
-    ERROR("%s", "failed while parsing size");
-    ret = -1;
-    goto fail;
-  }
-
- fail:
-  return ret;
-}
-
-
 blockResponse *
 block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
 {
@@ -453,8 +356,6 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
   char *savereply = NULL;
   char *tmp = NULL;
   blockServerDefPtr list = NULL;
-  char *cfgstring;
-  static blockCreate *blkcfg;
   static blockDelete *cobj;
   static blockResponse *reply = NULL;
   struct glfs *glfs = NULL;
@@ -462,6 +363,7 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
   struct glfs_fd *tgfd;
   struct flock lock = {0, };
   char *write;
+  MetaInfo *info = NULL;
 
   glfs = glusterBlockVolumeInit(blk->volume, "localhost");
   if (!glfs) {
@@ -490,28 +392,17 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
   }
   glfs_lseek (tgfd, 0, SEEK_END);
 
-  //for
-  cfgstring = getCfgstring(blk->block_name, blk->block_hosts);
-  if (!cfgstring) {
-    ERROR("%s", "failed while gathering CfgString");
-    goto out;
-  }
-
-  if (GB_ALLOC(blkcfg) < 0)
+  if (GB_ALLOC(info) < 0)
     goto out;
 
-  if(glusterBlockParseCfgStringToDef(cfgstring, blkcfg)) {
-    ERROR("%s", "failed while parsing CfgString to glusterBlockDef");
-    goto out;
-  }
+  blockGetMetaInfo(glfs, blk->block_name, info);
 
   if(GB_ALLOC(cobj) < 0)
     goto out;
 
   strcpy(cobj->block_name, blk->block_name);
 
-
-  strcpy(cobj->gbid, blkcfg->gbid);
+  strcpy(cobj->gbid, info->gbid);
 
   list = blockServerParse(blk->block_hosts);
   for (i = 0; i < list->nhosts; i++) {
@@ -532,9 +423,9 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
     GB_FREE(out);
   }
 
-  if (glusterBlockDeleteEntry(blkcfg)) {
+  if (glusterBlockDeleteEntry(blk->volume, info->gbid)) {
     ERROR("%s volume: %s host: %s",
-          FAILED_DELETING_FILE, blkcfg->volume, blkcfg->volfileserver);
+          FAILED_DELETING_FILE, blk->volume, "localhost");
   }
 
   if (GB_ALLOC(reply) < 0)
@@ -561,8 +452,6 @@ out:
   glfs_fini(glfs);
 
   blockServerDefFree(list);
-  GB_FREE(cfgstring);
-  GB_FREE(blkcfg);
   GB_FREE(cobj);
 
   return reply;
@@ -608,35 +497,6 @@ out:
   GB_FREE(exec);
   GB_FREE(backstore);
   GB_FREE(iqn);
-
-  return obj;
-}
-
-
-blockResponse *
-block_exec_1_svc(char **cmd, struct svc_req *rqstp)
-{
-  FILE *fp;
-  static blockResponse *obj;
-
-  if(GB_ALLOC(obj) < 0)
-    return NULL;
-
-  if (GB_ALLOC_N(obj->out, 4096) < 0) {
-    GB_FREE(obj);
-    return NULL;
-  }
-
-  fp = popen(*cmd, "r");
-  if (fp != NULL) {
-    size_t newLen = fread(obj->out, sizeof(char), 4996, fp);
-    if (ferror( fp ) != 0) {
-      ERROR("%s", "Error reading command output\n");
-    } else {
-      obj->out[newLen++] = '\0';
-    }
-    obj->exit = WEXITSTATUS(pclose(fp));
-  }
 
   return obj;
 }

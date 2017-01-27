@@ -57,6 +57,5 @@ program GLUSTER_BLOCK {
   version GLUSTER_BLOCK_VERS {
     blockResponse BLOCK_CREATE(blockCreate) = 1;
     blockResponse BLOCK_DELETE(blockDelete) = 2;
-    blockResponse BLOCK_EXEC(string) = 3;
   } = 1;
 } = 21215311; /* B2 L12 O15 C3 K11 */

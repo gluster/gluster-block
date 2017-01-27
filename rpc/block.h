@@ -115,9 +115,6 @@ extern  blockResponse * block_create_1_svc(blockCreate *, struct svc_req *);
 #define BLOCK_DELETE 2
 extern  blockResponse * block_delete_1(blockDelete *, CLIENT *);
 extern  blockResponse * block_delete_1_svc(blockDelete *, struct svc_req *);
-#define BLOCK_EXEC 3
-extern  blockResponse * block_exec_1(char **, CLIENT *);
-extern  blockResponse * block_exec_1_svc(char **, struct svc_req *);
 extern int gluster_block_1_freeresult (SVCXPRT *, xdrproc_t, caddr_t);
 
 #else /* K&R C */
@@ -127,9 +124,6 @@ extern  blockResponse * block_create_1_svc();
 #define BLOCK_DELETE 2
 extern  blockResponse * block_delete_1();
 extern  blockResponse * block_delete_1_svc();
-#define BLOCK_EXEC 3
-extern  blockResponse * block_exec_1();
-extern  blockResponse * block_exec_1_svc();
 extern int gluster_block_1_freeresult ();
 #endif /* K&R C */
 

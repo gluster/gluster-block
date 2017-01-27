@@ -91,18 +91,18 @@ glusterBlockCreateEntry(blockCreateCli *blk, char *gbid)
 
 
 int
-glusterBlockDeleteEntry(blockCreate *blk)
+glusterBlockDeleteEntry(char *volume, char *gbid)
 {
   struct glfs *glfs;
   int ret = -1;
 
-  glfs = glusterBlockVolumeInit(blk->volume, blk->volfileserver);
+  glfs = glusterBlockVolumeInit(volume, "localhost");
   if (!glfs) {
     ERROR("%s", "glusterBlockVolumeInit: failed");
     goto out;
   }
 
-  ret = glfs_unlink(glfs, blk->gbid);
+  ret = glfs_unlink(glfs, gbid);
   if (ret) {
     ERROR("%s", "glfs_unlink: failed");
     goto out;

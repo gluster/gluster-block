@@ -91,7 +91,6 @@ gluster_block_1(struct svc_req *rqstp, register SVCXPRT *transp)
 	union {
 		blockCreate block_create_1_arg;
 		blockDelete block_delete_1_arg;
-		char *block_exec_1_arg;
 	} argument;
 	char *result;
 	xdrproc_t _xdr_argument, _xdr_result;
@@ -112,12 +111,6 @@ gluster_block_1(struct svc_req *rqstp, register SVCXPRT *transp)
 		_xdr_argument = (xdrproc_t) xdr_blockDelete;
 		_xdr_result = (xdrproc_t) xdr_blockResponse;
 		local = (char *(*)(char *, struct svc_req *)) block_delete_1_svc;
-		break;
-
-	case BLOCK_EXEC:
-		_xdr_argument = (xdrproc_t) xdr_wrapstring;
-		_xdr_result = (xdrproc_t) xdr_blockResponse;
-		local = (char *(*)(char *, struct svc_req *)) block_exec_1_svc;
 		break;
 
 	default:
