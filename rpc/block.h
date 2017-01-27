@@ -28,6 +28,7 @@ struct blockCreateCli {
 	char volume[255];
 	char volfileserver[255];
 	u_quad_t size;
+	u_int mpath;
 	char block_name[255];
 	char *block_hosts;
 };

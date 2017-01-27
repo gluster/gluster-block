@@ -115,6 +115,7 @@ glusterBlockHelp(void)
       " -c, --create      <name>          Create the gluster block\n"
       "     -h, --host         <gluster-node>   node addr from gluster pool\n"
       "     -s, --size         <size>           block storage size in KiB|MiB|GiB|TiB..\n"
+      "     -m, --multipath    <count>          multi path requirement for high availablity\n"
       "\n"
       " -l, --list                        List available gluster blocks\n"
       "\n"
@@ -151,6 +152,7 @@ glusterBlockCreate(int count, char **options, char *name)
       {"volume",     required_argument, 0, 'v'},
       {"host",       required_argument, 0, 'h'},
       {"size",       required_argument, 0, 's'},
+      {"multipath",  required_argument, 0, 'm'},
       {"block-host", required_argument, 0, 'b'},
       {0, 0, 0, 0}
     };
@@ -165,9 +167,15 @@ glusterBlockCreate(int count, char **options, char *name)
       break;
 
     switch (c) {
+    case 'm':
+      sscanf(optarg, "%u", &cobj.mpath);
+      ret++;
+      break;
+
     case 'b':
       if (GB_STRDUP(cobj.block_hosts, optarg) < 0)
         return -1;
+      ret++;
       break;
 
     case 'v':
@@ -211,7 +219,7 @@ glusterBlockCreate(int count, char **options, char *name)
     goto out;
   }
 
-  if (ret != 3) {
+  if (ret != 5) {
     ERROR("%s", "Insufficient arguments supplied for"
                 "'gluster-block create'\n");
     ret = -1;

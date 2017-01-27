@@ -36,6 +36,8 @@ xdr_blockCreateCli (XDR *xdrs, blockCreateCli *objp)
 		 return FALSE;
 	 if (!xdr_u_quad_t (xdrs, &objp->size))
 		 return FALSE;
+	 if (!xdr_u_int (xdrs, &objp->mpath))
+		 return FALSE;
 	 if (!xdr_vector (xdrs, (char *)objp->block_name, 255,
 		sizeof (char), (xdrproc_t) xdr_char))
 		 return FALSE;

@@ -145,24 +145,6 @@ glusterBlockCreateMetaLockFile(struct glfs *glfs)
 }
 
 
-static int
-blockEnumParse(const char *opt)
-{
-    int i;
-
-    if (!opt) {
-        return METAKEY__MAX;
-    }
-
-    for (i = 0; i < METAKEY__MAX; i++) {
-        if (!strcmp(opt, MetakeyLookup[i])) {
-            return i;
-        }
-    }
-
-    return i;
-}
-
 void
 blockFreeMetaInfo(MetaInfo *info)
 {
@@ -175,6 +157,7 @@ blockFreeMetaInfo(MetaInfo *info)
   GB_FREE(info);
 }
 
+
 static void
 blockStuffMetaInfo(MetaInfo *info, char *line)
 {
@@ -183,7 +166,7 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
   int Flag = 0;
   size_t i;
 
-  switch (blockEnumParse(opt)) {
+  switch (blockMetaKeyEnumParse(opt)) {
   case GBID:
     strcpy(info->gbid, strchr(line, ' ')+1);
     break;
@@ -228,7 +211,7 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
   GB_FREE(tmp);
 }
 
-void
+int
 blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info)
 {
   size_t count = 0;
@@ -239,6 +222,7 @@ blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info)
   tgfd = glfs_open(glfs, metafile, O_RDWR);
   if (!tgfd) {
     ERROR("%s", "glfs_open failed");
+    return -1;
   }
 
   while (glfs_read (tgfd, line, 48, 0) > 0) {
@@ -249,4 +233,6 @@ blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info)
   }
 
   glfs_close(tgfd);
+
+  return 0;
 }

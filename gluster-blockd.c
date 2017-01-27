@@ -173,15 +173,108 @@ fail:
   return NULL;
 }
 
+static int
+block_create_remote(struct glfs_fd *tgfd, blockCreate *cobj, char *addr, char **reply)
+{
+  char *write = NULL;
+  char *out = NULL;
+  char *tmp = NULL;
+  int ret;
+
+    METAUPDATE(tgfd, write, "%s: CONFIGINPROGRESS\n", addr);
+
+    ret = gluster_block_1(addr, cobj, CREATE_SRV, &out);
+    if (ret) {
+      METAUPDATE(tgfd, write, "%s: CONFIGFAIL\n", addr);
+      ERROR("%s on host: %s", FAILED_CREATE, addr);
+
+      *reply = out;
+      goto out;
+    }
+
+    METAUPDATE(tgfd, write, "%s: CONFIGSUCCESS\n", addr);
+
+    asprintf(reply, "%s%s\n", (tmp==NULL?"":tmp), out);
+    if (tmp)
+      GB_FREE(tmp);
+    tmp = *reply;
+    GB_FREE(out);
+
+ out:
+  return ret;
+}
+
+static int
+block_cross_check_request(struct glfs *glfs,
+                          struct glfs_fd *tgfd,
+                          blockCreateCli *blk,
+                          blockCreate *cobj,
+                          blockServerDefPtr list,
+                          char **reply)
+{
+  MetaInfo *info;
+  size_t success_count = 0;
+  size_t fail_count = 0;
+  size_t spent;
+  size_t spare;
+  size_t morereq;
+  size_t i;
+  int  ret;
+
+  if (GB_ALLOC(info) < 0)
+    goto out;
+
+  ret = blockGetMetaInfo(glfs, blk->block_name, info);
+  if(ret)
+    goto out;
+
+  for (i = 0; i < info->nhosts; i++) {
+    switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+    case CONFIGSUCCESS:
+      success_count++;
+      break;
+    case CONFIGINPROGRESS:
+    case CONFIGFAIL:
+      fail_count++;
+    }
+  }
+
+  /* check if mpath is satisfied */
+  if(blk->mpath == success_count) {
+    return 0;
+  } else {
+    spent = success_count + fail_count;  /* total spent */
+    spare = list->nhosts  - spent;  /* spare after spent */
+    morereq = blk->mpath  - success_count;  /* needed nodes to complete req */
+    if (spare == 0) {
+      ERROR("%s", "No Spare nodes: rewining the creation of target");
+      return -1;
+    } else if (spare < morereq) {
+      ERROR("%s", "Not enough Spare nodes: rewining the creation of target");
+      return -1;
+    } else {
+      /* create on spare */
+      MSG("%s", "trying to serve the mpath from spare machines");
+      for(i = spent; i < list->nhosts; i++) {
+        block_create_remote(tgfd, cobj, list->hosts[i], reply);
+      }
+    }
+  }
+
+  blockFreeMetaInfo(info);
+  ret = block_cross_check_request(glfs, tgfd, blk, cobj, list, reply);
+
+ out:
+  return ret;
+}
+
 
 blockResponse *
 block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 {
   int ret = -1;
   size_t i = 0;
-  char *out = NULL;
   char *savereply = NULL;
-  char *tmp = NULL;
   uuid_t uuid;
   static blockCreate *cobj;
   static blockResponse *reply = NULL;
@@ -210,9 +303,6 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   uuid_generate(uuid);
   uuid_unparse(uuid, gbid);
 
-  if(GB_ALLOC(reply) < 0)
-    goto out;
-
 
   if (!glfs_access(glfs, blk->block_name, F_OK)) {
     GB_STRDUP(reply->out, "BLOCK Already EXIST");
@@ -227,8 +317,8 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   }
 
   METAUPDATE(tgfd, write,
-             "GBID: %s\nSIZE: %zu\nHA: %d\nENTRYCREATE: INPROGRESS\n",
-             gbid, blk->size, 1);
+             "GBID: %s\nSIZE: %zu\nHA: %d\nENTRYCREATE: CONFIGINPROGRESS\n",
+             gbid, blk->size, blk->mpath);
 
   ret = glusterBlockCreateEntry(blk, gbid);
   if (ret) {
@@ -237,7 +327,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  METAUPDATE(tgfd, write, "ENTRYCREATE: SUCCESS\n");
+  METAUPDATE(tgfd, write, "ENTRYCREATE: CONFIGSUCCESS\n");
 
   if(GB_ALLOC(cobj) < 0)
     goto out;
@@ -250,29 +340,22 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 
   list = blockServerParse(blk->block_hosts);
 
-  for (i = 0; i < list->nhosts; i++) {
-    METAUPDATE(tgfd, write, "%s: INPROGRESS\n", list->hosts[i]);
+  /* TODO: Fail if mpath > list->nhosts */
 
-    ret = gluster_block_1(list->hosts[i], cobj, CREATE_SRV, &out);
-    if (ret) {
-      METAUPDATE(tgfd, write, "%s: FAIL\n", list->hosts[i]);
-      ERROR("%s on host: %s",
-            FAILED_CREATE, list->hosts[i]);
-    }
-
-    METAUPDATE(tgfd, write, "%s: SUCCESS\n", list->hosts[i]);
-
-    asprintf(&savereply, "%s%s\n", (tmp==NULL?"":tmp), out);
-    if (tmp)
-      GB_FREE(tmp);
-    tmp = savereply;
-    GB_FREE(out);
+  for (i = 0; i < blk->mpath; i++) {
+    block_create_remote(tgfd, cobj, list->hosts[i], &savereply);
   }
+
+  /* Check Point */
+  ret = block_cross_check_request(glfs, tgfd, blk, cobj, list, &savereply);
+
+out:
+  if(GB_ALLOC(reply) < 0)
+    goto out;
 
   reply->out = savereply;
   reply->exit = ret;
 
-out:
   if (glfs_close(tgfd) != 0)
     ERROR("%s", "glfs_close: failed");
 
@@ -395,7 +478,9 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
   if (GB_ALLOC(info) < 0)
     goto out;
 
-  blockGetMetaInfo(glfs, blk->block_name, info);
+  ret = blockGetMetaInfo(glfs, blk->block_name, info);
+  if(ret)
+    goto out;
 
   if(GB_ALLOC(cobj) < 0)
     goto out;
@@ -428,13 +513,13 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
           FAILED_DELETING_FILE, blk->volume, "localhost");
   }
 
+ out:
   if (GB_ALLOC(reply) < 0)
     goto out;
 
   reply->out = savereply;
   reply->exit = ret;
 
-out:
   if (glfs_close(tgfd) != 0)
     ERROR("%s", "glfs_close: failed");
 
@@ -547,13 +632,14 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
     }
   }
 
-  if (GB_ALLOC(reply) < 0)
-    goto out;
-
-  reply->out = filelist;
   ret = 0;
 
 out:
+  if (GB_ALLOC(reply) < 0)
+    goto out;
+
+  reply->out = filelist? filelist:strdup("*Nil*");
+  reply->exit = ret;
 
   glfs_closedir (tgfd);
 
@@ -564,8 +650,6 @@ out:
 
   glfs_fini(glfs);
 
-  reply->exit = ret;
-
   return reply;
 }
 
@@ -574,6 +658,7 @@ blockResponse *
 block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
 {
   blockResponse *reply = NULL;
+  char *out = NULL;
   struct glfs *glfs;
   struct glfs_fd *lkfd;
   struct flock lock = {0, };
@@ -597,17 +682,24 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
   if (GB_ALLOC(info) < 0)
     goto out;
 
-  blockGetMetaInfo(glfs, blk->block_name, info);
-
-  if (GB_ALLOC(reply) < 0)
+  ret = blockGetMetaInfo(glfs, blk->block_name, info);
+  if(ret)
     goto out;
 
-  asprintf(&reply->out, "NAME: %s\nVOLUME: %s\nGBID: %s\nSIZE: %zu\nMULTIPATH: %zu",
+  asprintf(&out, "NAME: %s\nVOLUME: %s\nGBID: %s\nSIZE: %zu\nMULTIPATH: %zu\n",
            blk->block_name, blk->volume, info->gbid, info->size, info->mpath);
-
   ret = 0;
 
  out:
+  if (GB_ALLOC(reply) < 0)
+    goto out;
+
+  if(!out)
+    asprintf(&out, "No Block with name %s", blk->block_name);
+
+  reply->out = out;
+  reply->exit = ret;
+
   METAUNLOCK(lock, lkfd);
 
   if (glfs_close(lkfd) != 0)
@@ -616,8 +708,6 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
   glfs_fini(glfs);
 
   blockFreeMetaInfo(info);
-
-  reply->exit = ret;
 
   return reply;
 }

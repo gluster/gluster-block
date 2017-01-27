@@ -12,6 +12,43 @@
 # include "utils.h"
 
 
+int
+blockMetaKeyEnumParse(const char *opt)
+{
+    int i;
+
+    if (!opt) {
+        return METAKEY__MAX;
+    }
+
+    for (i = 0; i < METAKEY__MAX; i++) {
+        if (!strcmp(opt, MetakeyLookup[i])) {
+            return i;
+        }
+    }
+
+    return i;
+}
+
+
+int
+blockMetaStatusEnumParse(const char *opt)
+{
+    int i;
+
+    if (!opt) {
+        return METASTATUS__MAX;
+    }
+
+    for (i = 0; i < METASTATUS__MAX; i++) {
+        if (!strcmp(opt, MetaStatusLookup[i])) {
+            return i;
+        }
+    }
+
+    return i;
+}
+
 
 int
 gbAlloc(void *ptrptr, size_t size,

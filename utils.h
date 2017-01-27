@@ -91,7 +91,49 @@
 
 # define GB_FREE(ptr) gbFree(1 ? (void *) &(ptr) : (ptr))
 
+typedef enum Metakey {
+  GBID = 0,
+  SIZE = 1,
+  HA   = 2,
+  ENTRYCREATE = 3,
 
+  METAKEY__MAX = 4      /* Updata this when add new Key */
+} Metakey;
+
+static const char *const MetakeyLookup[] = {
+    [GBID] = "GBID",
+    [SIZE] = "SIZE",
+    [HA] = "HA",
+    [ENTRYCREATE] = "ENTRYCREATE",
+    [METAKEY__MAX] = NULL,
+};
+
+typedef enum MetaStatus {
+  CONFIGSUCCESS = 0,
+  CONFIGFAIL   = 1,
+  CONFIGINPROGRESS = 2,
+  CLEANUPSUCCESS = 3,
+  CLEANUPFAIL = 4,
+  CLEANUPINPROGRES = 5,
+
+  METASTATUS__MAX = 6      /* Updata this when add new Status type */
+} MetaStatus;
+
+static const char *const MetaStatusLookup[] = {
+    [CONFIGINPROGRESS] = "CONFIGINPROGRESS",
+    [CONFIGSUCCESS] = "CONFIGSUCCESS",
+    [CONFIGFAIL] = "CONFIGFAIL",
+    [CLEANUPINPROGRES] = "CLEANUPINPROGRESS",
+    [CLEANUPSUCCESS] = "CLEANUPSUCCESS",
+    [CLEANUPFAIL] = "CLEANUPFAIL",
+
+    [METASTATUS__MAX] = NULL,
+};
+
+
+int blockMetaKeyEnumParse(const char *opt);
+
+int blockMetaStatusEnumParse(const char *opt);
 
 int gbAlloc(void *ptrptr, size_t size,
             const char *filename, const char *funcname, size_t linenr);
