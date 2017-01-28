@@ -14,8 +14,12 @@
 
 # include "utils.h"
 
-# define  LOG_FILE         "/var/log/gluster-block/block.log"
-# define  LOG_LEVEL        7
+# define  DAEMON_LOG_FILE  "/var/log/gluster-block/gluster-blockd.log"
+# define  CLI_LOG_FILE     "/var/log/gluster-block/gluster-block-cli.log"
+
+# define  GFAPI_LOG_FILE   "/var/log/gluster-block/gluster-block-gfapi.log"
+# define  GFAPI_LOG_LEVEL  7
+
 
 size_t glusterBlockCreateParseSize(char *value);
 

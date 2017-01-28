@@ -17,6 +17,7 @@
 # include  <stdbool.h>
 # include  <string.h>
 # include  <errno.h>
+#include   <time.h>
 
 
 /* Target Create */
@@ -45,14 +46,58 @@
 # define  FAILED_DELETING_IQN       "failed while deleting IQN"
 # define  FAILED_DELETING_FILE      "failed while deleting block file from gluster volume"
 
+typedef enum LogLevel {
+    NONE       = 0,
+    EMERGENCY  = 1,
+    ALERT      = 2,
+    CRITICAL   = 3,
+    ERROR      = 4,
+    WARNING    = 5,
+    NOTICE     = 6,
+    INFO       = 7,
+    DEBUG      = 8,
+    TRACE      = 9,
+
+    LOGLEVEL__MAX = 10      /* Updata this when add new level */
+} LogLevel;
+
+static const char *const LogLevelLookup[] = {
+    [NONE]       = "NONE",
+    [EMERGENCY]  = "EMERGENCY",
+    [ALERT]      = "ALERT",
+    [CRITICAL]   = "CRITICAL",
+    [ERROR]      = "ERROR",
+    [WARNING]    = "WARNING",
+    [NOTICE]     = "NOTICE",
+    [INFO]       = "INFO",
+    [DEBUG]      = "DEBUG",
+    [TRACE]      = "TRACE",
+
+    [LOGLEVEL__MAX] = NULL,
+};
 
 # define ERROR(fmt, ...) \
          fprintf(stderr, "Error: " fmt " [at %s+%d :<%s>]\n", \
                  __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__)
 
 # define MSG(fmt, ...) \
-         fprintf(stdout, fmt "\n", __VA_ARGS__)
+         fprintf(stdout, fmt, __VA_ARGS__)
 
+# define LOG(str, level, fmt, ...) {\
+              static FILE *fd; \
+              if (!strcmp(str, "mgmt")) \
+                fd = fopen (DAEMON_LOG_FILE, "a"); \
+              else if (strcmp(str, "cli")) \
+                fd = fopen (CLI_LOG_FILE, "a"); \
+              else if (strcmp(str, "gfapi")) \
+                fd = fopen (GFAPI_LOG_FILE, "a"); \
+              else \
+                fd = stderr; \
+              fprintf(fd, "[%lu] %s: " fmt " [at %s+%d :<%s>]\n", \
+                      (unsigned long)time(NULL), LogLevelLookup[level], \
+                      __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__); \
+              fclose(fd); \
+              }
 
 # define  METALOCK(a, b) {\
                             memset (&a, 0, sizeof(a)); \

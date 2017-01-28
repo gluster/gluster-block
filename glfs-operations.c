@@ -22,25 +22,25 @@ glusterBlockVolumeInit(char *volume, char *volfileserver)
 
   glfs = glfs_new(volume);
   if (!glfs) {
-    ERROR("%s", "glfs_new: returned NULL");
+    LOG("gfapi", ERROR, "%s", "glfs_new: failed");
     return NULL;
   }
 
   ret = glfs_set_volfile_server(glfs, "tcp", volfileserver, 24007);
   if (ret) {
-    ERROR("%s", "glfs_set_volfile_server: failed");
+    LOG("gfapi", ERROR, "%s", "glfs_set_volfile_server: failed");
     goto out;
   }
 
-  ret = glfs_set_logging(glfs, LOG_FILE, LOG_LEVEL);
+  ret = glfs_set_logging(glfs, GFAPI_LOG_FILE, GFAPI_LOG_LEVEL);
   if (ret) {
-    ERROR("%s", "glfs_set_logging: failed");
+    LOG("gfapi", ERROR, "%s", "glfs_set_logging: failed");
     goto out;
   }
 
   ret = glfs_init(glfs);
   if (ret) {
-    ERROR("%s", "glfs_init: failed");
+    LOG("gfapi", ERROR, "%s", "glfs_init: failed");
     goto out;
   }
 
@@ -61,7 +61,7 @@ glusterBlockCreateEntry(blockCreateCli *blk, char *gbid)
 
   glfs = glusterBlockVolumeInit(blk->volume, blk->volfileserver);
   if (!glfs) {
-    ERROR("%s", "glusterBlockVolumeInit: failed");
+    LOG("gfapi", ERROR, "%s", "glusterBlockVolumeInit: failed");
     goto out;
   }
 
@@ -69,17 +69,17 @@ glusterBlockCreateEntry(blockCreateCli *blk, char *gbid)
                   O_WRONLY | O_CREAT | O_TRUNC,
                   S_IRUSR | S_IWUSR);
   if (!fd) {
-    ERROR("%s", "glfs_creat: failed");
+    LOG("gfapi", ERROR, "%s", "glfs_creat: failed");
     ret = -errno;
   } else {
     ret = glfs_ftruncate(fd, blk->size);
     if (ret) {
-      ERROR("%s", "glfs_ftruncate: failed");
+      LOG("gfapi", ERROR, "%s", "glfs_ftruncate: failed");
       goto out;
     }
 
     if (glfs_close(fd) != 0) {
-      ERROR("%s", "glfs_close: failed");
+      LOG("gfapi", ERROR, "%s", "glfs_close: failed");
       ret = -errno;
     }
   }
@@ -98,13 +98,13 @@ glusterBlockDeleteEntry(char *volume, char *gbid)
 
   glfs = glusterBlockVolumeInit(volume, "localhost");
   if (!glfs) {
-    ERROR("%s", "glusterBlockVolumeInit: failed");
+    LOG("gfapi", ERROR, "%s", "glusterBlockVolumeInit: failed");
     goto out;
   }
 
   ret = glfs_unlink(glfs, gbid);
   if (ret) {
-    ERROR("%s", "glfs_unlink: failed");
+    LOG("gfapi", ERROR, "%s", "glfs_unlink: failed");
     goto out;
   }
 
@@ -122,19 +122,19 @@ glusterBlockCreateMetaLockFile(struct glfs *glfs)
 
   ret = glfs_mkdir (glfs, "/block-meta", 0);
   if (ret && errno != EEXIST) {
-    ERROR("%s", "glfs_mkdir: failed");
+    LOG("gfapi", ERROR, "%s", "glfs_mkdir: failed");
     goto out;
   }
 
   ret = glfs_chdir (glfs, "/block-meta");
   if (ret) {
-    ERROR("%s", "glfs_chdir: failed");
+    LOG("gfapi", ERROR, "%s", "glfs_chdir: failed");
     goto out;
   }
 
   lkfd = glfs_creat(glfs, "meta.lock", O_RDWR, S_IRUSR | S_IWUSR);
   if (!lkfd) {
-    ERROR("%s", "glfs_creat: failed");
+    LOG("gfapi", ERROR, "%s", "glfs_creat: failed");
     goto out;
   }
 
@@ -222,9 +222,9 @@ blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info)
   char line[48];
   char *tmp;
 
-  tgfd = glfs_open(glfs, metafile, O_RDWR);
+  tgfd = glfs_open(glfs, metafile, O_RDONLY);
   if (!tgfd) {
-    ERROR("%s", "glfs_open failed");
+    LOG("gfapi", ERROR, "%s", "glfs_open failed");
     return -1;
   }
 

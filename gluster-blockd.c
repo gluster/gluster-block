@@ -23,8 +23,6 @@
 # define   UUID_BUF_SIZE     38
 
 # define   CREATE            "create"
-# define   LIST              "list"
-# define   INFO              "info"
 # define   DELETE            "delete"
 
 # define   GLFS_PATH         "/backstores/user:glfs"
@@ -32,8 +30,6 @@
 # define   TARGETCLI_ISCSI   "targetcli /iscsi"
 # define   TARGETCLI_SAVE    "targetcli / saveconfig"
 # define   ATTRIBUTES        "generate_node_acls=1 demo_mode_write_protect=0"
-# define   BACKEND_CFGSTR    "ls | grep ' %s ' | cut -d'[' -f2 | cut -d']' -f1"
-# define   LUNS_LIST         "ls | grep -v user:glfs | cut -d'-' -f2 | cut -d' ' -f2"
 # define   IQN_PREFIX        "iqn.2016-12.org.gluster-block:"
 
 # define   MSERVER_DELIMITER ","
@@ -63,14 +59,14 @@ gluster_block_1(char *host, void *cobj, opterations opt, char **out)
   struct sockaddr_in sain;
 
   if ((sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
-    perror("gluster-blockd: socket");
-    exit(1);
+    LOG("mgmt", ERROR, "socket creation failed (%s)", strerror (errno));
+    goto out;
   }
 
   server = gethostbyname(host);
   if (server == NULL) {
-    fprintf(stderr,"ERROR, no such host\n");
-    exit(0);
+    LOG("mgmt", ERROR, "gethostbyname failed (%s)", strerror (errno));
+    goto out;
   }
 
   bzero((char *) &sain, sizeof(sain));
@@ -79,27 +75,30 @@ gluster_block_1(char *host, void *cobj, opterations opt, char **out)
   sain.sin_port = htons(24006);
 
   if (connect(sockfd, (struct sockaddr *) &sain, sizeof(sain)) < 0) {
-    perror("gluster-blockd: connect");
-    exit(1);
+    LOG("mgmt", ERROR, "connect failed (%s)", strerror (errno));
+    goto out;
   }
 
   clnt = clnttcp_create ((struct sockaddr_in *) &sain, GLUSTER_BLOCK, GLUSTER_BLOCK_VERS, &sockfd, 0, 0);
   if (clnt == NULL) {
-    clnt_pcreateerror ("localhost");
-    exit (1);
+    LOG("mgmt", ERROR, "%s, inet host %s",
+        clnt_spcreateerror("client create failed"), host);
+    goto out;
   }
 
   switch(opt) {
   case CREATE_SRV:
     reply = block_create_1((blockCreate *)cobj, clnt);
     if (reply == NULL) {
-      clnt_perror (clnt, "call failed gluster-block");
+      LOG("mgmt", ERROR, "%s", clnt_sperror(clnt, "block create failed"));
+      goto out;
     }
     break;
   case DELETE_SRV:
     reply = block_delete_1((blockDelete *)cobj, clnt);
     if (reply == NULL) {
-      clnt_perror (clnt, "call failed gluster-block");
+      LOG("mgmt", ERROR, "%s", clnt_sperror (clnt, "block delete failed"));
+      goto out;
     }
     break;
   }
@@ -112,7 +111,7 @@ gluster_block_1(char *host, void *cobj, opterations opt, char **out)
 
  out:
   if (!clnt_freeres(clnt, (xdrproc_t) xdr_blockResponse, (char *) reply))
-    clnt_perror (clnt, "clnt_freeres failed");
+    LOG("mgmt", ERROR, "%s", clnt_sperror (clnt, "clnt_freeres failed"));
 
   clnt_destroy (clnt);
 
@@ -178,7 +177,7 @@ block_create_remote(struct glfs_fd *tgfd, blockCreate *cobj, char *addr, char **
 {
   char *write = NULL;
   char *out = NULL;
-  char *tmp = NULL;
+  char *tmp = *reply;
   int ret;
 
     METAUPDATE(tgfd, write, "%s: CONFIGINPROGRESS\n", addr);
@@ -186,7 +185,7 @@ block_create_remote(struct glfs_fd *tgfd, blockCreate *cobj, char *addr, char **
     ret = gluster_block_1(addr, cobj, CREATE_SRV, &out);
     if (ret) {
       METAUPDATE(tgfd, write, "%s: CONFIGFAIL\n", addr);
-      ERROR("%s on host: %s", FAILED_CREATE, addr);
+      LOG("mgmt", ERROR, "%s on host: %s", FAILED_CREATE, addr);
 
       *reply = out;
       goto out;
@@ -247,14 +246,14 @@ block_cross_check_request(struct glfs *glfs,
     spare = list->nhosts  - spent;  /* spare after spent */
     morereq = blk->mpath  - success_count;  /* needed nodes to complete req */
     if (spare == 0) {
-      ERROR("%s", "No Spare nodes: rewining the creation of target");
+      LOG("mgmt", WARNING, "%s", "No Spare nodes: rewining the creation of target");
       return -1;
     } else if (spare < morereq) {
-      ERROR("%s", "Not enough Spare nodes: rewining the creation of target");
+      LOG("mgmt", WARNING, "%s", "Not enough Spare nodes: rewining the creation of target");
       return -1;
     } else {
       /* create on spare */
-      MSG("%s", "trying to serve the mpath from spare machines");
+      LOG("mgmt", INFO, "%s", "trying to serve the mpath from spare machines");
       for(i = spent; i < list->nhosts; i++) {
         block_create_remote(tgfd, cobj, list->hosts[i], reply);
       }
@@ -274,15 +273,15 @@ block_delete_remote(struct glfs_fd *tgfd, blockDelete *cobj, char *addr, char **
 {
   char *write = NULL;
   char *out = NULL;
-  char *tmp = NULL;
+  char *tmp = *reply;
   int ret;
 
   METAUPDATE(tgfd, write, "%s: CLEANUPINPROGRES\n", addr);
   ret = gluster_block_1(addr, cobj, DELETE_SRV, &out);
   if (ret) {
     METAUPDATE(tgfd, write, "%s: CLEANUPFAIL\n", addr);
-    ERROR("%s on host: %s",
-           FAILED_GATHERING_INFO, addr);
+    LOG("mgmt", ERROR, "%s on host: %s",
+        FAILED_GATHERING_INFO, addr);
     goto out;
   }
   METAUPDATE(tgfd, write, "%s: CLEANUPSUCCESS\n", addr);
@@ -300,7 +299,7 @@ block_delete_remote(struct glfs_fd *tgfd, blockDelete *cobj, char *addr, char **
 
 static int
 blockCleanUp(struct glfs *glfs, char *blockname,
-                   bool deleteall, char **reply)
+             bool deleteall, char **reply)
 {
   MetaInfo *info = NULL;
   int ret = -1;
@@ -322,12 +321,11 @@ if (GB_ALLOC(info) < 0)
   strcpy(cobj->block_name, blockname);
   strcpy(cobj->gbid, info->gbid);
 
-  tgfd = glfs_open(glfs, blockname, O_RDWR);
+  tgfd = glfs_open(glfs, blockname, O_WRONLY|O_APPEND);
   if (!tgfd) {
-    ERROR("%s", "glfs_open: failed");
+    LOG("mgmt", ERROR, "%s", "glfs_open: failed");
     goto out;
   }
-  glfs_lseek (tgfd, 0, SEEK_END);          /* append at end of file */
 
   for (i = 0; i < info->nhosts; i++) {
     switch (blockMetaStatusEnumParse(info->list[i]->status)) {
@@ -359,12 +357,12 @@ if (GB_ALLOC(info) < 0)
 
   if( cleanup_success == info->nhosts) {
     if (glusterBlockDeleteEntry(info->volume, info->gbid)) {
-      ERROR("%s volume: %s host: %s",
+      LOG("mgmt", ERROR, "%s volume: %s host: %s",
             FAILED_DELETING_FILE, info->volume, "localhost");
     }
     ret = glfs_unlink(glfs, blockname);
     if (ret && errno != ENOENT) {
-      ERROR("%s", "glfs_unlink: failed");
+      LOG("mgmt", ERROR, "%s", "glfs_unlink: failed");
       goto out;
     }
   }
@@ -372,9 +370,9 @@ if (GB_ALLOC(info) < 0)
  out:
   blockFreeMetaInfo(info);
 
-  if (glfs_close(tgfd) != 0)
-    ERROR("%s", "glfs_close: failed");
-
+  if (glfs_close(tgfd) != 0) {
+    LOG("mgmt", ERROR, "%s", "glfs_close: failed");
+  }
   GB_FREE(cobj);
 
   return ret;
@@ -400,13 +398,13 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 
   glfs = glusterBlockVolumeInit(blk->volume, blk->volfileserver);
   if (!glfs) {
-    ERROR("%s", "glusterBlockVolumeInit failed");
+    LOG("mgmt", ERROR, "%s", "glusterBlockVolumeInit failed");
     goto out;
   }
 
   lkfd = glusterBlockCreateMetaLockFile(glfs);
   if (!lkfd) {
-    ERROR("%s", "glusterBlockCreateMetaLockFile failed");
+    LOG("mgmt", ERROR, "%s", "glusterBlockCreateMetaLockFile failed");
     goto out;
   }
 
@@ -423,7 +421,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 
   tgfd = glfs_creat(glfs, blk->block_name, O_RDWR, S_IRUSR | S_IWUSR);
   if (!tgfd) {
-    ERROR("%s", "glfs_creat: failed");
+    LOG("mgmt", ERROR, "%s", "glfs_creat: failed");
     goto out;
   }
 
@@ -434,7 +432,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   ret = glusterBlockCreateEntry(blk, gbid);
   if (ret) {
     METAUPDATE(tgfd, write, "ENTRYCREATE: FAIL\n");
-    ERROR("%s volume: %s host: %s",
+    LOG("mgmt", ERROR, "%s volume: %s host: %s",
           FAILED_CREATING_FILE, blk->volume, blk->volfileserver);
     goto out;
   }
@@ -460,6 +458,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   /* Check Point */
   ret = block_cross_check_request(glfs, tgfd, blk, cobj, list, &savereply);
   if(ret) {
+      LOG("mgmt", ERROR, "%s", "even spare nodes have exhausted rewinding");
       ret = blockCleanUp(glfs, blk->block_name, FALSE, &savereply);
   }
 
@@ -471,12 +470,12 @@ out:
   reply->exit = ret;
 
   if (glfs_close(tgfd) != 0)
-    ERROR("%s", "glfs_close: failed");
+    LOG("mgmt", ERROR, "%s", "glfs_close: failed");
 
   METAUNLOCK(lock, lkfd);
 
   if (glfs_close(lkfd) != 0)
-    ERROR("%s", "glfs_close: failed");
+    LOG("mgmt", ERROR, "%s", "glfs_close: failed");
 
   glfs_fini(glfs);
   blockServerDefFree(list);
@@ -525,7 +524,7 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   if (fp != NULL) {
     size_t newLen = fread(obj->out, sizeof(char), 4096, fp);
     if (ferror( fp ) != 0) {
-      ERROR("%s", "Error reading command output\n");
+      LOG("mgmt", ERROR, "Reading command %s output", exec);
     } else {
       obj->out[newLen++] = '\0';
     }
@@ -555,13 +554,13 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 
   glfs = glusterBlockVolumeInit(blk->volume, "localhost");
   if (!glfs) {
-    ERROR("%s", "glusterBlockVolumeInit failed");
+    LOG("mgmt", ERROR, "%s", "glusterBlockVolumeInit failed");
     goto out;
   }
 
   lkfd = glusterBlockCreateMetaLockFile(glfs);
   if (!lkfd) {
-    ERROR("%s", "glusterBlockCreateMetaLockFile failed");
+    LOG("mgmt", ERROR, "%s", "glusterBlockCreateMetaLockFile failed");
     goto out;
   }
 
@@ -585,7 +584,7 @@ ret = blockCleanUp(glfs, blk->block_name, TRUE, &savereply);
   METAUNLOCK(lock, lkfd);
 
   if (glfs_close(lkfd) != 0)
-    ERROR("%s", "glfs_close: failed");
+    LOG("mgmt", ERROR, "%s", "glfs_close: failed");
 
   glfs_fini(glfs);
 
@@ -621,7 +620,7 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
   if (fp != NULL) {
     size_t newLen = fread(obj->out, sizeof(char), 4096, fp);
     if (ferror( fp ) != 0) {
-      ERROR("%s", "Error reading command output\n");
+      LOG("mgmt", ERROR, "reading command %s output", exec);
     } else {
       obj->out[newLen++] = '\0';
     }
@@ -653,13 +652,13 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 
   glfs = glusterBlockVolumeInit(blk->volume, "localhost");
   if (!glfs) {
-    ERROR("%s", "glusterBlockVolumeInit failed");
+    LOG("mgmt", ERROR, "%s", "glusterBlockVolumeInit failed");
     goto out;
   }
 
   lkfd = glusterBlockCreateMetaLockFile(glfs);
   if (!lkfd) {
-    ERROR("%s", "glusterBlockCreateMetaLockFile failed");
+    LOG("mgmt", ERROR, "%s", "glusterBlockCreateMetaLockFile failed");
     goto out;
   }
 
@@ -667,7 +666,7 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 
   tgfd = glfs_opendir (glfs, "/block-meta");
   if (!tgfd) {
-    ERROR("%s", "glusterBlockVolumeInit failed");
+    LOG("mgmt", ERROR, "%s", "glusterBlockVolumeInit failed");
     goto out;
   }
 
@@ -688,7 +687,7 @@ out:
   if (GB_ALLOC(reply) < 0)
     goto out;
 
-  reply->out = filelist? filelist:strdup("*Nil*");
+  reply->out = filelist? filelist:strdup("*Nil*\n");
   reply->exit = ret;
 
   glfs_closedir (tgfd);
@@ -696,7 +695,7 @@ out:
   METAUNLOCK(lock, lkfd);
 
   if (glfs_close(lkfd) != 0)
-    ERROR("%s", "glfs_close: failed");
+    LOG("mgmt", ERROR, "%s", "glfs_close: failed");
 
   glfs_fini(glfs);
 
@@ -719,13 +718,13 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
 
   glfs = glusterBlockVolumeInit(blk->volume, "localhost");
   if (!glfs) {
-    ERROR("%s", "glusterBlockVolumeInit failed");
+    LOG("mgmt", ERROR, "%s", "glusterBlockVolumeInit failed");
     goto out;
   }
 
   lkfd = glusterBlockCreateMetaLockFile(glfs);
   if (!lkfd) {
-    ERROR("%s", "glusterBlockCreateMetaLockFile failed");
+    LOG("mgmt", ERROR, "%s", "glusterBlockCreateMetaLockFile failed");
     goto out;
   }
 
@@ -749,6 +748,7 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
       tmp = out;
     }
   }
+  asprintf(&out, "%s\n", tmp);
   ret = 0;
 
  out:
@@ -764,7 +764,7 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
   METAUNLOCK(lock, lkfd);
 
   if (glfs_close(lkfd) != 0)
-    ERROR("%s", "glfs_close: failed");
+    LOG("mgmt", ERROR, "%s", "glfs_close: failed");
 
   glfs_fini(glfs);
 
