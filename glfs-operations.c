@@ -167,6 +167,9 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
   size_t i;
 
   switch (blockMetaKeyEnumParse(opt)) {
+  case VOLUME:
+    strcpy(info->volume, strchr(line, ' ')+1);
+    break;
   case GBID:
     strcpy(info->gbid, strchr(line, ' ')+1);
     break;

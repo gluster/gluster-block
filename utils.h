@@ -92,18 +92,20 @@
 # define GB_FREE(ptr) gbFree(1 ? (void *) &(ptr) : (ptr))
 
 typedef enum Metakey {
-  GBID = 0,
-  SIZE = 1,
-  HA   = 2,
-  ENTRYCREATE = 3,
+  VOLUME = 0,
+  GBID   = 1,
+  SIZE   = 2,
+  HA     = 3,
+  ENTRYCREATE = 4,
 
-  METAKEY__MAX = 4      /* Updata this when add new Key */
+  METAKEY__MAX = 5      /* Updata this when add new Key */
 } Metakey;
 
 static const char *const MetakeyLookup[] = {
-    [GBID] = "GBID",
-    [SIZE] = "SIZE",
-    [HA] = "HA",
+    [VOLUME] = "VOLUME",
+    [GBID]   = "GBID",
+    [SIZE]   = "SIZE",
+    [HA]     = "HA",
     [ENTRYCREATE] = "ENTRYCREATE",
     [METAKEY__MAX] = NULL,
 };

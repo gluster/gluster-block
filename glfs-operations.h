@@ -29,6 +29,7 @@ typedef struct NodeInfo {
 } NodeInfo;
 
 typedef struct MetaInfo {
+  char   volume[255];
   char   gbid[38];
   size_t size;
   size_t mpath;
