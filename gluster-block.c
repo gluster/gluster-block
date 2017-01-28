@@ -239,21 +239,17 @@ glusterBlockCreate(int count, char **options, char *name)
 
 
 static int
-glusterBlockList(char *volume, char *blkServers)
+glusterBlockList(char *volume)
 {
   static blockListCli cobj;
   char *out = NULL;
   int ret = -1;
 
   strcpy(cobj.volume, volume);
-  if (GB_STRDUP(cobj.block_hosts, blkServers) < 0) {
-    return -1;
-  }
 
   ret = gluster_block_cli_1(&cobj, LIST_CLI, &out);
 
   MSG("%s", out);
-  GB_FREE(cobj.block_hosts);
   GB_FREE(out);
 
   return ret;
@@ -261,7 +257,7 @@ glusterBlockList(char *volume, char *blkServers)
 
 
 static int
-glusterBlockDelete(char* name, char* volume, char *blkServers)
+glusterBlockDelete(char* name, char* volume)
 {
   static blockDeleteCli cobj;
   char *out = NULL;
@@ -269,14 +265,10 @@ glusterBlockDelete(char* name, char* volume, char *blkServers)
 
   strcpy(cobj.block_name, name);
   strcpy(cobj.volume, volume);
-  if (GB_STRDUP(cobj.block_hosts, blkServers) < 0) {
-    return -1;
-  }
 
   ret = gluster_block_cli_1(&cobj, DELETE_CLI, &out);
 
   MSG("%s", out);
-  GB_FREE(cobj.block_hosts);
   GB_FREE(out);
 
   return ret;
@@ -284,7 +276,7 @@ glusterBlockDelete(char* name, char* volume, char *blkServers)
 
 
 static int
-glusterBlockInfo(char* name, char* volume, char *blkServers)
+glusterBlockInfo(char* name, char* volume)
 {
   static blockInfoCli cobj;
   char *out = NULL;
@@ -292,14 +284,10 @@ glusterBlockInfo(char* name, char* volume, char *blkServers)
 
   strcpy(cobj.block_name, name);
   strcpy(cobj.volume, volume);
-  if (GB_STRDUP(cobj.block_hosts, blkServers) < 0) {
-    return -1;
-  }
 
   ret = gluster_block_cli_1(&cobj, INFO_CLI, &out);
 
   MSG("%s", out);
-  GB_FREE(cobj.block_hosts);
   GB_FREE(out);
 
   return ret;
@@ -313,7 +301,6 @@ glusterBlockParseArgs(int count, char **options)
   int ret = 0;
   int optFlag = 0;
   char *block = NULL;
-  char *blkServers = NULL;
   char *volume = NULL;
 
   while (1) {
@@ -325,7 +312,6 @@ glusterBlockParseArgs(int count, char **options)
       {INFO,      required_argument, 0, 'i'},
       {MODIFY,    required_argument, 0, 'm'},
       {VOLUME,    required_argument, 0, 'v'},
-      {BLOCKHOST, required_argument, 0, 'b'},
       {0, 0, 0, 0}
     };
 
@@ -340,12 +326,6 @@ glusterBlockParseArgs(int count, char **options)
       break;
 
     switch (c) {
-    case 'b':
-      blkServers = optarg;
-      if (optFlag)
-        goto opt;
-      break;
-
     case 'v':
       volume = optarg;
       break;
@@ -365,8 +345,6 @@ glusterBlockParseArgs(int count, char **options)
         goto out;
       optFlag = c;
       block = optarg;
-      if (blkServers)
-        goto opt;
       break;
 
     case 'm':
@@ -383,20 +361,19 @@ glusterBlockParseArgs(int count, char **options)
     }
   }
 
- opt:
   switch (optFlag) {
   case 'l':
-    ret = glusterBlockList(volume, blkServers);
+    ret = glusterBlockList(volume);
     if (ret)
         ERROR("%s", FAILED_LIST);
     break;
   case 'i':
-    ret = glusterBlockInfo(block, volume, blkServers);
+    ret = glusterBlockInfo(block, volume);
     if (ret)
         ERROR("%s", FAILED_INFO);
     break;
   case 'd':
-    ret = glusterBlockDelete(block, volume, blkServers);
+    ret = glusterBlockDelete(block, volume);
     if (ret)
         ERROR("%s", FAILED_DELETE);
     break;

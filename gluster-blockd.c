@@ -303,7 +303,6 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   uuid_generate(uuid);
   uuid_unparse(uuid, gbid);
 
-
   if (!glfs_access(glfs, blk->block_name, F_OK)) {
     GB_STRDUP(reply->out, "BLOCK Already EXIST");
     reply->exit = EEXIST;
@@ -317,17 +316,18 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   }
 
   METAUPDATE(tgfd, write,
-             "GBID: %s\nSIZE: %zu\nHA: %d\nENTRYCREATE: CONFIGINPROGRESS\n",
+             "GBID: %s\nSIZE: %zu\nHA: %d\nENTRYCREATE: INPROGRESS\n",
              gbid, blk->size, blk->mpath);
 
   ret = glusterBlockCreateEntry(blk, gbid);
   if (ret) {
+    METAUPDATE(tgfd, write, "ENTRYCREATE: FAIL\n");
     ERROR("%s volume: %s host: %s",
           FAILED_CREATING_FILE, blk->volume, blk->volfileserver);
     goto out;
   }
 
-  METAUPDATE(tgfd, write, "ENTRYCREATE: CONFIGSUCCESS\n");
+  METAUPDATE(tgfd, write, "ENTRYCREATE: SUCCESS\n");
 
   if(GB_ALLOC(cobj) < 0)
     goto out;
@@ -430,23 +430,49 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
 }
 
 
+static int
+block_delete_remote(struct glfs_fd *tgfd, blockDelete *cobj, char *addr, char **reply)
+{
+  char *write = NULL;
+  char *out = NULL;
+  char *tmp = NULL;
+  int ret;
+
+  METAUPDATE(tgfd, write, "%s: CLEANUPINPROGRES\n", addr);
+  ret = gluster_block_1(addr, cobj, DELETE_SRV, &out);
+  if (ret) {
+    METAUPDATE(tgfd, write, "%s: CLEANUPFAIL\n", addr);
+    ERROR("%s on host: %s",
+           FAILED_GATHERING_INFO, addr);
+    goto out;
+  }
+  METAUPDATE(tgfd, write, "%s: CLEANUPSUCCESS\n", addr);
+
+  asprintf(reply, "%s%s\n", (tmp==NULL?"":tmp), out);
+  if (tmp)
+    GB_FREE(tmp);
+  tmp = *reply;
+  GB_FREE(out);
+
+ out:
+    return ret;
+}
+
+
 blockResponse *
 block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 {
   size_t i = 0;
   int ret = -1;
-  char *out = NULL;
   char *savereply = NULL;
-  char *tmp = NULL;
-  blockServerDefPtr list = NULL;
   static blockDelete *cobj;
   static blockResponse *reply = NULL;
   struct glfs *glfs = NULL;
   struct glfs_fd *lkfd;
   struct glfs_fd *tgfd;
   struct flock lock = {0, };
-  char *write;
   MetaInfo *info = NULL;
+  size_t cleanup_success = 0;
 
   glfs = glusterBlockVolumeInit(blk->volume, "localhost");
   if (!glfs) {
@@ -489,28 +515,41 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 
   strcpy(cobj->gbid, info->gbid);
 
-  list = blockServerParse(blk->block_hosts);
-  for (i = 0; i < list->nhosts; i++) {
-    METAUPDATE(tgfd, write, "%s: CLEANUPINPROGRES\n", list->hosts[i]);
-    ret = gluster_block_1(list->hosts[i], cobj, DELETE_SRV, &out);
-    if (ret) {
-      METAUPDATE(tgfd, write, "%s: CLEANUPFAIL\n", list->hosts[i]);
-      ERROR("%s on host: %s",
-            FAILED_GATHERING_INFO, list->hosts[i]);
-      goto out;
+  for (i = 0; i < info->nhosts; i++) {
+    switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+    case CLEANUPINPROGRES:
+    case CLEANUPFAIL:
+    case CONFIGSUCCESS:
+    case CONFIGFAIL:
+    case CONFIGINPROGRESS:
+      ret = block_delete_remote(tgfd, cobj, info->list[i]->addr, &savereply);
+      break;
     }
-    METAUPDATE(tgfd, write, "%s: CLEANUPSUCCESS\n", list->hosts[i]);
+  }
+  blockFreeMetaInfo(info);
 
-    asprintf(&savereply, "%s%s\n", (tmp==NULL?"":tmp), out);
-    if (tmp)
-      GB_FREE(tmp);
-    tmp = savereply;
-    GB_FREE(out);
+  if (GB_ALLOC(info) < 0)
+    goto out;
+
+  ret = blockGetMetaInfo(glfs, blk->block_name, info);
+  if(ret)
+    goto out;
+
+  for (i = 0; i < info->nhosts; i++) {
+    if(blockMetaStatusEnumParse(info->list[i]->status) == CLEANUPSUCCESS)
+      cleanup_success++;
   }
 
-  if (glusterBlockDeleteEntry(blk->volume, info->gbid)) {
-    ERROR("%s volume: %s host: %s",
-          FAILED_DELETING_FILE, blk->volume, "localhost");
+  if( cleanup_success == info->nhosts) {
+    if (glusterBlockDeleteEntry(blk->volume, info->gbid)) {
+      ERROR("%s volume: %s host: %s",
+            FAILED_DELETING_FILE, blk->volume, "localhost");
+    }
+    ret = glfs_unlink(glfs, blk->block_name);
+    if (ret && errno != ENOENT) {
+      ERROR("%s", "glfs_unlink: failed");
+      goto out;
+    }
   }
 
  out:
@@ -523,12 +562,6 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
   if (glfs_close(tgfd) != 0)
     ERROR("%s", "glfs_close: failed");
 
-  ret = glfs_unlink(glfs, blk->block_name);
-  if (ret && errno != ENOENT) {
-    ERROR("%s", "glfs_unlink: failed");
-    goto out;
-  }
-
   METAUNLOCK(lock, lkfd);
 
   if (glfs_close(lkfd) != 0)
@@ -536,7 +569,6 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 
   glfs_fini(glfs);
 
-  blockServerDefFree(list);
   GB_FREE(cobj);
 
   return reply;
