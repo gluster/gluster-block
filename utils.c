@@ -12,6 +12,7 @@
 # include "utils.h"
 
 
+
 int
 blockMetaKeyEnumParse(const char *opt)
 {
@@ -82,6 +83,9 @@ void
 gbFree(void *ptrptr)
 {
   int save_errno = errno;
+
+  if(*(void**)ptrptr == NULL)
+   return;
 
   free(*(void**)ptrptr);
   *(void**)ptrptr = NULL;

@@ -21,7 +21,7 @@
 # define  GFAPI_LOG_LEVEL  7
 
 
-size_t glusterBlockCreateParseSize(char *value);
 
+size_t glusterBlockCreateParseSize(char *value);
 
 # endif /* _COMMON_H */

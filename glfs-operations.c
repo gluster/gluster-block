@@ -12,13 +12,16 @@
 # include "common.h"
 # include "glfs-operations.h"
 
+# define  METADIR     "/block-meta"
+# define  TXLOCKFILE  "meta.lock"
+
 
 
 struct glfs *
 glusterBlockVolumeInit(char *volume, char *volfileserver)
 {
   struct glfs *glfs;
-  int ret = 0;
+  int ret;
 
   glfs = glfs_new(volume);
   if (!glfs) {
@@ -48,6 +51,7 @@ glusterBlockVolumeInit(char *volume, char *volfileserver)
 
  out:
   glfs_fini(glfs);
+
   return NULL;
 }
 
@@ -70,7 +74,6 @@ glusterBlockCreateEntry(blockCreateCli *blk, char *gbid)
                   S_IRUSR | S_IWUSR);
   if (!fd) {
     LOG("gfapi", ERROR, "%s", "glfs_creat: failed");
-    ret = -errno;
   } else {
     ret = glfs_ftruncate(fd, blk->size);
     if (ret) {
@@ -80,7 +83,6 @@ glusterBlockCreateEntry(blockCreateCli *blk, char *gbid)
 
     if (glfs_close(fd) != 0) {
       LOG("gfapi", ERROR, "%s", "glfs_close: failed");
-      ret = -errno;
     }
   }
 
@@ -120,19 +122,19 @@ glusterBlockCreateMetaLockFile(struct glfs *glfs)
   struct glfs_fd *lkfd;
   int ret;
 
-  ret = glfs_mkdir (glfs, "/block-meta", 0);
+  ret = glfs_mkdir (glfs, METADIR, 0);
   if (ret && errno != EEXIST) {
     LOG("gfapi", ERROR, "%s", "glfs_mkdir: failed");
     goto out;
   }
 
-  ret = glfs_chdir (glfs, "/block-meta");
+  ret = glfs_chdir (glfs, METADIR);
   if (ret) {
     LOG("gfapi", ERROR, "%s", "glfs_chdir: failed");
     goto out;
   }
 
-  lkfd = glfs_creat(glfs, "meta.lock", O_RDWR, S_IRUSR | S_IWUSR);
+  lkfd = glfs_creat(glfs, TXLOCKFILE, O_RDWR, S_IRUSR | S_IWUSR);
   if (!lkfd) {
     LOG("gfapi", ERROR, "%s", "glfs_creat: failed");
     goto out;
@@ -149,6 +151,9 @@ void
 blockFreeMetaInfo(MetaInfo *info)
 {
   int i;
+
+  if (!info)
+    return;
 
   for (i = 0; i< info->nhosts; i++)
     GB_FREE(info->list[i]);

@@ -17,7 +17,7 @@
 # include  <stdbool.h>
 # include  <string.h>
 # include  <errno.h>
-#include   <time.h>
+# include  <time.h>
 
 
 /* Target Create */
@@ -45,6 +45,89 @@
 # define  FAILED_DELETING_BACKEND   "failed while deleting glfs backend"
 # define  FAILED_DELETING_IQN       "failed while deleting IQN"
 # define  FAILED_DELETING_FILE      "failed while deleting block file from gluster volume"
+
+
+# define ERROR(fmt, ...)                                             \
+         do {                                                        \
+           fprintf(stderr, "Error: " fmt " [at %s+%d :<%s>]\n",      \
+                   __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__);   \
+          } while (0)
+
+# define  MSG(fmt, ...)                                              \
+          do {                                                       \
+            fprintf(stdout, fmt, __VA_ARGS__);                       \
+          } while (0)
+
+# define  LOG(str, level, fmt, ...)                                  \
+          do {                                                       \
+            FILE *fd;                                                \
+            if (!strcmp(str, "mgmt"))                                \
+              fd = fopen (DAEMON_LOG_FILE, "a");                     \
+            else if (strcmp(str, "cli"))                             \
+              fd = fopen (CLI_LOG_FILE, "a");                        \
+            else if (strcmp(str, "gfapi"))                           \
+              fd = fopen (GFAPI_LOG_FILE, "a");                      \
+            else                                                     \
+              fd = stderr;                                           \
+            fprintf(fd, "[%lu] %s: " fmt " [at %s+%d :<%s>]\n",      \
+                    (unsigned long)time(NULL), LogLevelLookup[level],\
+                    __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__);  \
+            fclose(fd);                                              \
+          } while (0)
+
+# define  METALOCK(lkfd)                                             \
+          do {                                                       \
+            struct flock lock = {0, };                               \
+            memset (&lock, 0, sizeof(lock));                         \
+            lock.l_type = F_WRLCK;                                   \
+            if (glfs_posix_lock (lkfd, F_SETLKW, &lock)) {           \
+              LOG("mgmt", ERROR, "%s", "glfs_posix_lock: failed");   \
+              ret = -1;                                              \
+              goto out;                                              \
+            }                                                        \
+          } while (0)
+
+# define  METAUPDATE(a, ...)                                         \
+          do {                                                       \
+            char *write;                                             \
+            asprintf(&write, __VA_ARGS__);                           \
+            if(glfs_write (a, write, strlen(write), 0) < 0) {        \
+              LOG("mgmt", ERROR, "%s", "glfs_write: failed");        \
+              ret = -1;                                              \
+              goto out;                                              \
+            }                                                        \
+            GB_FREE(write);                                          \
+          } while (0)
+
+# define  METAUNLOCK(lkfd)                                           \
+          do {                                                       \
+            struct flock lock = {0, };                               \
+            lock.l_type = F_UNLCK;                                   \
+            if (glfs_posix_lock(lkfd, F_SETLKW, &lock)) {            \
+              LOG("mgmt", ERROR, "%s", "glfs_posix_lock: failed");   \
+              ret = -1;                                              \
+            }                                                        \
+          } while (0)
+
+
+# define  CALLOC(x)                                                  \
+            calloc(1, x)
+
+# define  GB_ALLOC_N(ptr, count)                                     \
+            gbAllocN(&(ptr), sizeof(*(ptr)), (count),                \
+                     __FILE__, __FUNCTION__, __LINE__)               \
+
+# define  GB_ALLOC(ptr)                                              \
+            gbAlloc(&(ptr), sizeof(*(ptr)),                          \
+                    __FILE__, __FUNCTION__, __LINE__)
+
+# define  GB_STRDUP(dst, src)                                        \
+            gbStrdup(&(dst), src,                                    \
+                     __FILE__, __FUNCTION__, __LINE__)
+
+# define  GB_FREE(ptr)                                               \
+            gbFree(1 ? (void *) &(ptr) : (ptr))
+
 
 typedef enum LogLevel {
     NONE       = 0,
@@ -75,66 +158,6 @@ static const char *const LogLevelLookup[] = {
 
     [LOGLEVEL__MAX] = NULL,
 };
-
-# define ERROR(fmt, ...) \
-         fprintf(stderr, "Error: " fmt " [at %s+%d :<%s>]\n", \
-                 __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__)
-
-# define MSG(fmt, ...) \
-         fprintf(stdout, fmt, __VA_ARGS__)
-
-# define LOG(str, level, fmt, ...) {\
-              static FILE *fd; \
-              if (!strcmp(str, "mgmt")) \
-                fd = fopen (DAEMON_LOG_FILE, "a"); \
-              else if (strcmp(str, "cli")) \
-                fd = fopen (CLI_LOG_FILE, "a"); \
-              else if (strcmp(str, "gfapi")) \
-                fd = fopen (GFAPI_LOG_FILE, "a"); \
-              else \
-                fd = stderr; \
-              fprintf(fd, "[%lu] %s: " fmt " [at %s+%d :<%s>]\n", \
-                      (unsigned long)time(NULL), LogLevelLookup[level], \
-                      __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__); \
-              fclose(fd); \
-              }
-
-# define  METALOCK(a, b) {\
-                            memset (&a, 0, sizeof(a)); \
-                            a.l_type = F_WRLCK;        \
-                            if (glfs_posix_lock (b, F_SETLKW, &a)) {\
-                              ERROR("%s", "glfs_posix_lock: failed");\
-                              goto out;\
-                            }\
-                         }
-
-# define  METAUPDATE(a, b, ...) {\
-                              asprintf(&b, __VA_ARGS__);\
-                              if(glfs_write (a, b, strlen(b), 0) < 0) {\
-                                ERROR("%s", "glfs_write: failed");\
-                                goto out;\
-                              }\
-                              GB_FREE(b); \
-                           }
-
-# define METAUNLOCK(a, b)   {\
-                              a.l_type = F_UNLCK; \
-                              glfs_posix_lock(b, F_SETLKW, &a); \
-                            }
-
-
-# define CALLOC(x)    calloc(1, x)
-
-# define GB_ALLOC_N(ptr, count) gbAllocN(&(ptr), sizeof(*(ptr)), (count), \
-                                         __FILE__, __FUNCTION__, __LINE__)
-
-# define GB_ALLOC(ptr) gbAlloc(&(ptr), sizeof(*(ptr)), \
-                               __FILE__, __FUNCTION__, __LINE__)
-
-# define GB_STRDUP(dst, src) gbStrdup(&(dst), src, \
-                                      __FILE__, __FUNCTION__, __LINE__)
-
-# define GB_FREE(ptr) gbFree(1 ? (void *) &(ptr) : (ptr))
 
 typedef enum Metakey {
   VOLUME = 0,
