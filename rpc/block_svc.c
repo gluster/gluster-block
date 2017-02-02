@@ -20,9 +20,6 @@
 
 
 
-pthread_t p_thread1, p_thread2;
-
-
 static void
 gluster_block_cli_1(struct svc_req *rqstp, register SVCXPRT *transp)
 {
@@ -134,7 +131,7 @@ gluster_block_1(struct svc_req *rqstp, register SVCXPRT *transp)
 }
 
 void *
-cli_thread(void *vargp)
+cli_thread_proc (void *vargp)
 {
   register SVCXPRT *transp;
   struct sockaddr_un saun;
@@ -173,7 +170,7 @@ cli_thread(void *vargp)
 }
 
 void *
-server_thread(void *vargp)
+server_thread_proc(void *vargp)
 {
   register SVCXPRT *transp;
   struct sockaddr_in sain;
@@ -213,14 +210,18 @@ server_thread(void *vargp)
 int
 main (int argc, char **argv)
 {
+  pthread_t cli_thread;
+  pthread_t server_thread;
+
+
 	pmap_unset (GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS);
   pmap_unset (GLUSTER_BLOCK, GLUSTER_BLOCK_VERS);
 
-  pthread_create(&p_thread1, NULL, cli_thread, NULL);
-  pthread_create(&p_thread2, NULL, server_thread, NULL);
+  pthread_create(&cli_thread, NULL, cli_thread_proc , NULL);
+  pthread_create(&server_thread, NULL, server_thread_proc , NULL);
 
-  pthread_join(p_thread1, NULL);
-  pthread_join(p_thread2, NULL);
+  pthread_join(cli_thread, NULL);
+  pthread_join(server_thread, NULL);
 
 
   fprintf (stderr, "%s", "svc_run returned");

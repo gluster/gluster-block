@@ -23,27 +23,32 @@ glusterBlockVolumeInit(char *volume, char *volfileserver)
   struct glfs *glfs;
   int ret;
 
+
   glfs = glfs_new(volume);
   if (!glfs) {
-    LOG("gfapi", ERROR, "%s", "glfs_new: failed");
+    LOG("gfapi", GB_LOG_ERROR, "glfs_new(%s) from %s failed[%s]", volume,
+        volfileserver, strerror(errno));
     return NULL;
   }
 
   ret = glfs_set_volfile_server(glfs, "tcp", volfileserver, 24007);
   if (ret) {
-    LOG("gfapi", ERROR, "%s", "glfs_set_volfile_server: failed");
+    LOG("gfapi", GB_LOG_ERROR, "glfs_set_volfile_server(%s) of %s "
+        "failed[%s]", volfileserver, volume, strerror(errno));
     goto out;
   }
 
   ret = glfs_set_logging(glfs, GFAPI_LOG_FILE, GFAPI_LOG_LEVEL);
   if (ret) {
-    LOG("gfapi", ERROR, "%s", "glfs_set_logging: failed");
+    LOG("gfapi", GB_LOG_ERROR, "glfs_set_logging(%s, %d) on %s failed[%s]",
+        GFAPI_LOG_FILE, GFAPI_LOG_LEVEL, volume, strerror(errno));
     goto out;
   }
 
   ret = glfs_init(glfs);
   if (ret) {
-    LOG("gfapi", ERROR, "%s", "glfs_init: failed");
+    LOG("gfapi", GB_LOG_ERROR, "glfs_init() on %s failed[%s]", volume,
+        strerror(errno) );
     goto out;
   }
 
@@ -60,29 +65,36 @@ int
 glusterBlockCreateEntry(blockCreateCli *blk, char *gbid)
 {
   struct glfs *glfs;
-  struct glfs_fd *fd;
+  struct glfs_fd *tgfd;
   int ret = -1;
+
 
   glfs = glusterBlockVolumeInit(blk->volume, blk->volfileserver);
   if (!glfs) {
-    LOG("gfapi", ERROR, "%s", "glusterBlockVolumeInit: failed");
+    LOG("gfapi", GB_LOG_ERROR, "glusterBlockVolumeInit(%s): failed",
+        blk->volume);
     goto out;
   }
 
-  fd = glfs_creat(glfs, gbid,
-                  O_WRONLY | O_CREAT | O_TRUNC,
+  tgfd = glfs_creat(glfs, gbid,
+                  O_WRONLY | O_CREAT | O_EXCL,
                   S_IRUSR | S_IWUSR);
-  if (!fd) {
-    LOG("gfapi", ERROR, "%s", "glfs_creat: failed");
+  if (!tgfd) {
+    LOG("gfapi", GB_LOG_ERROR, "glfs_creat(%s) on volume %s failed[%s]",
+        gbid, blk->volume, strerror(errno));
   } else {
-    ret = glfs_ftruncate(fd, blk->size);
+    ret = glfs_ftruncate(tgfd, blk->size);
     if (ret) {
-      LOG("gfapi", ERROR, "%s", "glfs_ftruncate: failed");
+      LOG("gfapi", GB_LOG_ERROR, "glfs_ftruncate(%s): on volume %s "
+          "of size %zu failed[%s]", gbid, blk->volume, blk->size,
+          strerror(errno));
       goto out;
     }
 
-    if (glfs_close(fd) != 0) {
-      LOG("gfapi", ERROR, "%s", "glfs_close: failed");
+    if (glfs_close(tgfd) != 0) {
+      LOG("gfapi", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
+          gbid, blk->volume, strerror(errno));
+      goto out;
     }
   }
 
@@ -98,15 +110,18 @@ glusterBlockDeleteEntry(char *volume, char *gbid)
   struct glfs *glfs;
   int ret = -1;
 
+
   glfs = glusterBlockVolumeInit(volume, "localhost");
   if (!glfs) {
-    LOG("gfapi", ERROR, "%s", "glusterBlockVolumeInit: failed");
+    LOG("gfapi", GB_LOG_ERROR, "glusterBlockVolumeInit(%s): failed",
+        volume);
     goto out;
   }
 
   ret = glfs_unlink(glfs, gbid);
   if (ret) {
-    LOG("gfapi", ERROR, "%s", "glfs_unlink: failed");
+    LOG("gfapi", GB_LOG_ERROR, "glfs_unlink(%s) on volume %s failed[%s]",
+        gbid, volume, strerror(errno));
     goto out;
   }
 
@@ -117,26 +132,30 @@ glusterBlockDeleteEntry(char *volume, char *gbid)
 
 
 struct glfs_fd *
-glusterBlockCreateMetaLockFile(struct glfs *glfs)
+glusterBlockCreateMetaLockFile(struct glfs *glfs, char *volume)
 {
   struct glfs_fd *lkfd;
   int ret;
 
+
   ret = glfs_mkdir (glfs, METADIR, 0);
   if (ret && errno != EEXIST) {
-    LOG("gfapi", ERROR, "%s", "glfs_mkdir: failed");
+    LOG("gfapi", GB_LOG_ERROR, "glfs_mkdir(%s) on volume %s failed[%s]",
+        METADIR, volume, strerror(errno));
     goto out;
   }
 
   ret = glfs_chdir (glfs, METADIR);
   if (ret) {
-    LOG("gfapi", ERROR, "%s", "glfs_chdir: failed");
+    LOG("gfapi", GB_LOG_ERROR, "glfs_chdir(%s) on volume %s failed[%s]",
+        METADIR, volume, strerror(errno));
     goto out;
   }
 
   lkfd = glfs_creat(glfs, TXLOCKFILE, O_RDWR, S_IRUSR | S_IWUSR);
   if (!lkfd) {
-    LOG("gfapi", ERROR, "%s", "glfs_creat: failed");
+    LOG("gfapi", GB_LOG_ERROR, "glfs_creat(%s) on volume %s failed[%s]",
+        TXLOCKFILE, volume, strerror(errno));
     goto out;
   }
 
@@ -152,10 +171,11 @@ blockFreeMetaInfo(MetaInfo *info)
 {
   int i;
 
+
   if (!info)
     return;
 
-  for (i = 0; i< info->nhosts; i++)
+  for (i = 0; i < info->nhosts; i++)
     GB_FREE(info->list[i]);
 
   GB_FREE(info->list);
@@ -171,20 +191,21 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
   int Flag = 0;
   size_t i;
 
+
   switch (blockMetaKeyEnumParse(opt)) {
-  case VOLUME:
+  case GB_META_VOLUME:
     strcpy(info->volume, strchr(line, ' ')+1);
     break;
-  case GBID:
+  case GB_META_GBID:
     strcpy(info->gbid, strchr(line, ' ')+1);
     break;
-  case SIZE:
+  case GB_META_SIZE:
     sscanf(strchr(line, ' ')+1, "%zu", &info->size);
     break;
-  case HA:
+  case GB_META_HA:
     sscanf(strchr(line, ' ')+1, "%zu", &info->mpath);
     break;
-  case ENTRYCREATE:
+  case GB_META_ENTRYCREATE:
     strcpy(info->entry, strchr(line, ' ')+1);
     break;
 
@@ -219,28 +240,31 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
   GB_FREE(tmp);
 }
 
+
 int
 blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info)
 {
   size_t count = 0;
-  struct glfs_fd *tgfd;
-  char line[48];
+  struct glfs_fd *tgmfd;
+  char line[1024];
   char *tmp;
 
-  tgfd = glfs_open(glfs, metafile, O_RDONLY);
-  if (!tgfd) {
-    LOG("gfapi", ERROR, "%s", "glfs_open failed");
+
+  tgmfd = glfs_open(glfs, metafile, O_RDONLY);
+  if (!tgmfd) {
+    LOG("gfapi", GB_LOG_ERROR, "glfs_open(%s) on volume %s failed[%s]",
+        metafile, info->volume, strerror(errno));
     return -1;
   }
 
-  while (glfs_read (tgfd, line, 48, 0) > 0) {
+  while (glfs_read (tgmfd, line, sizeof(line), 0) > 0) {
     tmp = strtok(line,"\n");
     count += strlen(tmp) + 1;
     blockStuffMetaInfo(info, tmp);
-    glfs_lseek(tgfd, count, SEEK_SET);
+    glfs_lseek(tgmfd, count, SEEK_SET);
   }
 
-  glfs_close(tgfd);
+  glfs_close(tgmfd);
 
   return 0;
 }

@@ -16,38 +16,40 @@
 int
 blockMetaKeyEnumParse(const char *opt)
 {
-    int i;
+  int i;
 
-    if (!opt) {
-        return METAKEY__MAX;
+
+  if (!opt) {
+    return GB_METAKEY_MAX;
+  }
+
+  for (i = 0; i < GB_METAKEY_MAX; i++) {
+    if (!strcmp(opt, MetakeyLookup[i])) {
+      return i;
     }
+  }
 
-    for (i = 0; i < METAKEY__MAX; i++) {
-        if (!strcmp(opt, MetakeyLookup[i])) {
-            return i;
-        }
-    }
-
-    return i;
+  return i;
 }
 
 
 int
 blockMetaStatusEnumParse(const char *opt)
 {
-    int i;
+  int i;
 
-    if (!opt) {
-        return METASTATUS__MAX;
+
+  if (!opt) {
+    return GB_METASTATUS_MAX;
+  }
+
+  for (i = 0; i < GB_METASTATUS_MAX; i++) {
+    if (!strcmp(opt, MetaStatusLookup[i])) {
+      return i;
     }
+  }
 
-    for (i = 0; i < METASTATUS__MAX; i++) {
-        if (!strcmp(opt, MetaStatusLookup[i])) {
-            return i;
-        }
-    }
-
-    return i;
+  return i;
 }
 
 
@@ -56,11 +58,12 @@ gbAlloc(void *ptrptr, size_t size,
         const char *filename, const char *funcname, size_t linenr)
 {
   *(void **)ptrptr = calloc(1, size);
+
   if (*(void **)ptrptr == NULL) {
-    ERROR("%s", "Error: memory allocation failed");
     errno = ENOMEM;
     return -1;
   }
+
   return 0;
 }
 
@@ -70,11 +73,12 @@ gbAllocN(void *ptrptr, size_t size, size_t count,
          const char *filename, const char *funcname, size_t linenr)
 {
   *(void**)ptrptr = calloc(count, size);
+
   if (*(void**)ptrptr == NULL) {
-    ERROR("%s", "Error: memory allocation failed");
     errno = ENOMEM;
     return -1;
   }
+
   return 0;
 }
 
@@ -84,8 +88,9 @@ gbFree(void *ptrptr)
 {
   int save_errno = errno;
 
-  if(*(void**)ptrptr == NULL)
+  if(*(void**)ptrptr == NULL) {
    return;
+  }
 
   free(*(void**)ptrptr);
   *(void**)ptrptr = NULL;
@@ -97,13 +102,15 @@ int
 gbStrdup(char **dest, const char *src,
          const char *filename, const char *funcname, size_t linenr)
 {
-    *dest = NULL;
-    if (!src)
-        return 0;
-    if (!(*dest = strdup(src))) {
-      ERROR("%s", "Error: string duplication failed");
-        return -1;
-    }
+  *dest = NULL;
 
+  if (!src) {
     return 0;
+  }
+
+  if (!(*dest = strdup(src))) {
+    return -1;
+  }
+
+  return 0;
 }

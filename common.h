@@ -22,6 +22,6 @@
 
 
 
-size_t glusterBlockCreateParseSize(char *value);
+ssize_t glusterBlockCreateParseSize(char *value);
 
 # endif /* _COMMON_H */

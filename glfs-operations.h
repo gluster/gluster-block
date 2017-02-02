@@ -50,7 +50,7 @@ int
 glusterBlockDeleteEntry(char *volume, char *gbid);
 
 struct glfs_fd *
-glusterBlockCreateMetaLockFile(struct glfs *glfs);
+glusterBlockCreateMetaLockFile(struct glfs *glfs, char *volume);
 
 int
 blockGetMetaInfo(struct glfs *glfs, char *metafile, MetaInfo *info);

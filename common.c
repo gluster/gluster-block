@@ -13,12 +13,12 @@
 
 
 
-size_t
+ssize_t
 glusterBlockCreateParseSize(char *value)
 {
   char *postfix;
   char *tmp;
-  size_t sizef;
+  ssize_t sizef;
 
   if (!value)
     return -1;
@@ -30,8 +30,9 @@ glusterBlockCreateParseSize(char *value)
   }
 
   tmp = postfix;
-  if (*postfix == ' ')
+  if (*postfix == ' ') {
     tmp = tmp + 1;
+  }
 
   switch (*tmp) {
   case 'Y':
@@ -64,8 +65,9 @@ glusterBlockCreateParseSize(char *value)
     return sizef;
     break;
   default:
-    ERROR("%s", "You may use k/K, M, G or T suffixes for "
-                "kilobytes, megabytes, gigabytes and terabytes.");
+  /*TODO: Log this instead of printing
+     ERROR("%s", "You may use k/K, M, G or T suffixes for "
+           "kilobytes, megabytes, gigabytes and terabytes."); */
     return -1;
   }
 }

@@ -48,7 +48,7 @@ glusterBlockCliRPC_1(void *cobj, operations opt, char **out)
 
 
   if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
-    LOG("cli", ERROR, "socket creation failed (%s)", strerror (errno));
+    LOG("cli", GB_LOG_ERROR, "socket creation failed (%s)", strerror (errno));
     goto out;
   }
 
@@ -57,7 +57,7 @@ glusterBlockCliRPC_1(void *cobj, operations opt, char **out)
 
   if (connect(sockfd, (struct sockaddr *) &saun,
               sizeof(struct sockaddr_un)) < 0) {
-    LOG("cli", ERROR, "connect failed (%s)", strerror (errno));
+    LOG("cli", GB_LOG_ERROR, "connect failed (%s)", strerror (errno));
     goto out;
   }
 
@@ -65,7 +65,7 @@ glusterBlockCliRPC_1(void *cobj, operations opt, char **out)
                           GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS,
                           &sockfd, 0, 0);
   if (!clnt) {
-    LOG("cli", ERROR, "%s, unix addr %s",
+    LOG("cli", GB_LOG_ERROR, "%s, unix addr %s",
         clnt_spcreateerror("client create failed"), ADDRESS);
     goto out;
   }
@@ -74,28 +74,28 @@ glusterBlockCliRPC_1(void *cobj, operations opt, char **out)
   case CREATE_CLI:
     reply = block_create_cli_1((blockCreateCli *)cobj, clnt);
     if (!reply) {
-      LOG("cli", ERROR, "%s", clnt_sperror(clnt, "block create failed"));
+      LOG("cli", GB_LOG_ERROR, "%s", clnt_sperror(clnt, "block create failed"));
       goto out;
     }
     break;
   case DELETE_CLI:
     reply = block_delete_cli_1((blockDeleteCli *)cobj, clnt);
     if (!reply) {
-      LOG("cli", ERROR, "%s", clnt_sperror(clnt, "block delete failed"));
+      LOG("cli", GB_LOG_ERROR, "%s", clnt_sperror(clnt, "block delete failed"));
       goto out;
     }
     break;
   case INFO_CLI:
     reply = block_info_cli_1((blockInfoCli *)cobj, clnt);
     if (!reply) {
-      LOG("cli", ERROR, "%s", clnt_sperror(clnt, "block info failed"));
+      LOG("cli", GB_LOG_ERROR, "%s", clnt_sperror(clnt, "block info failed"));
       goto out;
     }
     break;
   case LIST_CLI:
     reply = block_list_cli_1((blockListCli *)cobj, clnt);
     if (!reply) {
-      LOG("cli", ERROR, "%s", clnt_sperror(clnt, "block list failed"));
+      LOG("cli", GB_LOG_ERROR, "%s", clnt_sperror(clnt, "block list failed"));
       goto out;
     }
     break;
@@ -107,7 +107,7 @@ glusterBlockCliRPC_1(void *cobj, operations opt, char **out)
 
  out:
   if (!clnt_freeres(clnt, (xdrproc_t)xdr_blockResponse, (char *)reply))
-    LOG("cli", ERROR, "%s", clnt_sperror(clnt, "clnt_freeres failed"));
+    LOG("cli", GB_LOG_ERROR, "%s", clnt_sperror(clnt, "clnt_freeres failed"));
 
   if (clnt)
     clnt_destroy (clnt);
@@ -152,7 +152,7 @@ glusterBlockCreate(int count, char **options, char *name)
 
 
   if (!name) {
-    LOG("cli", ERROR, "%s", "Insufficient arguments supplied for"
+    LOG("cli", GB_LOG_ERROR, "%s", "Insufficient arguments supplied for"
                             "'gluster-block create'");
     ret = -1;
     goto out;
@@ -171,7 +171,7 @@ glusterBlockCreate(int count, char **options, char *name)
     };
 
     optchar = getopt_long(count, options, "b:v:h:s:",
-                    long_options, &option_index);
+                          long_options, &option_index);
 
     if (optchar == -1)
       break;
@@ -184,7 +184,7 @@ glusterBlockCreate(int count, char **options, char *name)
 
     case 'b':
       if (GB_STRDUP(cobj.block_hosts, optarg) < 0) {
-        LOG("cli", ERROR, "%s", "failed while parsing size");
+        LOG("cli", GB_LOG_ERROR, "%s", "failed while parsing size");
         ret = -1;
         goto out;
       }
@@ -204,7 +204,7 @@ glusterBlockCreate(int count, char **options, char *name)
     case 's':
       cobj.size = glusterBlockCreateParseSize(optarg);
       if (cobj.size < 0) {
-        LOG("cli", ERROR, "%s", "failed while parsing size");
+        LOG("cli", GB_LOG_ERROR, "%s", "failed while parsing size");
         ret = -1;
         goto out;
       }
@@ -223,7 +223,7 @@ glusterBlockCreate(int count, char **options, char *name)
 
   /* Print any remaining command line arguments (not options). */
   if (optind < count) {
-    LOG("cli", ERROR, "%s", "non-option ARGV-elements: ");
+    LOG("cli", GB_LOG_ERROR, "%s", "non-option ARGV-elements: ");
     while (optind < count)
       MSG("provided options: %s", options[optind++]);
     putchar('\n');
@@ -233,7 +233,7 @@ glusterBlockCreate(int count, char **options, char *name)
   }
 
   if (ret != 5) {
-    LOG("cli", ERROR, "%s", "Insufficient arguments supplied for"
+    LOG("cli", GB_LOG_ERROR, "%s", "Insufficient arguments supplied for"
                             "'gluster-block create'\n");
     ret = -1;
     goto out;
@@ -350,7 +350,7 @@ glusterBlockParseArgs(int count, char **options)
     case 'c':
       ret = glusterBlockCreate(count, options, optarg);
       if (ret && ret != EEXIST) {
-        LOG("cli", ERROR, "%s", FAILED_CREATE);
+        LOG("cli", GB_LOG_ERROR, "%s", FAILED_CREATE);
         goto out;
       }
       break;
@@ -382,23 +382,23 @@ glusterBlockParseArgs(int count, char **options)
   case 'l':
     ret = glusterBlockList(volume);
     if (ret)
-        LOG("cli", ERROR, "%s", FAILED_LIST);
+        LOG("cli", GB_LOG_ERROR, "%s", FAILED_LIST);
     break;
   case 'i':
     ret = glusterBlockInfo(blockname, volume);
     if (ret)
-        LOG("cli", ERROR, "%s", FAILED_INFO);
+        LOG("cli", GB_LOG_ERROR, "%s", FAILED_INFO);
     break;
   case 'd':
     ret = glusterBlockDelete(blockname, volume);
     if (ret)
-        LOG("cli", ERROR, "%s", FAILED_DELETE);
+        LOG("cli", GB_LOG_ERROR, "%s", FAILED_DELETE);
     break;
   }
 
  out:
   if (ret == 0 && optind < count) {
-    LOG("cli", ERROR, "%s", "Unable to parse elements: ");
+    LOG("cli", GB_LOG_ERROR, "%s", "Unable to parse elements: ");
     while (optind < count)
       MSG("provided options: %s", options[optind++]);
     putchar('\n');

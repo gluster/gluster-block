@@ -72,39 +72,46 @@
             fprintf(fd, "[%lu] %s: " fmt " [at %s+%d :<%s>]\n",      \
                     (unsigned long)time(NULL), LogLevelLookup[level],\
                     __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__);  \
-            fclose(fd);                                              \
+            if (fd != stderr)                                        \
+              fclose(fd);                                            \
           } while (0)
 
-# define  METALOCK(lkfd)                                             \
+# define  GB_METALOCK_OR_GOTO(lkfd, volume, ret, label)              \
           do {                                                       \
             struct flock lock = {0, };                               \
-            memset (&lock, 0, sizeof(lock));                         \
             lock.l_type = F_WRLCK;                                   \
             if (glfs_posix_lock (lkfd, F_SETLKW, &lock)) {           \
-              LOG("mgmt", ERROR, "%s", "glfs_posix_lock: failed");   \
+              LOG("mgmt", GB_LOG_ERROR, "glfs_posix_lock() on "      \
+                  "volume %s failed[%s]", volume, strerror(errno));  \
               ret = -1;                                              \
-              goto out;                                              \
+              goto label;                                            \
             }                                                        \
           } while (0)
 
-# define  METAUPDATE(a, ...)                                         \
+# define  GB_METAUPDATE_OR_GOTO(tgmfd, fname, volume, ret, label,...)\
           do {                                                       \
             char *write;                                             \
-            asprintf(&write, __VA_ARGS__);                           \
-            if(glfs_write (a, write, strlen(write), 0) < 0) {        \
-              LOG("mgmt", ERROR, "%s", "glfs_write: failed");        \
+            if (asprintf(&write, __VA_ARGS__) < 0) {                 \
               ret = -1;                                              \
-              goto out;                                              \
+              goto label;                                            \
+            }                                                        \
+            if(glfs_write (tgmfd, write, strlen(write), 0) < 0) {    \
+              LOG("mgmt", GB_LOG_ERROR, "glfs_write(%s): on "        \
+                  "volume %s failed[%s]", fname, volume,             \
+                  strerror(errno));                                  \
+              ret = -1;                                              \
+              goto label;                                            \
             }                                                        \
             GB_FREE(write);                                          \
           } while (0)
 
-# define  METAUNLOCK(lkfd)                                           \
+# define  GB_METAUNLOCK(lkfd, volume, ret)                           \
           do {                                                       \
             struct flock lock = {0, };                               \
             lock.l_type = F_UNLCK;                                   \
-            if (glfs_posix_lock(lkfd, F_SETLKW, &lock)) {            \
-              LOG("mgmt", ERROR, "%s", "glfs_posix_lock: failed");   \
+            if (glfs_posix_lock(lkfd, F_SETLK, &lock)) {             \
+              LOG("mgmt", GB_LOG_ERROR, "glfs_posix_lock() on "      \
+                  "volume %s failed[%s]", volume, strerror(errno));  \
               ret = -1;                                              \
             }                                                        \
           } while (0)
@@ -130,74 +137,77 @@
 
 
 typedef enum LogLevel {
-    NONE       = 0,
-    EMERGENCY  = 1,
-    ALERT      = 2,
-    CRITICAL   = 3,
-    ERROR      = 4,
-    WARNING    = 5,
-    NOTICE     = 6,
-    INFO       = 7,
-    DEBUG      = 8,
-    TRACE      = 9,
+  GB_LOG_NONE       = 0,
+  GB_LOG_EMERGENCY  = 1,
+  GB_LOG_ALERT      = 2,
+  GB_LOG_CRITICAL   = 3,
+  GB_LOG_ERROR      = 4,
+  GB_LOG_WARNING    = 5,
+  GB_LOG_NOTICE     = 6,
+  GB_LOG_INFO       = 7,
+  GB_LOG_DEBUG      = 8,
+  GB_LOG_TRACE      = 9,
 
-    LOGLEVEL__MAX = 10      /* Updata this when add new level */
+  GB_LOG_MAX
 } LogLevel;
 
 static const char *const LogLevelLookup[] = {
-    [NONE]       = "NONE",
-    [EMERGENCY]  = "EMERGENCY",
-    [ALERT]      = "ALERT",
-    [CRITICAL]   = "CRITICAL",
-    [ERROR]      = "ERROR",
-    [WARNING]    = "WARNING",
-    [NOTICE]     = "NOTICE",
-    [INFO]       = "INFO",
-    [DEBUG]      = "DEBUG",
-    [TRACE]      = "TRACE",
+  [GB_LOG_NONE]       = "NONE",
+  [GB_LOG_EMERGENCY]  = "EMERGENCY",
+  [GB_LOG_ALERT]      = "ALERT",
+  [GB_LOG_CRITICAL]   = "CRITICAL",
+  [GB_LOG_ERROR]      = "ERROR",
+  [GB_LOG_WARNING]    = "WARNING",
+  [GB_LOG_NOTICE]     = "NOTICE",
+  [GB_LOG_INFO]       = "INFO",
+  [GB_LOG_DEBUG]      = "DEBUG",
+  [GB_LOG_TRACE]      = "TRACE",
 
-    [LOGLEVEL__MAX] = NULL,
+  [GB_LOG_MAX]        = NULL,
 };
 
 typedef enum Metakey {
-  VOLUME = 0,
-  GBID   = 1,
-  SIZE   = 2,
-  HA     = 3,
-  ENTRYCREATE = 4,
+  GB_META_INVALID     = 0,
+  GB_META_VOLUME      = 1,
+  GB_META_GBID        = 2,
+  GB_META_SIZE        = 3,
+  GB_META_HA          = 4,
+  GB_META_ENTRYCREATE = 5,
 
-  METAKEY__MAX = 5      /* Updata this when add new Key */
+  GB_METAKEY_MAX
 } Metakey;
 
 static const char *const MetakeyLookup[] = {
-    [VOLUME] = "VOLUME",
-    [GBID]   = "GBID",
-    [SIZE]   = "SIZE",
-    [HA]     = "HA",
-    [ENTRYCREATE] = "ENTRYCREATE",
-    [METAKEY__MAX] = NULL,
+  [GB_META_INVALID]     = NULL,
+  [GB_META_VOLUME]      = "VOLUME",
+  [GB_META_GBID]        = "GBID",
+  [GB_META_SIZE]        = "SIZE",
+  [GB_META_HA]          = "HA",
+  [GB_META_ENTRYCREATE] = "ENTRYCREATE",
+
+  [GB_METAKEY_MAX]      = NULL
 };
 
 typedef enum MetaStatus {
-  CONFIGSUCCESS = 0,
-  CONFIGFAIL   = 1,
-  CONFIGINPROGRESS = 2,
-  CLEANUPSUCCESS = 3,
-  CLEANUPFAIL = 4,
-  CLEANUPINPROGRES = 5,
+  GB_CONFIG_SUCCESS    = 0,
+  GB_CONFIG_FAIL       = 1,
+  GB_CONFIG_INPROGRESS = 2,
+  GB_CLEANUP_SUCCESS   = 3,
+  GB_CLEANUP_FAIL      = 4,
+  GB_CLEANUP_INPROGRES = 5,
 
-  METASTATUS__MAX = 6      /* Updata this when add new Status type */
+  GB_METASTATUS_MAX
 } MetaStatus;
 
 static const char *const MetaStatusLookup[] = {
-    [CONFIGINPROGRESS] = "CONFIGINPROGRESS",
-    [CONFIGSUCCESS] = "CONFIGSUCCESS",
-    [CONFIGFAIL] = "CONFIGFAIL",
-    [CLEANUPINPROGRES] = "CLEANUPINPROGRESS",
-    [CLEANUPSUCCESS] = "CLEANUPSUCCESS",
-    [CLEANUPFAIL] = "CLEANUPFAIL",
+  [GB_CONFIG_SUCCESS]     = "CONFIGSUCCESS",
+  [GB_CONFIG_FAIL]        = "CONFIGFAIL",
+  [GB_CONFIG_INPROGRESS]  = "CONFIGINPROGRESS",
+  [GB_CLEANUP_INPROGRES]  = "CLEANUPINPROGRESS",
+  [GB_CLEANUP_SUCCESS]    = "CLEANUPSUCCESS",
+  [GB_CLEANUP_FAIL]       = "CLEANUPFAIL",
 
-    [METASTATUS__MAX] = NULL,
+  [GB_METASTATUS_MAX]     = NULL,
 };
 
 
