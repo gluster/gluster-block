@@ -14,6 +14,65 @@
 
 
 int
+glusterBlockCLIOptEnumParse(const char *opt)
+{
+  int i;
+
+
+  if (!opt) {
+    return GB_CLI_OPT_MAX;
+  }
+
+  for (i = 0; i < GB_CLI_OPT_MAX; i++) {
+    if (!strcmp(opt, gbCmdlineOptLookup[i])) {
+      return i;
+    }
+  }
+
+  return i;
+}
+
+int
+glusterBlockCLICreateOptEnumParse(const char *opt)
+{
+  int i;
+
+
+  if (!opt) {
+    return GB_CLI_CREATE_OPT_MAX;
+  }
+
+  /* i = 11, enum start look gbCmdlineCreateOption */
+  for (i = 11; i < GB_CLI_CREATE_OPT_MAX; i++) {
+    if (!strcmp(opt, gbCmdlineCreateOptLookup[i])) {
+      return i;
+    }
+  }
+
+  return i;
+}
+
+int
+glusterBlockCLICommonOptEnumParse(const char *opt)
+{
+  int i;
+
+
+  if (!opt) {
+    return GB_CLI_COMMON_OPT_MAX;
+  }
+
+  /* i = 21, enum start look gbCmdlineCreateOption */
+  for (i = 21; i < GB_CLI_COMMON_OPT_MAX; i++) {
+    if (!strcmp(opt, gbCmdlineCommonOptLookup[i])) {
+      return i;
+    }
+  }
+
+  return i;
+}
+
+int
 blockMetaKeyEnumParse(const char *opt)
 {
   int i;

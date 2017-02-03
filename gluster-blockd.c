@@ -118,13 +118,14 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   ret = reply->exit;
 
  out:
-  if (!clnt_freeres(clnt, (xdrproc_t)xdr_blockResponse, (char *)reply)) {
-    LOG("mgmt", GB_LOG_ERROR, "%s",
-        clnt_sperror(clnt, "clnt_freeres failed"));
-  }
-
   if (clnt) {
-    clnt_destroy (clnt);
+    if (!reply ||
+        !clnt_freeres(clnt, (xdrproc_t)xdr_blockResponse, (char *)reply)) {
+      LOG("mgmt", GB_LOG_ERROR, "%s",
+          clnt_sperror(clnt, "clnt_freeres failed"));
+
+      clnt_destroy (clnt);
+    }
   }
 
   close(sockfd);

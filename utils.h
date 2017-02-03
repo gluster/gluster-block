@@ -136,6 +136,70 @@
             gbFree(1 ? (void *) &(ptr) : (ptr))
 
 
+typedef enum gbCmdlineCreateOption {
+  /* needed by create option  */
+  GB_CLI_CREATE_VOLUME           = 11,
+  GB_CLI_CREATE_VOLSERVER        = 12,   /* optional (default: localhost)*/
+  GB_CLI_CREATE_SIZE             = 13,
+  GB_CLI_CREATE_MULTIPATH        = 14,
+  GB_CLI_CREATE_BACKEND_SERVESRS = 15,
+
+  GB_CLI_CREATE_OPT_MAX
+} gbCmdlineCreateOption;
+
+
+typedef enum gbCmdlineCommonOption {
+  /* common to all the cli options */
+  GB_CLI_COMMON_VOLUME      = 21,
+
+  GB_CLI_COMMON_OPT_MAX
+} gbCmdlineCommonOption;
+
+
+typedef enum gbCmdlineOption {
+  GB_CLI_UNKNOWN     = 0,
+
+  GB_CLI_CREATE      = 1,
+  GB_CLI_LIST        = 2,
+  GB_CLI_INFO        = 3,
+  GB_CLI_DELETE      = 4,
+  GB_CLI_MODIFY      = 5,
+  GB_CLI_HELP        = 6,
+
+  GB_CLI_OPT_MAX
+} gbCmdlineOption;
+
+
+static const char *const gbCmdlineOptLookup[] = {
+  [GB_CLI_UNKNOWN]     = "NONE",
+
+  [GB_CLI_CREATE]      = "create",
+  [GB_CLI_LIST]        = "list",
+  [GB_CLI_INFO]        = "info",
+  [GB_CLI_DELETE]      = "delete",
+  [GB_CLI_MODIFY]      = "modify",
+  [GB_CLI_HELP]        = "help",
+
+  [GB_CLI_OPT_MAX]     = NULL,
+};
+
+static const char *const gbCmdlineCreateOptLookup[] = {
+  [GB_CLI_CREATE_VOLUME]           = "volume",
+  [GB_CLI_CREATE_VOLSERVER]        = "volserver",
+  [GB_CLI_CREATE_SIZE]             = "size",
+  [GB_CLI_CREATE_MULTIPATH]        = "mpath",
+  [GB_CLI_CREATE_BACKEND_SERVESRS] = "backend-servers",
+
+
+  [GB_CLI_CREATE_OPT_MAX]   = NULL
+};
+
+static const char *const gbCmdlineCommonOptLookup[] = {
+  [GB_CLI_COMMON_VOLUME]           = "volume",
+
+  [GB_CLI_COMMON_OPT_MAX]   = NULL
+};
+
 typedef enum LogLevel {
   GB_LOG_NONE       = 0,
   GB_LOG_EMERGENCY  = 1,
@@ -167,18 +231,16 @@ static const char *const LogLevelLookup[] = {
 };
 
 typedef enum Metakey {
-  GB_META_INVALID     = 0,
-  GB_META_VOLUME      = 1,
-  GB_META_GBID        = 2,
-  GB_META_SIZE        = 3,
-  GB_META_HA          = 4,
-  GB_META_ENTRYCREATE = 5,
+  GB_META_VOLUME      = 0,
+  GB_META_GBID        = 1,
+  GB_META_SIZE        = 2,
+  GB_META_HA          = 3,
+  GB_META_ENTRYCREATE = 4,
 
   GB_METAKEY_MAX
 } Metakey;
 
 static const char *const MetakeyLookup[] = {
-  [GB_META_INVALID]     = NULL,
   [GB_META_VOLUME]      = "VOLUME",
   [GB_META_GBID]        = "GBID",
   [GB_META_SIZE]        = "SIZE",
@@ -210,6 +272,12 @@ static const char *const MetaStatusLookup[] = {
   [GB_METASTATUS_MAX]     = NULL,
 };
 
+
+int glusterBlockCLIOptEnumParse(const char *opt);
+
+int glusterBlockCLICreateOptEnumParse(const char *opt);
+
+int glusterBlockCLICommonOptEnumParse(const char *opt);
 
 int blockMetaKeyEnumParse(const char *opt);
 
