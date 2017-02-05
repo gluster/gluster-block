@@ -1,0 +1,42 @@
+
+Summary:          Gluster block storage utility
+Name:             @PACKAGE_NAME@
+Version:          @PACKAGE_VERSION@
+Vendor:           Gluster Community
+Release:          @PACKAGE_RELEASE@
+License:          GPLv2 or LGPLv3+
+Group:            System Environment/Base
+BuildRequires:    glusterfs-api-devel >= 3.6.0
+BuildRequires:    help2man >= 1.36
+Requires:         glusterfs-api >= 3.6.0
+%if ( 0%{?_with_systemd:1} )
+BuildRequires:    systemd
+%endif
+URL:              http://www.gluster.org/docs/index.php/GlusterFS
+Source0:          @PACKAGE_NAME@-@PACKAGE_VERSION@.tar.gz
+
+%description
+gluster-block is a CLI utility, which aims at making gluster backed
+block storage creation and maintenance as simple as possible.
+
+%prep
+rm -rf %{_topdir}/BUILD/*
+
+%setup
+
+%build
+%configure
+make
+
+%install
+make DESTDIR=${RPM_BUILD_ROOT} install
+
+%clean
+rm -rf ${RPM_BUILD_ROOT}
+
+%files
+%{_sbindir}/gluster-block
+%{_sbindir}/gluster-blockd
+%if ( 0%{?_with_systemd:1} )
+%{_unitdir}/gluster-blockd.service
+%endif

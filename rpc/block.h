@@ -69,6 +69,27 @@ struct blockResponse {
 };
 typedef struct blockResponse blockResponse;
 
+typedef struct blockServerDef {
+  size_t nhosts;
+  char   **hosts;
+} blockServerDef;
+typedef blockServerDef *blockServerDefPtr;
+
+typedef enum operations {
+  CREATE_SRV = 1,
+  DELETE_SRV = 2,
+} operations;
+
+void
+gluster_block_cli_1(struct svc_req *rqstp, register SVCXPRT *transp);
+
+void
+gluster_block_1(struct svc_req *rqstp, register SVCXPRT *transp);
+
+
+int
+glusterBlockCallRPC_1(char *host, void *cobj, operations opt, char **out);
+
 #define GLUSTER_BLOCK_CLI 212153113
 #define GLUSTER_BLOCK_CLI_VERS 1
 

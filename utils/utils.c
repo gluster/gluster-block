@@ -32,6 +32,7 @@ glusterBlockCLIOptEnumParse(const char *opt)
   return i;
 }
 
+
 int
 glusterBlockCLICreateOptEnumParse(const char *opt)
 {
@@ -52,6 +53,7 @@ glusterBlockCLICreateOptEnumParse(const char *opt)
   return i;
 }
 
+
 int
 glusterBlockCLICommonOptEnumParse(const char *opt)
 {
@@ -71,6 +73,7 @@ glusterBlockCLICommonOptEnumParse(const char *opt)
 
   return i;
 }
+
 
 int
 blockMetaKeyEnumParse(const char *opt)
@@ -146,6 +149,7 @@ void
 gbFree(void *ptrptr)
 {
   int save_errno = errno;
+
 
   if(*(void**)ptrptr == NULL) {
    return;

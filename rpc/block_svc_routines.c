@@ -9,16 +9,11 @@
 */
 
 
-# define _GNU_SOURCE         /* See feature_test_macros(7) */
-
-# include  <stdio.h>
-# include  <netdb.h>
-# include  <sys/socket.h>
-# include  <uuid/uuid.h>
-
-# include  "rpc/block.h"
 # include  "common.h"
 # include  "glfs-operations.h"
+
+# include  <netdb.h>
+# include  <uuid/uuid.h>
 
 
 # define   UUID_BUF_SIZE     38
@@ -37,19 +32,7 @@
 
 
 
-typedef struct blockServerDef {
-  size_t nhosts;
-  char   **hosts;
-} blockServerDef;
-typedef blockServerDef *blockServerDefPtr;
-
-typedef enum operations {
-  CREATE_SRV = 1,
-  DELETE_SRV = 2,
-} operations;
-
-
-static int
+int
 glusterBlockCallRPC_1(char *host, void *cobj,
                       operations opt, char **out)
 {

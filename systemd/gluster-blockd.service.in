@@ -5,7 +5,7 @@ After=rpcbind.service target.service tcmu-runner.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/sbin/gluster-blockd
+ExecStart=@prefix@/sbin/gluster-blockd
 KillMode=process
 
 [Install]

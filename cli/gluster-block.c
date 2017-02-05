@@ -9,32 +9,17 @@
 */
 
 
-# define   _GNU_SOURCE         /* See feature_test_macros(7) */
-
-# include  <unistd.h>
-# include  <getopt.h>
-
 # include  "common.h"
-# include  "rpc/block.h"
-
-
-# define  LIST      "list"
-# define  CREATE    "create"
-# define  DELETE    "delete"
-# define  INFO      "info"
-# define  MODIFY    "modify"
-# define  BLOCKHOST "block-host"
-# define  VOLUME    "volume"
-# define  HELP      "help"
+# include  "block.h"
 
 
 
-typedef enum operations {
+typedef enum clioperations {
   CREATE_CLI = 1,
   LIST_CLI   = 2,
   INFO_CLI   = 3,
   DELETE_CLI = 4
-} operations;
+} clioperations;
 
 
 static int
@@ -174,7 +159,6 @@ glusterBlockCreate(int argcount, char **options)
       return -1;
     }
 
-
     switch (opt) {
     case GB_CLI_CREATE_VOLUME:
       strcpy(cobj.volume, options[optind++]);
@@ -290,6 +274,7 @@ glusterBlockDelete(int argcount, char **options)
   char *out = NULL;
   int ret = -1;
 
+
   if(argcount <= optind) {
     MSG("%s\n", "Insufficient options for delete");
     return -1;
@@ -331,6 +316,7 @@ glusterBlockInfo(int argcount, char **options)
   char *out = NULL;
   int ret = -1;
 
+
   if(argcount <= optind) {
     MSG("%s\n", "Insufficient options for info");
     return -1;
@@ -368,6 +354,7 @@ glusterBlockParseArgs(int count, char **options)
 {
   int ret = 0;
   size_t opt = 0;
+
 
   opt = glusterBlockCLIOptEnumParse(options[1]);
   if (!opt || opt >= GB_CLI_OPT_MAX) {

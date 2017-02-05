@@ -20,6 +20,7 @@ glusterBlockCreateParseSize(char *value)
   char *tmp;
   ssize_t sizef;
 
+
   if (!value)
     return -1;
 

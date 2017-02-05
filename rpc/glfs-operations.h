@@ -19,7 +19,7 @@
 
 # include  <glusterfs/api/glfs.h>
 
-# include  "rpc/block.h"
+# include  "block.h"
 
 
 

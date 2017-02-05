@@ -12,7 +12,9 @@
 # ifndef   _UTILS_H
 # define   _UTILS_H   1
 
+# define   _GNU_SOURCE         /* See feature_test_macros(7) */
 # include  <stdio.h>
+
 # include  <stdlib.h>
 # include  <stdbool.h>
 # include  <string.h>
