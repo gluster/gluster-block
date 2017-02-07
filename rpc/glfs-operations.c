@@ -62,23 +62,17 @@ glusterBlockVolumeInit(char *volume, char *volfileserver)
 
 
 int
-glusterBlockCreateEntry(blockCreateCli *blk, char *gbid)
+glusterBlockCreateEntry(struct glfs *glfs,
+                        blockCreateCli *blk,
+                        char *gbid)
 {
-  struct glfs *glfs;
   struct glfs_fd *tgfd;
   int ret = -1;
 
 
-  glfs = glusterBlockVolumeInit(blk->volume, blk->volfileserver);
-  if (!glfs) {
-    LOG("gfapi", GB_LOG_ERROR, "glusterBlockVolumeInit(%s): failed",
-        blk->volume);
-    goto out;
-  }
-
   tgfd = glfs_creat(glfs, gbid,
-                  O_WRONLY | O_CREAT | O_EXCL,
-                  S_IRUSR | S_IWUSR);
+                    O_WRONLY | O_CREAT | O_EXCL,
+                    S_IRUSR | S_IWUSR);
   if (!tgfd) {
     LOG("gfapi", GB_LOG_ERROR, "glfs_creat(%s) on volume %s failed[%s]",
         gbid, blk->volume, strerror(errno));
@@ -99,34 +93,23 @@ glusterBlockCreateEntry(blockCreateCli *blk, char *gbid)
   }
 
  out:
-  glfs_fini(glfs);
   return ret;
 }
 
 
 int
-glusterBlockDeleteEntry(char *volume, char *gbid)
+glusterBlockDeleteEntry(struct glfs *glfs, char *volume, char *gbid)
 {
-  struct glfs *glfs;
-  int ret = -1;
+  int ret;
 
-
-  glfs = glusterBlockVolumeInit(volume, "localhost");
-  if (!glfs) {
-    LOG("gfapi", GB_LOG_ERROR, "glusterBlockVolumeInit(%s): failed",
-        volume);
-    goto out;
-  }
 
   ret = glfs_unlink(glfs, gbid);
   if (ret) {
     LOG("gfapi", GB_LOG_ERROR, "glfs_unlink(%s) on volume %s failed[%s]",
         gbid, volume, strerror(errno));
-    goto out;
   }
 
  out:
-  glfs_fini(glfs);
   return ret;
 }
 

@@ -376,7 +376,7 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
   }
 
   if (cleanupsuccess == info->nhosts) {
-    if (glusterBlockDeleteEntry(info->volume, info->gbid)) {
+    if (glusterBlockDeleteEntry(glfs, info->volume, info->gbid)) {
       LOG("mgmt", GB_LOG_ERROR, "%s volume: %s host: %s",
           FAILED_DELETING_FILE, info->volume, "localhost");
     }
@@ -467,7 +467,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
                         "ENTRYCREATE: INPROGRESS\n",
                         blk->volume, gbid, blk->size, blk->mpath);
 
-  ret = glusterBlockCreateEntry(blk, gbid);
+  ret = glusterBlockCreateEntry(glfs, blk, gbid);
   if (ret) {
     GB_METAUPDATE_OR_GOTO(tgmfd, blk->block_name, blk->volume, ret,
                           exist, "ENTRYCREATE: FAIL\n");

@@ -44,10 +44,10 @@ struct glfs *
 glusterBlockVolumeInit(char *volume, char *volfileserver);
 
 int
-glusterBlockCreateEntry(blockCreateCli *blk, char *gbid);
+glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid);
 
 int
-glusterBlockDeleteEntry(char *volume, char *gbid);
+glusterBlockDeleteEntry(struct glfs *glfs, char *volume, char *gbid);
 
 struct glfs_fd *
 glusterBlockCreateMetaLockFile(struct glfs *glfs, char *volume);
