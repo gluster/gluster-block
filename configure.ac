@@ -16,7 +16,7 @@ AC_INIT([glusterfs-block],
 AC_SUBST([PACKAGE_RELEASE], 1)
 
 AC_ARG_WITH(systemddir,
-            [  --with-systemddir=DIR systemd service files in DIR @<:@PREFIX/lib/systemd/system@:>@],
+            [--with-systemddir=DIR systemd service files in DIR @<:@PREFIX/lib/systemd/system@:>@],
             [systemddir=$withval],
             [systemddir='${prefix}/lib/systemd/system'])
 AC_SUBST(systemddir)
@@ -44,11 +44,22 @@ LT_INIT
 AC_PROG_CC
 
 # Checks for header files.
-AC_CHECK_HEADERS([memory.h netdb.h netinet/in.h stdlib.h string.h sys/socket.h unistd.h])
+AC_CHECK_HEADERS([stdio.h stdlib.h string.h stdbool.h        \
+                  unistd.h errno.h memory.h time.h           \
+                  netdb.h netinet/in.h sys/socket.h          \
+                  pthread.h uuid/uuid.h glusterfs/api/glfs.h \
+                  rpc/pmap_clnt.h ])
 
 # Checks for libraries.
-AC_CHECK_LIB([gfapi], [glfs_init])
-PKG_CHECK_MODULES([GLFS], [glusterfs-api >= 3])
+AC_CHECK_LIB([gfapi], [glfs_init], [GFAPI="-lgfapi"],
+             AC_MSG_ERROR([gfapi library is required to build gluster-block]))
+AC_SUBST(GFAPI)
+AC_CHECK_LIB([uuid], [uuid_generate], [UUID="-luuid"],
+             AC_MSG_ERROR([uuid library is required to build gluster-block]))
+AC_SUBST(UUID)
+AC_CHECK_LIB([pthread], [pthread_mutex_init],[PTHREAD="-lpthread"],
+             AC_MSG_ERROR([Posix threads library is required to build gluster-block]))
+AC_SUBST(PTHREAD)
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
@@ -66,7 +77,7 @@ cat <<EOF
  $PACKAGE_NAME version $PACKAGE_VERSION
   Prefix.........: $prefix
   C Compiler.....: $CC $CFLAGS $CPPFLAGS
-  Linker.........: $LD $MORE_LDFLAGS $LDFLAGS $LIBS
+  Linker.........: $LD $LDFLAGS $LIBS
 ---------------------------------------------
 
 Check the above options and compile with:

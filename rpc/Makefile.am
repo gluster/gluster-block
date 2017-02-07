@@ -6,7 +6,7 @@ noinst_HEADERS = block.h glfs-operations.h
 
 libgbxdr_la_CFLAGS = -I$(top_srcdir)/utils/
 
-libgbxdr_la_LIBADD = -lgfapi
+libgbxdr_la_LIBADD = $(GFAPI) $(UUID)
 
 libgbxdr_ladir = $(includedir)/gluster-block/rpc
 
