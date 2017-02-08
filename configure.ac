@@ -8,7 +8,7 @@ dnl  cases as published by the Free Software Foundation.
 
 
 AC_PREREQ([2.69])
-AC_INIT([glusterfs-block],
+AC_INIT([gluster-block],
         m4_esyscmd(echo -n `git describe --always --tags`),
         [pkalever@redhat.com],,
         [https://github.com/pkalever/gluster-block.git])
