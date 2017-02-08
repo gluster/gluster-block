@@ -44,10 +44,10 @@ LT_INIT
 AC_PROG_CC
 
 # Checks for header files.
-AC_CHECK_HEADERS([stdio.h stdlib.h string.h stdbool.h        \
-                  unistd.h errno.h memory.h time.h           \
-                  netdb.h netinet/in.h sys/socket.h          \
-                  pthread.h uuid/uuid.h glusterfs/api/glfs.h \
+AC_CHECK_HEADERS([stdio.h stdlib.h string.h stdbool.h stddef.h \
+                  unistd.h errno.h memory.h time.h             \
+                  netdb.h netinet/in.h sys/socket.h            \
+                  pthread.h uuid/uuid.h glusterfs/api/glfs.h   \
                   rpc/pmap_clnt.h ])
 
 # Checks for libraries.

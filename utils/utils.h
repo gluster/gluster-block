@@ -16,6 +16,7 @@
 # include  <stdio.h>
 
 # include  <stdlib.h>
+# include  <stddef.h>
 # include  <stdbool.h>
 # include  <string.h>
 # include  <errno.h>
@@ -122,13 +123,20 @@
 # define  CALLOC(x)                                                  \
             calloc(1, x)
 
+# define  GB_ALLOC(ptr)                                              \
+            gbAlloc(&(ptr), sizeof(*(ptr)),                          \
+                    __FILE__, __FUNCTION__, __LINE__)
+
 # define  GB_ALLOC_N(ptr, count)                                     \
             gbAllocN(&(ptr), sizeof(*(ptr)), (count),                \
                      __FILE__, __FUNCTION__, __LINE__)               \
 
-# define  GB_ALLOC(ptr)                                              \
-            gbAlloc(&(ptr), sizeof(*(ptr)),                          \
-                    __FILE__, __FUNCTION__, __LINE__)
+# define  xalloc_oversized(n, s)                                     \
+            ((size_t) (sizeof(ptrdiff_t) <= sizeof(size_t) ? -1 : -2) / (s) < (n))
+
+# define  GB_REALLOC_N(ptr, count)                                    \
+            gbReallocN(&(ptr), sizeof(*(ptr)), (count),               \
+                       __FILE__, __FUNCTION__, __LINE__)
 
 # define  GB_STRDUP(dst, src)                                        \
             gbStrdup(&(dst), src,                                    \
@@ -290,6 +298,9 @@ int gbAlloc(void *ptrptr, size_t size,
 
 int gbAllocN(void *ptrptr, size_t size, size_t count,
              const char *filename, const char *funcname, size_t linenr);
+
+int gbReallocN(void *ptrptr, size_t size, size_t count,
+               const char *filename, const char *funcname, size_t linenr);
 
 int gbStrdup(char **dest, const char *src,
              const char *filename, const char *funcname, size_t linenr);

@@ -109,7 +109,6 @@ glusterBlockDeleteEntry(struct glfs *glfs, char *volume, char *gbid)
         gbid, volume, strerror(errno));
   }
 
- out:
   return ret;
 }
 
@@ -202,6 +201,8 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
       strcpy(info->list[0]->status, strchr(line, ' ')+1);
       info->nhosts = 1;
     } else {
+      if(GB_REALLOC_N(info->list, info->nhosts+1) < 0)
+        return;
       for (i = 0; i < info->nhosts; i++) {
         if(!strcmp(info->list[i]->addr, opt)) {
           strcpy(info->list[i]->status, strchr(line, ' ')+1);

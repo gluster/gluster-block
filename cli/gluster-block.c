@@ -23,13 +23,13 @@ typedef enum clioperations {
 
 
 static int
-glusterBlockCliRPC_1(void *cobj, operations opt, char **out)
+glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
 {
   CLIENT *clnt = NULL;
   int ret = -1;
   int sockfd;
   struct sockaddr_un saun;
-  blockResponse *reply;
+  blockResponse *reply = NULL;
 
 
   if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
@@ -86,9 +86,11 @@ glusterBlockCliRPC_1(void *cobj, operations opt, char **out)
     break;
   }
 
-  if (GB_STRDUP(*out, reply->out) < 0)
-    goto out;
-  ret = reply->exit;
+  if (reply) {
+    if (GB_STRDUP(*out, reply->out) < 0)
+      goto out;
+    ret = reply->exit;
+  }
 
  out:
   if (clnt) {

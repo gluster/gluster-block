@@ -145,6 +145,28 @@ gbAllocN(void *ptrptr, size_t size, size_t count,
 }
 
 
+int
+gbReallocN(void *ptrptr, size_t size, size_t count,
+         const char *filename, const char *funcname, size_t linenr)
+{
+  void *tmp;
+
+
+  if (xalloc_oversized(count, size)) {
+    errno = ENOMEM;
+    return -1;
+  }
+  tmp = realloc(*(void**)ptrptr, size * count);
+  if (!tmp && (size * count)) {
+    errno = ENOMEM;
+    return -1;
+  }
+  *(void**)ptrptr = tmp;
+
+  return 0;
+}
+
+
 void
 gbFree(void *ptrptr)
 {
