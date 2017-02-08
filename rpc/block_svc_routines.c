@@ -388,9 +388,9 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
       LOG("mgmt", GB_LOG_ERROR, "%s volume: %s host: %s",
           FAILED_DELETING_FILE, info->volume, "localhost");
     }
-    ret = glfs_unlink(glfs, blockname);
-    if (ret && errno != ENOENT) {
-      LOG("mgmt", GB_LOG_ERROR, "%s", "glfs_unlink: failed");
+    ret = glusterBlockDeleteMetaLockFile(glfs, info->volume, blockname);
+    if (ret) {
+      LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockDeleteMetaLockFile: failed");
       goto out;
     }
   }
@@ -554,9 +554,9 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  if (asprintf(&backstore, "%s %s %s %zu %s@%s/%s %s", TARGETCLI_GLFS,
+  if (asprintf(&backstore, "%s %s %s %zu %s@%s%s/%s %s", TARGETCLI_GLFS,
                CREATE, blk->block_name, blk->size, blk->volume,
-               blk->volfileserver, blk->gbid, blk->gbid) == -1) {
+               blk->volfileserver, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
     reply->exit = -1;
     goto out;
   }
@@ -754,7 +754,7 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 
   GB_METALOCK_OR_GOTO(lkfd, blk->volume, ret, out);
 
-  tgmfd = glfs_opendir (glfs, "/block-meta");
+  tgmfd = glfs_opendir (glfs, GB_METADIR);
   if (!tgmfd) {
     LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockVolumeInit failed");
     goto out;

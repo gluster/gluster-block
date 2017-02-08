@@ -198,7 +198,7 @@ static const char *const gbCmdlineCreateOptLookup[] = {
   [GB_CLI_CREATE_VOLSERVER]        = "volserver",
   [GB_CLI_CREATE_SIZE]             = "size",
   [GB_CLI_CREATE_MULTIPATH]        = "mpath",
-  [GB_CLI_CREATE_BACKEND_SERVESRS] = "backend-servers",
+  [GB_CLI_CREATE_BACKEND_SERVESRS] = "servers",
 
 
   [GB_CLI_CREATE_OPT_MAX]   = NULL

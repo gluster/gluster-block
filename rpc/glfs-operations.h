@@ -53,6 +53,9 @@ struct glfs_fd *
 glusterBlockCreateMetaLockFile(struct glfs *glfs, char *volume);
 
 int
+glusterBlockDeleteMetaLockFile(struct glfs *glfs, char *volume, char *blockname);
+
+int
 blockGetMetaInfo(struct glfs *glfs, char *metafile, MetaInfo *info);
 
 void
