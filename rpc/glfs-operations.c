@@ -212,9 +212,9 @@ blockFreeMetaInfo(MetaInfo *info)
 static void
 blockStuffMetaInfo(MetaInfo *info, char *line)
 {
-  char* tmp = strdup(line);
-  char* opt = strtok(tmp,":");
-  int Flag = 0;
+  char *tmp = strdup(line);
+  char *opt = strtok(tmp, ":");
+  bool Flag = 0;
   size_t i;
 
 

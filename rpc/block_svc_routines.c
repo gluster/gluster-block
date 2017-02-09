@@ -12,6 +12,7 @@
 # include  "common.h"
 # include  "glfs-operations.h"
 
+# include  <pthread.h>
 # include  <netdb.h>
 # include  <uuid/uuid.h>
 
@@ -30,6 +31,15 @@
 
 # define   MSERVER_DELIMITER ","
 
+
+
+typedef struct blockRemoteObj {
+    struct glfs_fd *tgmfd;
+    void *obj;
+    char *volume;
+    char *addr;
+    char *reply;
+} blockRemoteObj;
 
 
 int
@@ -137,6 +147,22 @@ blockServerDefFree(blockServerDefPtr blkServers)
 }
 
 
+void
+blockRemoteObjFree(pthread_t **tid, blockRemoteObj **args, int count)
+{
+  size_t i;
+
+
+  for (i = 0; i < count; i++) {
+    GB_FREE(args[i]);
+    GB_FREE(tid[i]);
+  }
+
+  GB_FREE(args);
+  GB_FREE(tid);
+}
+
+
 static blockServerDefPtr
 blockServerParse(char *blkServers)
 {
@@ -182,36 +208,92 @@ blockServerParse(char *blkServers)
 }
 
 
-static void
-glusterBlockCreateRemote(struct glfs_fd *tgmfd, char *volume,
-                         blockCreate *cobj, char *addr, char **reply)
+void *
+glusterBlockCreateRemote(void *data)
 {
   int ret;
-  char *out = NULL;
-  char *tmp = *reply;
+  blockRemoteObj *args = *(blockRemoteObj**)data;
+  blockCreate cobj = *(blockCreate *)args->obj;
 
 
-  GB_METAUPDATE_OR_GOTO(tgmfd, cobj->gbid, volume, ret, out,
-                        "%s: CONFIGINPROGRESS\n", addr);
+  GB_METAUPDATE_OR_GOTO(args->tgmfd, cobj.gbid, cobj.volume, ret, out,
+                        "%s: CONFIGINPROGRESS\n", args->addr);
 
-  ret = glusterBlockCallRPC_1(addr, cobj, CREATE_SRV, &out);
+  ret = glusterBlockCallRPC_1(args->addr, &cobj, CREATE_SRV, &args->reply);
   if (ret) {
-    GB_METAUPDATE_OR_GOTO(tgmfd, cobj->gbid, volume, ret, out,
-                          "%s: CONFIGFAIL\n", addr);
-    LOG("mgmt", GB_LOG_ERROR, "%s on host: %s", FAILED_CREATE, addr);
+    GB_METAUPDATE_OR_GOTO(args->tgmfd, cobj.gbid, cobj.volume, ret, out,
+                          "%s: CONFIGFAIL\n", args->addr);
+    LOG("mgmt", GB_LOG_ERROR, "%s on host: %s", FAILED_CREATE, args->addr);
     goto out;
   }
 
-  GB_METAUPDATE_OR_GOTO(tgmfd, cobj->gbid, volume, ret, out,
-                        "%s: CONFIGSUCCESS\n", addr);
+  GB_METAUPDATE_OR_GOTO(args->tgmfd, cobj.gbid, cobj.volume, ret, out,
+                        "%s: CONFIGSUCCESS\n", args->addr);
 
  out:
-  if (asprintf(reply, "%s%s\n", (tmp==NULL?"":tmp), out) == -1) {
-    *reply = tmp;
-  } else {
-    GB_FREE(tmp);
+  pthread_exit(&ret);   /* collect ret in pthread_join 2nd arg */
+}
+
+
+void
+glusterBlockCreateRemoteAsync(blockServerDefPtr list,
+                            size_t listindex, size_t mpath,
+                            struct glfs_fd *tgmfd,
+                            blockCreate *cobj,
+                            char **savereply)
+{
+  pthread_t  **tid = NULL;
+  static blockRemoteObj **args = NULL;
+  char *tmp = *savereply;
+  size_t i;
+
+
+  if (GB_ALLOC_N(tid, mpath) < 0) {
+    goto out;
   }
-  GB_FREE(out);
+
+  if (GB_ALLOC_N(args, mpath) < 0) {
+    goto out;
+  }
+
+  for (i = 0; i < mpath; i++) {
+    if (GB_ALLOC(tid[i])< 0) {
+      goto out;
+    }
+
+    if (GB_ALLOC(args[i])< 0) {
+      goto out;
+    }
+  }
+
+  for (i = 0; i < mpath; i++) {
+    args[i]->tgmfd = tgmfd;
+    args[i]->obj = (void *)cobj;
+    args[i]->addr = list->hosts[i + listindex];
+  }
+
+  for (i = 0; i < mpath; i++) {
+    pthread_create(tid[i], NULL, glusterBlockCreateRemote, &args[i]);
+  }
+
+  for (i = 0; i < mpath; i++) {
+    pthread_join(*tid[i], NULL);
+  }
+
+  for (i = 0; i < mpath; i++) {
+    if (asprintf(savereply, "%s%s\n", (tmp==NULL?"":tmp), args[i]->reply) == -1) {
+      *savereply = tmp;
+      goto out;
+    } else {
+      GB_FREE(tmp);
+      tmp = *savereply;
+    }
+  }
+
+ out:
+  blockRemoteObjFree(tid, args, mpath);
+
+  return;
 }
 
 
@@ -276,8 +358,8 @@ glusterBlockAuditRequest(struct glfs *glfs,
       LOG("mgmt", GB_LOG_INFO, "%s",
           "trying to serve the mpath from spare machines");
       for (i = spent; i < list->nhosts; i++) {
-        glusterBlockCreateRemote(tgmfd, info->volume, cobj,
-                                 list->hosts[i], reply);
+        glusterBlockCreateRemoteAsync(list, spent, morereq,
+                                    tgmfd, cobj, reply);
       }
     }
   }
@@ -290,35 +372,123 @@ glusterBlockAuditRequest(struct glfs *glfs,
 }
 
 
-static void
-glusterBlockDeleteRemote(struct glfs_fd *tgmfd, MetaInfo *info,
-                         blockDelete *cobj, char *addr, char **reply)
+void *
+glusterBlockDeleteRemote(void *data)
 {
-  int ret = -1;
-  char *out = NULL;
-  char *tmp = *reply;
+  int ret;
+  blockRemoteObj *args = *(blockRemoteObj**)data;
+  blockDelete dobj = *(blockDelete *)args->obj;
 
 
-  GB_METAUPDATE_OR_GOTO(tgmfd, info->gbid, info->volume, ret, out,
-                        "%s: CLEANUPINPROGRES\n", addr);
-  ret = glusterBlockCallRPC_1(addr, cobj, DELETE_SRV, &out);
+  GB_METAUPDATE_OR_GOTO(args->tgmfd, dobj.gbid, args->volume, ret, out,
+                        "%s: CLEANUPINPROGRES\n", args->addr);
+  ret = glusterBlockCallRPC_1(args->addr, &dobj, DELETE_SRV, &args->reply);
   if (ret) {
-    GB_METAUPDATE_OR_GOTO(tgmfd, info->gbid, info->volume, ret, out,
-                          "%s: CLEANUPFAIL\n", addr);
+    GB_METAUPDATE_OR_GOTO(args->tgmfd, dobj.gbid, args->volume, ret, out,
+                          "%s: CLEANUPFAIL\n", args->addr);
     LOG("mgmt", GB_LOG_ERROR, "%s on host: %s",
-        FAILED_GATHERING_INFO, addr);
+        FAILED_GATHERING_INFO, args->addr);
     goto out;
   }
-  GB_METAUPDATE_OR_GOTO(tgmfd, info->gbid, info->volume, ret, out,
-                        "%s: CLEANUPSUCCESS\n", addr);
+  GB_METAUPDATE_OR_GOTO(args->tgmfd, dobj.gbid, args->volume, ret, out,
+                        "%s: CLEANUPSUCCESS\n", args->addr);
 
  out:
-  if (asprintf(reply, "%s%s\n", (tmp==NULL?"":tmp), out) == -1) {
-    *reply = tmp;
-  } else {
-    GB_FREE(tmp);
+  pthread_exit(&ret);   /* collect ret in pthread_join 2nd arg */
+}
+
+
+void
+glusterBlockDeleteRemoteAsync(MetaInfo *info,
+                              struct glfs_fd *tgmfd,
+                              blockDelete *dobj,
+                              bool deleteall,
+                              char **savereply)
+{
+  pthread_t  **tid = NULL;
+  static blockRemoteObj **args = NULL;
+  char *tmp = *savereply;
+  size_t i;
+  size_t count = 0;
+
+  for (i = 0; i < info->nhosts; i++) {
+    switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+    case GB_CLEANUP_INPROGRES:
+    case GB_CLEANUP_FAIL:
+    case GB_CONFIG_FAIL:
+    case GB_CONFIG_INPROGRESS:
+      count++;
+      break;
+    }
+    if (deleteall &&
+        blockMetaStatusEnumParse(info->list[i]->status) == GB_CONFIG_SUCCESS) {
+      count++;
+    }
   }
-  GB_FREE(out);
+
+  if (GB_ALLOC_N(tid, count) < 0) {
+    goto out;
+  }
+
+  if (GB_ALLOC_N(args, count) < 0) {
+    goto out;
+  }
+
+  for (i = 0; i < count; i++) {
+    if (GB_ALLOC(tid[i])< 0) {
+      goto out;
+    }
+
+    if (GB_ALLOC(args[i])< 0) {
+      goto out;
+    }
+  }
+
+  for (i = 0, count = 0; i < info->nhosts; i++) {
+    switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+    case GB_CLEANUP_INPROGRES:
+    case GB_CLEANUP_FAIL:
+    case GB_CONFIG_FAIL:
+    case GB_CONFIG_INPROGRESS:
+      args[count]->tgmfd = tgmfd;
+      args[count]->obj = (void *)dobj;
+      args[count]->volume = info->volume;
+      args[count]->addr = info->list[i]->addr;
+      count++;
+      break;
+    }
+    if (deleteall &&
+        blockMetaStatusEnumParse(info->list[i]->status) == GB_CONFIG_SUCCESS) {
+      args[count]->tgmfd = tgmfd;
+      args[count]->obj = (void *)dobj;
+      args[count]->volume = info->volume;
+      args[count]->addr = info->list[i]->addr;
+      count++;
+    }
+  }
+
+  for (i = 0; i < count; i++) {
+    pthread_create(tid[i], NULL, glusterBlockDeleteRemote, &args[i]);
+  }
+
+  for (i = 0; i < count; i++) {
+    pthread_join(*tid[i], NULL);
+  }
+
+  for (i = 0; i < count; i++) {
+    if (asprintf(savereply, "%s%s\n", (tmp==NULL?"":tmp), args[i]->reply) == -1) {
+      *savereply = tmp;
+      goto out;
+    } else {
+      GB_FREE(tmp);
+      tmp = *savereply;
+    }
+  }
+
+ out:
+  blockRemoteObjFree(tid, args, count);
+
+  return;
 }
 
 
@@ -328,7 +498,7 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
 {
   int ret = -1;
   size_t i;
-  static blockDelete cobj;
+  static blockDelete dobj;
   struct glfs_fd *tgmfd = NULL;
   size_t cleanupsuccess = 0;
   MetaInfo *info;
@@ -343,8 +513,8 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
     goto out;
   }
 
-  strcpy(cobj.block_name, blockname);
-  strcpy(cobj.gbid, info->gbid);
+  strcpy(dobj.block_name, blockname);
+  strcpy(dobj.gbid, info->gbid);
 
   tgmfd = glfs_open(glfs, blockname, O_WRONLY|O_APPEND);
   if (!tgmfd) {
@@ -352,22 +522,8 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
     goto out;
   }
 
-  for (i = 0; i < info->nhosts; i++) {
-    switch (blockMetaStatusEnumParse(info->list[i]->status)) {
-    case GB_CLEANUP_INPROGRES:
-    case GB_CLEANUP_FAIL:
-    case GB_CONFIG_FAIL:
-    case GB_CONFIG_INPROGRESS:
-      glusterBlockDeleteRemote(tgmfd, info, &cobj,
-                               info->list[i]->addr, reply);
-      break;
-    }
-    if (deleteall &&
-        blockMetaStatusEnumParse(info->list[i]->status) == GB_CONFIG_SUCCESS) {
-        glusterBlockDeleteRemote(tgmfd, info, &cobj,
-                                 info->list[i]->addr, reply);
-    }
-  }
+  glusterBlockDeleteRemoteAsync(info, tgmfd, &dobj, deleteall, reply);
+
   blockFreeMetaInfo(info);
 
   if (GB_ALLOC(info) < 0)
@@ -410,7 +566,6 @@ blockResponse *
 block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 {
   int ret = -1;
-  size_t i;
   uuid_t uuid;
   char *savereply = NULL;
   char gbid[UUID_BUF_SIZE];
@@ -499,10 +654,8 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   cobj.size = blk->size;
   strcpy(cobj.gbid, gbid);
 
-  for (i = 0; i < blk->mpath; i++) {
-    glusterBlockCreateRemote(tgmfd, blk->volume, &cobj,
-                             list->hosts[i], &savereply);
-  }
+  glusterBlockCreateRemoteAsync(list, 0, blk->mpath,
+                              tgmfd, &cobj, &savereply);
 
   /* Check Point */
   ret = glusterBlockAuditRequest(glfs, tgmfd, blk,
