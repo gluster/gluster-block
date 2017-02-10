@@ -140,7 +140,10 @@ glusterBlockCreate(int argcount, char **options)
 
 
   if(argcount <= optind) {
-    MSG("%s\n", "Insufficient options for create");
+    MSG("%s\n", "Insufficient arguments for create:");
+    MSG("%s\n", "gluster-block create <block-name> volume <volume> "
+                "volserver <gluster-node> size <bytes> mpath <count>"
+                "servers <host1,host2,...>");
     return -1;
   }
 
@@ -205,7 +208,10 @@ glusterBlockCreate(int argcount, char **options)
 
   /* check all options required by create command are specified */
   if(ret < 4) {
-    MSG("%s\n", "Insufficient options for create");
+    MSG("%s\n", "Insufficient arguments for create:");
+    MSG("%s\n", "gluster-block create <block-name> volume <volume> "
+                "volserver <gluster-node> size <bytes> mpath <count>"
+                "servers <host1,host2,...>");
     ret = -1;
     goto out;
   }
@@ -238,7 +244,8 @@ glusterBlockList(int argcount, char **options)
 
 
   if(argcount <= optind) {
-    MSG("%s\n", "Insufficient options for list");
+    MSG("%s\n", "Insufficient arguments for list:");
+    MSG("%s\n", "gluster-block list volume <volume>");
     return -1;
   }
 
@@ -278,7 +285,8 @@ glusterBlockDelete(int argcount, char **options)
 
 
   if(argcount <= optind) {
-    MSG("%s\n", "Insufficient options for delete");
+    MSG("%s\n", "Insufficient arguments for delete:");
+    MSG("%s\n", "gluster-block delete <block-name> volume <volume>");
     return -1;
   }
 
@@ -320,7 +328,8 @@ glusterBlockInfo(int argcount, char **options)
 
 
   if(argcount <= optind) {
-    MSG("%s\n", "Insufficient options for info");
+    MSG("%s\n", "Insufficient arguments for info:");
+    MSG("%s\n", "gluster-block info <block-name> volume <volume>");
     return -1;
   }
 
@@ -385,6 +394,10 @@ glusterBlockParseArgs(int count, char **options)
       if (ret) {
         LOG("cli", GB_LOG_ERROR, "%s", FAILED_INFO);
       }
+      goto out;
+
+    case GB_CLI_MODIFY:
+      MSG("option '%s' is not supported yet.\n", options[1]);
       goto out;
 
     case GB_CLI_DELETE:
