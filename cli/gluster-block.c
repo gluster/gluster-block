@@ -29,20 +29,26 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
   int ret = -1;
   int sockfd;
   struct sockaddr_un saun;
+  blockCreateCli *create_obj;
+  blockDeleteCli *delete_obj;
+  blockInfoCli *info_obj;
+  blockListCli *list_obj;
   blockResponse *reply = NULL;
 
 
   if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
-    LOG("cli", GB_LOG_ERROR, "socket creation failed (%s)", strerror (errno));
+    LOG("cli", GB_LOG_ERROR, "%s: socket creation failed (%s)", GB_UNIX_ADDRESS,
+        strerror (errno));
     goto out;
   }
 
   saun.sun_family = AF_UNIX;
-  strcpy(saun.sun_path, ADDRESS);
+  strcpy(saun.sun_path, GB_UNIX_ADDRESS);
 
   if (connect(sockfd, (struct sockaddr *) &saun,
               sizeof(struct sockaddr_un)) < 0) {
-    LOG("cli", GB_LOG_ERROR, "connect failed (%s)", strerror (errno));
+    LOG("cli", GB_LOG_ERROR, "%s: connect failed (%s)", GB_UNIX_ADDRESS,
+        strerror (errno));
     goto out;
   }
 
@@ -51,44 +57,56 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
                           &sockfd, 0, 0);
   if (!clnt) {
     LOG("cli", GB_LOG_ERROR, "%s, unix addr %s",
-        clnt_spcreateerror("client create failed"), ADDRESS);
+        clnt_spcreateerror("client create failed"), GB_UNIX_ADDRESS);
     goto out;
   }
 
   switch(opt) {
   case CREATE_CLI:
-    reply = block_create_cli_1((blockCreateCli *)cobj, clnt);
+    create_obj = cobj;
+    reply = block_create_cli_1(create_obj, clnt);
     if (!reply) {
-      LOG("cli", GB_LOG_ERROR, "%s", clnt_sperror(clnt, "block create failed"));
+      LOG("cli", GB_LOG_ERROR, "%sblock %s create on volume %s failed\n",
+          clnt_sperror(clnt, "block_create_cli_1"),
+          create_obj->block_name, create_obj->volume);
       goto out;
     }
     break;
   case DELETE_CLI:
-    reply = block_delete_cli_1((blockDeleteCli *)cobj, clnt);
+    delete_obj = cobj;
+    reply = block_delete_cli_1(delete_obj, clnt);
     if (!reply) {
-      LOG("cli", GB_LOG_ERROR, "%s", clnt_sperror(clnt, "block delete failed"));
+      LOG("cli", GB_LOG_ERROR, "%sblock %s delete on volume %s failed",
+          clnt_sperror(clnt, "block_delete_cli_1"),
+          delete_obj->block_name, delete_obj->volume);
       goto out;
     }
     break;
   case INFO_CLI:
-    reply = block_info_cli_1((blockInfoCli *)cobj, clnt);
+    info_obj = cobj;
+    reply = block_info_cli_1(info_obj, clnt);
     if (!reply) {
-      LOG("cli", GB_LOG_ERROR, "%s", clnt_sperror(clnt, "block info failed"));
+      LOG("cli", GB_LOG_ERROR, "%sblock %s info on volume %s failed",
+          clnt_sperror(clnt, "block_info_cli_1"),
+          info_obj->block_name, info_obj->volume);
       goto out;
     }
     break;
   case LIST_CLI:
-    reply = block_list_cli_1((blockListCli *)cobj, clnt);
+    list_obj = cobj;
+    reply = block_list_cli_1(list_obj, clnt);
     if (!reply) {
-      LOG("cli", GB_LOG_ERROR, "%s", clnt_sperror(clnt, "block list failed"));
+      LOG("cli", GB_LOG_ERROR, "%sblock list on volume %s failed",
+          clnt_sperror(clnt, "block_list_cli_1"), list_obj->volume);
       goto out;
     }
     break;
   }
 
   if (reply) {
-    if (GB_STRDUP(*out, reply->out) < 0)
+    if (GB_STRDUP(*out, reply->out) < 0) {
       goto out;
+    }
     ret = reply->exit;
   }
 
@@ -98,6 +116,9 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
       LOG("cli", GB_LOG_ERROR, "%s", clnt_sperror(clnt, "clnt_freeres failed"));
 
     clnt_destroy (clnt);
+  }
+  if (sockfd != -1) {
+    close (sockfd);
   }
 
   return ret;
@@ -222,8 +243,9 @@ glusterBlockCreate(int argcount, char **options)
 
   ret = glusterBlockCliRPC_1(&cobj, CREATE_CLI, &out);
 
-  if(out)
+  if(out) {
     MSG("%s", out);
+  }
 
  out:
   GB_FREE(cobj.block_hosts);
@@ -259,16 +281,15 @@ glusterBlockList(int argcount, char **options)
     return -1;
   }
 
-  if ((opt == GB_CLI_COMMON_VOLUME)) {
-    strcpy(cobj.volume, options[optind]);
+  strcpy(cobj.volume, options[optind]);
 
-    ret = glusterBlockCliRPC_1(&cobj, LIST_CLI, &out);
+  ret = glusterBlockCliRPC_1(&cobj, LIST_CLI, &out);
 
-    if(out)
-      MSG("%s", out);
-
-    GB_FREE(out);
+  if(out) {
+    MSG("%s", out);
   }
+
+  GB_FREE(out);
 
   return ret;
 }
@@ -303,15 +324,14 @@ glusterBlockDelete(int argcount, char **options)
     return -1;
   }
 
-  if ((opt == GB_CLI_COMMON_VOLUME)) {
-    strcpy(cobj.volume, options[optind]);
-    ret = glusterBlockCliRPC_1(&cobj, DELETE_CLI, &out);
+  strcpy(cobj.volume, options[optind]);
+  ret = glusterBlockCliRPC_1(&cobj, DELETE_CLI, &out);
 
-    if(out)
-      MSG("%s", out);
-
-    GB_FREE(out);
+  if(out) {
+    MSG("%s", out);
   }
+
+  GB_FREE(out);
 
   return ret;
 }
@@ -346,15 +366,14 @@ glusterBlockInfo(int argcount, char **options)
     return -1;
   }
 
-  if ((opt == GB_CLI_COMMON_VOLUME)) {
-    strcpy(cobj.volume, options[optind]);
-    ret = glusterBlockCliRPC_1(&cobj, INFO_CLI, &out);
+  strcpy(cobj.volume, options[optind]);
+  ret = glusterBlockCliRPC_1(&cobj, INFO_CLI, &out);
 
-    if(out)
-      MSG("%s", out);
-
-    GB_FREE(out);
+  if(out) {
+    MSG("%s", out);
   }
+
+  GB_FREE(out);
 
   return ret;
 }
@@ -421,8 +440,9 @@ glusterBlockParseArgs(int count, char **options)
 int
 main(int argc, char *argv[])
 {
-  if (argc <= 1)
+  if (argc <= 1) {
     glusterBlockHelp();
+  }
 
   return glusterBlockParseArgs(argc, argv);
 }

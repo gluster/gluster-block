@@ -14,15 +14,17 @@
 
 # include "utils.h"
 
+# define  GB_UNIX_ADDRESS  "/var/run/gluster-block.socket"
+
 # define  DAEMON_LOG_FILE  "/var/log/gluster-block/gluster-blockd.log"
 # define  CLI_LOG_FILE     "/var/log/gluster-block/gluster-block-cli.log"
 
 # define  GFAPI_LOG_FILE   "/var/log/gluster-block/gluster-block-gfapi.log"
 # define  GFAPI_LOG_LEVEL  7
 
-# define  GB_METADIR          "/block-meta"
-# define  GB_STOREDIR         "/block-store"
-# define  GB_TXLOCKFILE       "meta.lock"
+# define  GB_METADIR       "/block-meta"
+# define  GB_STOREDIR      "/block-store"
+# define  GB_TXLOCKFILE    "meta.lock"
 
 
 ssize_t glusterBlockCreateParseSize(char *value);

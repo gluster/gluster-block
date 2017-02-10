@@ -8,8 +8,6 @@
 
 #include <rpc/rpc.h>
 
-#define ADDRESS "/var/run/gluster-block.socket"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

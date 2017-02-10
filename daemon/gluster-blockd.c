@@ -9,10 +9,10 @@
 */
 
 
-# include  <unistd.h>
 # include  <pthread.h>
 # include  <rpc/pmap_clnt.h>
 
+# include  "common.h"
 # include  "block.h"
 
 
@@ -31,9 +31,9 @@ glusterBlockCliThreadProc (void *vargp)
   }
 
   saun.sun_family = AF_UNIX;
-  strcpy(saun.sun_path, ADDRESS);
+  strcpy(saun.sun_path, GB_UNIX_ADDRESS);
 
-  unlink(ADDRESS);
+  unlink(GB_UNIX_ADDRESS);
   len = sizeof(saun.sun_family) + strlen(saun.sun_path);
 
   if (bind(sockfd, (struct sockaddr *) &saun, len) < 0) {
@@ -41,12 +41,12 @@ glusterBlockCliThreadProc (void *vargp)
     exit(1);
   }
 
-  transp = svcunix_create(sockfd, 0, 0, ADDRESS);
+  transp = svcunix_create(sockfd, 0, 0, GB_UNIX_ADDRESS);
   if (transp == NULL) {
     fprintf (stderr, "%s", "cannot create tcp service");
     exit(1);
   }
-	
+
   if (!svc_register(transp, GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS, gluster_block_cli_1, IPPROTO_IP)) {
 		fprintf (stderr, "%s", "unable to register (GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS, unix|local).");
 		exit(1);

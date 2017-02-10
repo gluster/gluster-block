@@ -24,7 +24,6 @@ BRKDIR="/tmp/block/"
 
 function TEST()
 {
-
   echo "TEST : $@"
   eval $@
   if [ $? -ne 0 ]; then
@@ -49,7 +48,8 @@ function cleanup()
 }
 
 
-function force_terminate () {
+function force_terminate()
+{
   local ret=$?;
   >&2 echo -e "\nreceived external"\
               "signal --$(kill -l $ret)--, calling 'cleanup' ...\n";
