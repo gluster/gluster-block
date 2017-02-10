@@ -209,12 +209,13 @@ blockFreeMetaInfo(MetaInfo *info)
 }
 
 
-static void
+static int
 blockStuffMetaInfo(MetaInfo *info, char *line)
 {
   char *tmp = strdup(line);
   char *opt = strtok(tmp, ":");
-  bool Flag = 0;
+  bool flag = 0;
+  int  ret = -1;
   size_t i;
 
 
@@ -238,25 +239,25 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
   default:
     if(!info->list) {
       if(GB_ALLOC(info->list) < 0)
-        return;
+        goto out;
       if(GB_ALLOC(info->list[0]) < 0)
-        return;
+        goto out;
       strcpy(info->list[0]->addr, opt);
       strcpy(info->list[0]->status, strchr(line, ' ')+1);
       info->nhosts = 1;
     } else {
       if(GB_REALLOC_N(info->list, info->nhosts+1) < 0)
-        return;
+        goto out;
       for (i = 0; i < info->nhosts; i++) {
         if(!strcmp(info->list[i]->addr, opt)) {
           strcpy(info->list[i]->status, strchr(line, ' ')+1);
-          Flag = 1;
+          flag = 1;
           break;
         }
       }
-      if (!Flag) {
+      if (!flag) {
         if(GB_ALLOC(info->list[info->nhosts]) < 0)
-          return;
+          goto out;
         strcpy(info->list[info->nhosts]->addr, opt);
         strcpy(info->list[info->nhosts]->status, strchr(line, ' ')+1);
         info->nhosts++;
@@ -265,7 +266,12 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
     break;
   }
 
+  ret = 0;
+
+ out:
   GB_FREE(tmp);
+
+  return ret;
 }
 
 
@@ -273,34 +279,41 @@ int
 blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info)
 {
   size_t count = 0;
-  struct glfs_fd *tgmfd;
+  struct glfs_fd *tgmfd = NULL;
   char line[1024];
   char *tmp;
-  int ret;
+  int ret = 0;
 
 
   ret = glfs_chdir (glfs, GB_METADIR);
   if (ret) {
     LOG("gfapi", GB_LOG_ERROR, "glfs_chdir(%s) on volume %s failed[%s]",
         GB_METADIR, info->volume, strerror(errno));
-    return ret;
+    goto out;
   }
 
   tgmfd = glfs_open(glfs, metafile, O_RDONLY);
   if (!tgmfd) {
     LOG("gfapi", GB_LOG_ERROR, "glfs_open(%s) on volume %s failed[%s]",
         metafile, info->volume, strerror(errno));
-    return -1;
+    ret = -1;
+    goto out;
   }
 
   while (glfs_read (tgmfd, line, sizeof(line), 0) > 0) {
     tmp = strtok(line,"\n");
     count += strlen(tmp) + 1;
-    blockStuffMetaInfo(info, tmp);
+    ret = blockStuffMetaInfo(info, tmp);
+    if (ret) {
+      goto out;
+    }
     glfs_lseek(tgmfd, count, SEEK_SET);
   }
 
-  glfs_close(tgmfd);
+ out:
+  if (tgmfd) {
+    glfs_close(tgmfd);
+  }
 
-  return 0;
+  return ret;
 }
