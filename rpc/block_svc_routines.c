@@ -25,6 +25,7 @@
 # define   GLFS_PATH         "/backstores/user:glfs"
 # define   TARGETCLI_GLFS    "targetcli "GLFS_PATH
 # define   TARGETCLI_ISCSI   "targetcli /iscsi"
+# define   TARGETCLI_GLOBALS "targetcli set global auto_add_default_portal=false"
 # define   TARGETCLI_SAVE    "targetcli / saveconfig"
 # define   ATTRIBUTES        "generate_node_acls=1 demo_mode_write_protect=0"
 # define   IQN_PREFIX        "iqn.2016-12.org.gluster-block:"
@@ -695,15 +696,23 @@ blockResponse *
 block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
 {
   FILE *fp;
-  char *backstore = NULL;;
+  char hostname[255];
+  char *backstore = NULL;
   char *iqn = NULL;
   char *lun = NULL;
+  char *portal = NULL;
   char *attr = NULL;
   char *exec = NULL;
   blockResponse *reply = NULL;
 
 
   if (GB_ALLOC(reply) < 0) {
+    goto out;
+  }
+
+  if (gethostname(hostname, 255)) {
+    LOG("mgmt", GB_LOG_ERROR, "gethostname failed (%s)", strerror(errno));
+    reply->exit = -1;
     goto out;
   }
 
@@ -728,6 +737,13 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
     goto out;
   }
 
+  if (asprintf(&portal, "%s/%s%s/tpg1/portals create %s",
+               TARGETCLI_ISCSI, IQN_PREFIX, blk->gbid,
+               hostname) == -1) {
+    reply->exit = -1;
+    goto out;
+  }
+
   if (asprintf(&attr, "%s/%s%s/tpg1 set attribute %s",
                TARGETCLI_ISCSI, IQN_PREFIX, blk->gbid,
                ATTRIBUTES) == -1) {
@@ -736,8 +752,8 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   }
 
 
-  if (asprintf(&exec, "%s && %s && %s && %s && %s", backstore, iqn,
-               lun, attr, TARGETCLI_SAVE) == -1) {
+  if (asprintf(&exec, "%s && %s && %s && %s && %s && %s && %s", TARGETCLI_GLOBALS,
+               backstore, iqn, lun, portal, attr, TARGETCLI_SAVE) == -1) {
     reply->exit = -1;
     goto out;
   }
@@ -761,6 +777,7 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
  out:
   GB_FREE(exec);
   GB_FREE(attr);
+  GB_FREE(portal);
   GB_FREE(lun);
   GB_FREE(iqn);
   GB_FREE(backstore);
