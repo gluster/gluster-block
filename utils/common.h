@@ -15,6 +15,7 @@
 # include "utils.h"
 
 # define  GB_UNIX_ADDRESS  "/var/run/gluster-block.socket"
+# define  GB_TCP_PORT      24006
 
 # define  DAEMON_LOG_FILE  "/var/log/gluster-block/gluster-blockd.log"
 # define  CLI_LOG_FILE     "/var/log/gluster-block/gluster-block-cli.log"

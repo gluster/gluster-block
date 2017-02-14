@@ -71,7 +71,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   sain.sin_family = AF_INET;
   bcopy((char *)server->h_addr, (char *)&sain.sin_addr.s_addr,
         server->h_length);
-  sain.sin_port = htons(24006);
+  sain.sin_port = htons(GB_TCP_PORT);
 
   if (connect(sockfd, (struct sockaddr *) &sain, sizeof(sain)) < 0) {
     LOG("mgmt", GB_LOG_ERROR, "connect failed (%s)", strerror (errno));

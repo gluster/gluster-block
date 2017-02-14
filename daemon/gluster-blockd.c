@@ -20,14 +20,15 @@
 void *
 glusterBlockCliThreadProc (void *vargp)
 {
-  register SVCXPRT *transp;
+  register SVCXPRT *transp = NULL;
   struct sockaddr_un saun;
   int sockfd, len;
 
 
   if ((sockfd = socket(AF_UNIX, SOCK_STREAM, IPPROTO_IP)) < 0) {
-    perror("server: socket");
-    exit(1);
+    LOG("mgmt", GB_LOG_ERROR, "UNIX socket creation failed (%s)",
+        strerror (errno));
+    goto out;
   }
 
   saun.sun_family = AF_UNIX;
@@ -37,22 +38,37 @@ glusterBlockCliThreadProc (void *vargp)
   len = sizeof(saun.sun_family) + strlen(saun.sun_path);
 
   if (bind(sockfd, (struct sockaddr *) &saun, len) < 0) {
-    perror("server: bind");
-    exit(1);
+    LOG("mgmt", GB_LOG_ERROR, "bind on '%s' failed (%s)",
+        GB_UNIX_ADDRESS, strerror (errno));
+    goto out;
   }
 
   transp = svcunix_create(sockfd, 0, 0, GB_UNIX_ADDRESS);
-  if (transp == NULL) {
-    fprintf (stderr, "%s", "cannot create tcp service");
-    exit(1);
+  if (!transp) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "RPC service transport create failed for unix (%s)",
+        strerror (errno));
+    goto out;
   }
 
-  if (!svc_register(transp, GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS, gluster_block_cli_1, IPPROTO_IP)) {
-		fprintf (stderr, "%s", "unable to register (GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS, unix|local).");
-		exit(1);
+  if (!svc_register(transp, GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS,
+                    gluster_block_cli_1, IPPROTO_IP)) {
+		LOG("mgmt", GB_LOG_ERROR,
+        "unable to register (GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS: %s)",
+        strerror (errno));
+    goto out;
 	}
 
   svc_run ();
+
+ out:
+  if (transp) {
+    svc_destroy(transp);
+  }
+
+  if (sockfd != -1) {
+    close(sockfd);
+  }
 
   return NULL;
 }
@@ -61,37 +77,53 @@ glusterBlockCliThreadProc (void *vargp)
 void *
 glusterBlockServerThreadProc(void *vargp)
 {
-  register SVCXPRT *transp;
+  register SVCXPRT *transp = NULL;
   struct sockaddr_in sain;
   int sockfd;
 
 
   if ((sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
-    perror("server: socket");
-    exit(1);
+    LOG("mgmt", GB_LOG_ERROR, "TCP socket creation failed (%s)",
+        strerror (errno));
+    goto out;
   }
 
   sain.sin_family = AF_INET;
   sain.sin_addr.s_addr = INADDR_ANY;
-  sain.sin_port = htons(24006);
+  sain.sin_port = htons(GB_TCP_PORT);
 
   if (bind(sockfd, (struct sockaddr *) &sain, sizeof (sain)) < 0) {
-    perror("server: bind");
-    exit(1);
+    LOG("mgmt", GB_LOG_ERROR, "bind on port %d failed (%s)",
+        GB_TCP_PORT, strerror (errno));
+    goto out;
   }
 
   transp = svctcp_create(sockfd, 0, 0);
-  if (transp == NULL) {
-    fprintf (stderr, "%s", "cannot create tcp service");
-    exit(1);
+  if (!transp) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "RPC service transport create failed for tcp (%s)",
+        strerror (errno));
+    goto out;
   }
 
-	if (!svc_register(transp, GLUSTER_BLOCK, GLUSTER_BLOCK_VERS, gluster_block_1, IPPROTO_TCP)) {
-		fprintf (stderr, "%s", "unable to register (GLUSTER_BLOCK, GLUSTER_BLOCK_VERS, tcp).");
-		exit(1);
+	if (!svc_register(transp, GLUSTER_BLOCK, GLUSTER_BLOCK_VERS,
+                    gluster_block_1, IPPROTO_TCP)) {
+		LOG("mgmt", GB_LOG_ERROR,
+        "unable to register (GLUSTER_BLOCK, GLUSTER_BLOCK_VERS: %s)",
+        strerror (errno));
+    goto out;
 	}
 
   svc_run ();
+
+ out:
+  if (transp) {
+    svc_destroy(transp);
+  }
+
+  if (sockfd != -1) {
+    close(sockfd);
+  }
 
   return NULL;
 }
@@ -104,8 +136,8 @@ main (int argc, char **argv)
   pthread_t server_thread;
 
 
-	pmap_unset (GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS);
-  pmap_unset (GLUSTER_BLOCK, GLUSTER_BLOCK_VERS);
+	pmap_unset(GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS);
+  pmap_unset(GLUSTER_BLOCK, GLUSTER_BLOCK_VERS);
 
   pthread_create(&cli_thread, NULL, glusterBlockCliThreadProc , NULL);
   pthread_create(&server_thread, NULL, glusterBlockServerThreadProc , NULL);
@@ -114,7 +146,9 @@ main (int argc, char **argv)
   pthread_join(server_thread, NULL);
 
 
-  fprintf (stderr, "%s", "svc_run returned");
-  exit (0);
+  LOG("mgmt", GB_LOG_ERROR, "svc_run returned (%s)",
+      strerror (errno));
+
+  exit (errno);
   /* NOTREACHED */
 }
