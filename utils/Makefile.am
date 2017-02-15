@@ -4,6 +4,8 @@ libgb_la_SOURCES = common.c utils.c
 
 noinst_HEADERS = common.h utils.h
 
+libgb_la_CFLAGS = -DDATADIR=\"$(localstatedir)\"
+
 libgb_ladir = $(includedir)/gluster-block/utils
 
 DISTCLEANFILES = Makefile.in

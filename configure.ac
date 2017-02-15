@@ -61,6 +61,12 @@ AC_CHECK_LIB([pthread], [pthread_mutex_init],[PTHREAD="-lpthread"],
              AC_MSG_ERROR([Posix threads library is required to build gluster-block]))
 AC_SUBST(PTHREAD)
 
+# Dirty hacky stuff to make STATEDIR work
+if test "x$prefix" = xNONE; then
+   test $localstatedir = '${prefix}/var' && localstatedir=$ac_default_prefix/var
+   localstatedir=/var
+fi
+
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
 AC_TYPE_SIZE_T

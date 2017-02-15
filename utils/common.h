@@ -14,13 +14,16 @@
 
 # include "utils.h"
 
-# define  GB_UNIX_ADDRESS  "/var/run/gluster-block.socket"
+# define  GB_LOGDIR        DATADIR "/log/gluster-block"
+# define  GB_INFODIR       DATADIR "/run"
+
+# define  GB_UNIX_ADDRESS  GB_INFODIR "/gluster-block.socket"
 # define  GB_TCP_PORT      24006
 
-# define  DAEMON_LOG_FILE  "/var/log/gluster-block/gluster-blockd.log"
-# define  CLI_LOG_FILE     "/var/log/gluster-block/gluster-block-cli.log"
+# define  DAEMON_LOG_FILE  GB_LOGDIR "/gluster-blockd.log"
+# define  CLI_LOG_FILE     GB_LOGDIR "/gluster-block-cli.log"
 
-# define  GFAPI_LOG_FILE   "/var/log/gluster-block/gluster-block-gfapi.log"
+# define  GFAPI_LOG_FILE   GB_LOGDIR "/gluster-block-gfapi.log"
 # define  GFAPI_LOG_LEVEL  7
 
 # define  GB_METADIR       "/block-meta"

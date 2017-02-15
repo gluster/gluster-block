@@ -9,12 +9,31 @@
 */
 
 
+# include  <sys/stat.h>
 # include  <pthread.h>
 # include  <rpc/pmap_clnt.h>
 
 # include  "common.h"
 # include  "block.h"
 
+
+
+static bool
+glusterBlockLogdirCreate(void)
+{
+  struct stat st = {0};
+
+  if (stat(GB_LOGDIR, &st) == -1) {
+    if (mkdir(GB_LOGDIR, 0755) == -1) {
+      LOG("mgmt", GB_LOG_ERROR, "mkdir(%s) failed (%s)",
+          GB_LOGDIR, strerror (errno));
+
+      return FALSE;
+    }
+  }
+
+  return TRUE;
+}
 
 
 void *
@@ -135,6 +154,9 @@ main (int argc, char **argv)
   pthread_t cli_thread;
   pthread_t server_thread;
 
+  if (glusterBlockLogdirCreate()) {
+    return -1;
+  }
 
 	pmap_unset(GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS);
   pmap_unset(GLUSTER_BLOCK, GLUSTER_BLOCK_VERS);
