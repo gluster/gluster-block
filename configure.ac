@@ -61,6 +61,17 @@ AC_CHECK_LIB([pthread], [pthread_mutex_init],[PTHREAD="-lpthread"],
              AC_MSG_ERROR([Posix threads library is required to build gluster-block]))
 AC_SUBST(PTHREAD)
 
+AC_CHECK_PROG(TCMURUNNER, tcmu-runner, yes, no)
+if test "x$TCMURUNNER" = "xno"; then
+  AC_MSG_ERROR([tcmu-runner not found; try again after installing])
+fi
+
+# FIXME: version check, need atleast 'targetcli-2.1.fb43'
+AC_CHECK_PROG(TARGETCLI, targetcli, yes, no)
+if test "x$TARGETCLI" = "xno"; then
+  AC_MSG_ERROR([targetcli not found; try again after installing])
+fi
+
 # Dirty hacky stuff to make STATEDIR work
 if test "x$prefix" = xNONE; then
    test $localstatedir = '${prefix}/var' && localstatedir=$ac_default_prefix/var
