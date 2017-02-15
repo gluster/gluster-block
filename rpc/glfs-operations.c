@@ -96,7 +96,7 @@ glusterBlockCreateEntry(struct glfs *glfs,
       goto out;
     }
 
-    if (glfs_close(tgfd) != 0) {
+    if (tgfd && glfs_close(tgfd) != 0) {
       LOG("gfapi", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
           gbid, blk->volume, strerror(errno));
       goto out;
@@ -122,7 +122,7 @@ glusterBlockDeleteEntry(struct glfs *glfs, char *volume, char *gbid)
   }
 
   ret = glfs_unlink(glfs, gbid);
-  if (ret) {
+  if (ret && errno != ENOENT) {
     LOG("gfapi", GB_LOG_ERROR, "glfs_unlink(%s) on volume %s failed[%s]",
         gbid, volume, strerror(errno));
   }
@@ -167,7 +167,7 @@ glusterBlockCreateMetaLockFile(struct glfs *glfs, char *volume)
 }
 
 int
-glusterBlockDeleteMetaLockFile(struct glfs *glfs,
+glusterBlockDeleteMetaFile(struct glfs *glfs,
                                char *volume, char *blockname)
 {
   int ret;
@@ -311,8 +311,9 @@ blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info)
   }
 
  out:
-  if (tgmfd) {
-    glfs_close(tgmfd);
+  if (tgmfd && glfs_close(tgmfd) != 0) {
+    LOG("gfapi", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
+        metafile, info->volume, strerror(errno));
   }
 
   return ret;

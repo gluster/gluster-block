@@ -8,7 +8,7 @@
   cases as published by the Free Software Foundation.
 */
 
-
+# include  <dirent.h>
 # include  <sys/stat.h>
 # include  <pthread.h>
 # include  <rpc/pmap_clnt.h>
@@ -21,15 +21,21 @@
 static bool
 glusterBlockLogdirCreate(void)
 {
-  struct stat st = {0};
+  DIR* dir = opendir(GB_LOGDIR);
 
-  if (stat(GB_LOGDIR, &st) == -1) {
+
+  if (dir) {
+    closedir(dir);
+  } else if (errno == ENOENT) {
     if (mkdir(GB_LOGDIR, 0755) == -1) {
       LOG("mgmt", GB_LOG_ERROR, "mkdir(%s) failed (%s)",
           GB_LOGDIR, strerror (errno));
-
       return FALSE;
     }
+  } else {
+    LOG("mgmt", GB_LOG_ERROR, "opendir(%s) failed (%s)",
+        GB_LOGDIR, strerror (errno));
+    return FALSE;
   }
 
   return TRUE;
@@ -40,9 +46,16 @@ void *
 glusterBlockCliThreadProc (void *vargp)
 {
   register SVCXPRT *transp = NULL;
-  struct sockaddr_un saun;
-  int sockfd, len;
+  struct sockaddr_un saun = {0, };
+  int sockfd = -1;
 
+
+  if (strlen(GB_UNIX_ADDRESS) > SUN_PATH_MAX) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "%s: path length is more than SUN_PATH_MAX: (%zu > %zu chars)",
+        GB_UNIX_ADDRESS, strlen(GB_UNIX_ADDRESS), SUN_PATH_MAX);
+    goto out;
+  }
 
   if ((sockfd = socket(AF_UNIX, SOCK_STREAM, IPPROTO_IP)) < 0) {
     LOG("mgmt", GB_LOG_ERROR, "UNIX socket creation failed (%s)",
@@ -53,10 +66,14 @@ glusterBlockCliThreadProc (void *vargp)
   saun.sun_family = AF_UNIX;
   strcpy(saun.sun_path, GB_UNIX_ADDRESS);
 
-  unlink(GB_UNIX_ADDRESS);
-  len = sizeof(saun.sun_family) + strlen(saun.sun_path);
+  if (unlink(GB_UNIX_ADDRESS) && errno != ENOENT) {
+    LOG("mgmt", GB_LOG_ERROR, "unlink(%s) failed (%s)",
+        GB_UNIX_ADDRESS, strerror (errno));
+    goto out;
+  }
 
-  if (bind(sockfd, (struct sockaddr *) &saun, len) < 0) {
+  if (bind(sockfd, (struct sockaddr *) &saun,
+           sizeof(struct sockaddr_un)) < 0) {
     LOG("mgmt", GB_LOG_ERROR, "bind on '%s' failed (%s)",
         GB_UNIX_ADDRESS, strerror (errno));
     goto out;

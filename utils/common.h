@@ -31,6 +31,7 @@
 # define  GB_STOREDIR      "/block-store"
 # define  GB_TXLOCKFILE    "meta.lock"
 
+# define  SUN_PATH_MAX     (sizeof(struct sockaddr_un) - sizeof(unsigned short int)) /*sun_family*/
 
 ssize_t glusterBlockCreateParseSize(char *value);
 

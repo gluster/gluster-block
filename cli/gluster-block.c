@@ -37,14 +37,21 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
 {
   CLIENT *clnt = NULL;
   int ret = -1;
-  int sockfd;
-  struct sockaddr_un saun;
+  int sockfd = -1;
+  struct sockaddr_un saun = {0,};
   blockCreateCli *create_obj;
   blockDeleteCli *delete_obj;
   blockInfoCli *info_obj;
   blockListCli *list_obj;
   blockResponse *reply = NULL;
 
+
+  if (strlen(GB_UNIX_ADDRESS) > SUN_PATH_MAX) {
+    LOG("cli", GB_LOG_ERROR,
+        "%s: path length is more than SUN_PATH_MAX: (%zu > %zu chars)",
+        GB_UNIX_ADDRESS, strlen(GB_UNIX_ADDRESS), SUN_PATH_MAX);
+    goto out;
+  }
 
   if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
     LOG("cli", GB_LOG_ERROR, "%s: socket creation failed (%s)", GB_UNIX_ADDRESS,

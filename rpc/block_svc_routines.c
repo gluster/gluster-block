@@ -19,18 +19,17 @@
 
 # define   UUID_BUF_SIZE     38
 
-# define   CREATE            "create"
-# define   DELETE            "delete"
+# define   GB_CREATE            "create"
+# define   GB_DELETE            "delete"
+# define   GB_MSERVER_DELIMITER ","
 
-# define   GLFS_PATH         "/backstores/user:glfs"
-# define   TARGETCLI_GLFS    "targetcli "GLFS_PATH
-# define   TARGETCLI_ISCSI   "targetcli /iscsi"
-# define   TARGETCLI_GLOBALS "targetcli set global auto_add_default_portal=false > " DEVNULLPATH
-# define   TARGETCLI_SAVE    "targetcli / saveconfig > " DEVNULLPATH
-# define   ATTRIBUTES        "generate_node_acls=1 demo_mode_write_protect=0 > " DEVNULLPATH
-# define   IQN_PREFIX        "iqn.2016-12.org.gluster-block:"
-
-# define   MSERVER_DELIMITER ","
+# define   GB_TGCLI_GLFS_PATH   "/backstores/user:glfs"
+# define   GB_TGCLI_GLFS        "targetcli " GB_TGCLI_GLFS_PATH
+# define   GB_TGCLI_ISCSI       "targetcli /iscsi"
+# define   GB_TGCLI_GLOBALS     "targetcli set global auto_add_default_portal=false > " DEVNULLPATH
+# define   GB_TGCLI_SAVE        "targetcli / saveconfig > " DEVNULLPATH
+# define   GB_TGCLI_ATTRIBUTES  "generate_node_acls=1 demo_mode_write_protect=0 > " DEVNULLPATH
+# define   GB_TGCLI_IQN_PREFIX  "iqn.2016-12.org.gluster-block:"
 
 
 
@@ -124,7 +123,9 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     }
   }
 
-  close(sockfd);
+  if (sockfd != -1) {
+    close(sockfd);
+  }
 
   return ret;
 }
@@ -149,16 +150,13 @@ blockServerDefFree(blockServerDefPtr blkServers)
 
 
 void
-blockRemoteObjFree(pthread_t **tid, blockRemoteObj **args, int count)
+blockRemoteObjFree(pthread_t *tid, blockRemoteObj **args, int count)
 {
   size_t i;
 
-
   for (i = 0; i < count; i++) {
     GB_FREE(args[i]);
-    GB_FREE(tid[i]);
   }
-
   GB_FREE(args);
   GB_FREE(tid);
 }
@@ -168,16 +166,21 @@ static blockServerDefPtr
 blockServerParse(char *blkServers)
 {
   blockServerDefPtr list;
-  char *tmp = blkServers;
+  char *tmp;
+  char *base;
   size_t i = 0;
 
-
-  if (GB_ALLOC(list) < 0) {
+  if (!blkServers) {
     return NULL;
   }
 
-  if (!blkServers) {
-    blkServers = "localhost";
+  if (GB_STRDUP(tmp, blkServers) < 0) {
+    return NULL;
+  }
+  base = tmp;
+
+  if (GB_ALLOC(list) < 0) {
+    goto fail;
   }
 
   /* count number of servers */
@@ -188,7 +191,7 @@ blockServerParse(char *blkServers)
     tmp++;
   }
   list->nhosts++;
-  tmp = blkServers; /* reset addr */
+  tmp = base; /* reset addr */
 
 
   if (GB_ALLOC_N(list->hosts, list->nhosts) < 0) {
@@ -196,7 +199,7 @@ blockServerParse(char *blkServers)
   }
 
   for (i = 0; tmp != NULL; i++) {
-    if (GB_STRDUP(list->hosts[i], strsep(&tmp, MSERVER_DELIMITER)) < 0) {
+    if (GB_STRDUP(list->hosts[i], strsep(&tmp, GB_MSERVER_DELIMITER)) < 0) {
       goto fail;
     }
   }
@@ -204,6 +207,7 @@ blockServerParse(char *blkServers)
   return list;
 
  fail:
+  GB_FREE(base);
   blockServerDefFree(list);
   return NULL;
 }
@@ -243,7 +247,7 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
                             blockCreate *cobj,
                             char **savereply)
 {
-  pthread_t  **tid = NULL;
+  pthread_t  *tid = NULL;
   static blockRemoteObj **args = NULL;
   char *tmp = *savereply;
   size_t i;
@@ -258,10 +262,6 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
   }
 
   for (i = 0; i < mpath; i++) {
-    if (GB_ALLOC(tid[i])< 0) {
-      goto out;
-    }
-
     if (GB_ALLOC(args[i])< 0) {
       goto out;
     }
@@ -274,11 +274,11 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
   }
 
   for (i = 0; i < mpath; i++) {
-    pthread_create(tid[i], NULL, glusterBlockCreateRemote, &args[i]);
+    pthread_create(&tid[i], NULL, glusterBlockCreateRemote, &args[i]);
   }
 
   for (i = 0; i < mpath; i++) {
-    pthread_join(*tid[i], NULL);
+    pthread_join(tid[i], NULL);
   }
 
   for (i = 0; i < mpath; i++) {
@@ -345,23 +345,24 @@ glusterBlockAuditRequest(struct glfs *glfs,
     spare = list->nhosts  - spent;  /* spare after spent */
     morereq = blk->mpath  - successcnt;  /* needed nodes to complete req */
     if (spare == 0) {
-      LOG("mgmt", GB_LOG_WARNING, "%s",
-          "No Spare nodes: rewining the creation of target");
+      LOG("mgmt", GB_LOG_WARNING,
+          "No Spare nodes to create (%s): rewinding creation of target",
+          blk->block_name);
       ret = -1;
       goto out;
     } else if (spare < morereq) {
-      LOG("mgmt", GB_LOG_WARNING, "%s",
-          "Not enough Spare nodes: rewining the creation of target");
+      LOG("mgmt", GB_LOG_WARNING,
+          "Not enough Spare nodes for (%s): rewinding creation of target",
+          blk->block_name);
       ret = -1;
       goto out;
     } else {
       /* create on spare */
-      LOG("mgmt", GB_LOG_INFO, "%s",
-          "trying to serve the mpath from spare machines");
-      for (i = spent; i < list->nhosts; i++) {
+      LOG("mgmt", GB_LOG_INFO,
+          "Trying to serve request for (%s) from spare machines",
+          blk->block_name);
         glusterBlockCreateRemoteAsync(list, spent, morereq,
-                                    tgmfd, cobj, reply);
-      }
+                                      tgmfd, cobj, reply);
     }
   }
 
@@ -382,7 +383,7 @@ glusterBlockDeleteRemote(void *data)
 
 
   GB_METAUPDATE_OR_GOTO(args->tgmfd, dobj.gbid, args->volume, ret, out,
-                        "%s: CLEANUPINPROGRES\n", args->addr);
+                        "%s: CLEANUPINPROGRESS\n", args->addr);
   ret = glusterBlockCallRPC_1(args->addr, &dobj, DELETE_SRV, &args->reply);
   if (ret) {
     GB_METAUPDATE_OR_GOTO(args->tgmfd, dobj.gbid, args->volume, ret, out,
@@ -406,7 +407,7 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
                               bool deleteall,
                               char **savereply)
 {
-  pthread_t  **tid = NULL;
+  pthread_t  *tid = NULL;
   static blockRemoteObj **args = NULL;
   char *tmp = *savereply;
   size_t i;
@@ -436,10 +437,6 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
   }
 
   for (i = 0; i < count; i++) {
-    if (GB_ALLOC(tid[i])< 0) {
-      goto out;
-    }
-
     if (GB_ALLOC(args[i])< 0) {
       goto out;
     }
@@ -469,11 +466,11 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
   }
 
   for (i = 0; i < count; i++) {
-    pthread_create(tid[i], NULL, glusterBlockDeleteRemote, &args[i]);
+    pthread_create(&tid[i], NULL, glusterBlockDeleteRemote, &args[i]);
   }
 
   for (i = 0; i < count; i++) {
-    pthread_join(*tid[i], NULL);
+    pthread_join(tid[i], NULL);
   }
 
   for (i = 0; i < count; i++) {
@@ -519,7 +516,8 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
 
   tgmfd = glfs_open(glfs, blockname, O_WRONLY|O_APPEND);
   if (!tgmfd) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "glfs_open: failed");
+    LOG("mgmt", GB_LOG_ERROR, "glfs_open(%s): on volume %s failed[%s]",
+        blockname, info->volume, strerror(errno));
     goto out;
   }
 
@@ -545,9 +543,9 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
       LOG("mgmt", GB_LOG_ERROR, "%s volume: %s host: %s",
           FAILED_DELETING_FILE, info->volume, "localhost");
     }
-    ret = glusterBlockDeleteMetaLockFile(glfs, info->volume, blockname);
+    ret = glusterBlockDeleteMetaFile(glfs, info->volume, blockname);
     if (ret) {
-      LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockDeleteMetaLockFile: failed");
+      LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockDeleteMetaFile: failed");
       goto out;
     }
   }
@@ -555,8 +553,9 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
  out:
   blockFreeMetaInfo(info);
 
-  if (glfs_close(tgmfd) != 0) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "glfs_close: failed");
+  if (tgmfd && glfs_close(tgmfd) != 0) {
+    LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
+        blockname, info->volume, strerror(errno));
   }
 
   return ret;
@@ -625,7 +624,8 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 
   tgmfd = glfs_creat(glfs, blk->block_name, O_RDWR, S_IRUSR | S_IWUSR);
   if (!tgmfd) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "glfs_creat: failed");
+    LOG("mgmt", GB_LOG_ERROR, "glfs_creat(%s): on volume %s failed[%s]",
+        blk->block_name, blk->volume, strerror(errno));
     goto exist;
   }
 
@@ -662,8 +662,9 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   ret = glusterBlockAuditRequest(glfs, tgmfd, blk,
                                  &cobj, list, &savereply);
   if (ret) {
-      LOG("mgmt", GB_LOG_ERROR, "%s",
-          "even spare nodes have exhausted rewinding");
+      LOG("mgmt", GB_LOG_ERROR,
+          "even spare nodes have exhausted for (%s) rewinding",
+          blk->block_name);
       ret = glusterBlockCleanUp(glfs,
                                 blk->block_name, FALSE, &savereply);
   }
@@ -671,16 +672,19 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
  out:
   reply->out = savereply;
 
-  if (glfs_close(tgmfd) != 0)
-    LOG("mgmt", GB_LOG_ERROR, "%s", "glfs_close: failed");
+  if (tgmfd && glfs_close(tgmfd) != 0) {
+    LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
+        blk->block_name, blk->volume, strerror(errno));
+  }
 
  exist:
   GB_METAUNLOCK(lkfd, blk->volume, ret);
 
   reply->exit = ret;
 
-  if (glfs_close(lkfd) != 0) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "glfs_close: failed");
+  if (lkfd && glfs_close(lkfd) != 0) {
+    LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
+        GB_TXLOCKFILE, blk->volume, strerror(errno));
   }
 
   glfs_fini(glfs);
@@ -710,50 +714,51 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  if (gethostname(hostname, 255)) {
+  if (gethostname(hostname, HOST_NAME_MAX)) {
     LOG("mgmt", GB_LOG_ERROR, "gethostname failed (%s)", strerror(errno));
     reply->exit = -1;
     goto out;
   }
 
-  if (asprintf(&backstore, "%s %s %s %zu %s@%s%s/%s %s", TARGETCLI_GLFS,
-               CREATE, blk->block_name, blk->size, blk->volume,
+  if (asprintf(&backstore, "%s %s %s %zu %s@%s%s/%s %s", GB_TGCLI_GLFS,
+               GB_CREATE, blk->block_name, blk->size, blk->volume,
                blk->volfileserver, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
     reply->exit = -1;
     goto out;
   }
 
-  if (asprintf(&iqn, "%s %s %s%s", TARGETCLI_ISCSI, CREATE,
-               IQN_PREFIX, blk->gbid) == -1) {
+  if (asprintf(&iqn, "%s %s %s%s", GB_TGCLI_ISCSI, GB_CREATE,
+               GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
     reply->exit = -1;
     goto out;
   }
 
 
-  if (asprintf(&lun, "%s/%s%s/tpg1/luns %s %s/%s",  TARGETCLI_ISCSI,
-               IQN_PREFIX, blk->gbid, CREATE, GLFS_PATH,
-               blk->block_name) == -1) {
+  if (asprintf(&lun, "%s/%s%s/tpg1/luns %s %s/%s",  GB_TGCLI_ISCSI,
+               GB_TGCLI_IQN_PREFIX, blk->gbid, GB_CREATE,
+               GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
     reply->exit = -1;
     goto out;
   }
 
   if (asprintf(&portal, "%s/%s%s/tpg1/portals create %s",
-               TARGETCLI_ISCSI, IQN_PREFIX, blk->gbid,
+               GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid,
                hostname) == -1) {
     reply->exit = -1;
     goto out;
   }
 
   if (asprintf(&attr, "%s/%s%s/tpg1 set attribute %s",
-               TARGETCLI_ISCSI, IQN_PREFIX, blk->gbid,
-               ATTRIBUTES) == -1) {
+               GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid,
+               GB_TGCLI_ATTRIBUTES) == -1) {
     reply->exit = -1;
     goto out;
   }
 
 
-  if (asprintf(&exec, "%s && %s && %s && %s && %s && %s && %s", TARGETCLI_GLOBALS,
-               backstore, iqn, lun, portal, attr, TARGETCLI_SAVE) == -1) {
+  if (asprintf(&exec, "%s && %s && %s && %s && %s && %s && %s",
+               GB_TGCLI_GLOBALS, backstore, iqn, lun, portal, attr,
+               GB_TGCLI_SAVE) == -1) {
     reply->exit = -1;
     goto out;
   }
@@ -772,6 +777,11 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
       reply->out[newLen++] = '\0';
     }
     reply->exit = WEXITSTATUS(pclose(fp));
+  } else {
+      LOG("mgmt", GB_LOG_ERROR,
+          "popen(): on host %s executing command (%s) failed(%s)",
+          hostname, exec, strerror(errno));
+    reply->exit = errno;
   }
 
  out:
@@ -830,8 +840,9 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 
   reply->exit = ret;
 
-  if (glfs_close(lkfd) != 0)
-    LOG("mgmt", GB_LOG_ERROR, "%s", "glfs_close: failed");
+  if (lkfd && glfs_close(lkfd) != 0)
+    LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
+        GB_TXLOCKFILE, blk->volume, strerror(errno));
 
   glfs_fini(glfs);
 
@@ -853,20 +864,20 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  if (asprintf(&iqn, "%s %s %s%s", TARGETCLI_ISCSI, DELETE,
-               IQN_PREFIX, blk->gbid) == -1) {
+  if (asprintf(&iqn, "%s %s %s%s", GB_TGCLI_ISCSI, GB_DELETE,
+               GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
     reply->exit = -1;
     goto out;
   }
 
-  if (asprintf(&backstore, "%s %s %s", TARGETCLI_GLFS,
-               DELETE, blk->block_name) == -1) {
+  if (asprintf(&backstore, "%s %s %s", GB_TGCLI_GLFS,
+               GB_DELETE, blk->block_name) == -1) {
     reply->exit = -1;
     goto out;
   }
 
   if (asprintf(&exec, "%s && %s && %s", backstore, iqn,
-               TARGETCLI_SAVE) == -1) {
+               GB_TGCLI_SAVE) == -1) {
     reply->exit = -1;
     goto out;
   }
@@ -926,7 +937,8 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 
   tgmfd = glfs_opendir (glfs, GB_METADIR);
   if (!tgmfd) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockVolumeInit failed");
+    LOG("mgmt", GB_LOG_ERROR, "glfs_opendir(%s): on volume %s failed[%s]",
+        GB_METADIR, blk->volume, strerror(errno));
     goto out;
   }
 
@@ -955,14 +967,18 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 
   reply->out = filelist? filelist:strdup("*Nil*\n");
 
-  glfs_closedir (tgmfd);
+  if (tgmfd && glfs_closedir (tgmfd) != 0) {
+    LOG("mgmt", GB_LOG_ERROR, "glfs_closedir(%s): on volume %s failed[%s]",
+        GB_METADIR, blk->volume, strerror(errno));
+  }
 
   GB_METAUNLOCK(lkfd, blk->volume, ret);
 
   reply->exit = ret;
 
-  if (glfs_close(lkfd) != 0) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "glfs_close: failed");
+  if (lkfd && glfs_close(lkfd) != 0) {
+    LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
+        GB_TXLOCKFILE, blk->volume, strerror(errno));
   }
 
   glfs_fini(glfs);
@@ -1051,8 +1067,9 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
 
   reply->exit = ret;
 
-  if (glfs_close(lkfd) != 0) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "glfs_close: failed");
+  if (lkfd && glfs_close(lkfd) != 0) {
+    LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
+        GB_TXLOCKFILE, blk->volume, strerror(errno));
   }
 
   glfs_fini(glfs);
