@@ -11,6 +11,7 @@
 
 # include  "common.h"
 # include  "block.h"
+# include  "config.h"
 
 
 
@@ -21,6 +22,15 @@ typedef enum clioperations {
   DELETE_CLI = 4
 } clioperations;
 
+const char *argp_program_version = ""                                 \
+  PACKAGE_NAME" ("PACKAGE_VERSION")"                                  \
+  "\nRepository rev: https://github.com/pkalever/gluster-block.git\n" \
+  "Copyright (c) 2016 Red Hat, Inc. <https://redhat.com/>\n"          \
+  "gluster-block comes with ABSOLUTELY NO WARRANTY.\n"                \
+  "It is licensed to you under your choice of the GNU Lesser\n"       \
+  "General Public License, version 3 or any later version (LGPLv3\n"  \
+  "or later), or the GNU General Public License, version 2 (GPLv2),\n"\
+  "in all cases as published by the Free Software Foundation.";
 
 static int
 glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
@@ -129,22 +139,23 @@ static void
 glusterBlockHelp(void)
 {
   MSG("%s",
-      "gluster-block (Version 0.1) \n"
-      " create         <name>          Create the gluster block\n"
-      "    volserver      [gluster-node]     node addr from gluster pool(default: localhost)\n"
+      PACKAGE_NAME" ("PACKAGE_VERSION")\n"
+      "usage:\n"
+      "  gluster-block <command> [<args>] <volume=volname>\n"
+      "\n"
+      "commands and arguments:\n"
+      "  create         <name>          Create the gluster block\n"
+      "    volserver      <gluster-node>     node addr from gluster pool\n"
       "    size           <size>             block storage size in KiB|MiB|GiB|TiB..\n"
-      "    mpath          <count>            multipath requirement for high availability\n"
+      "    [mpath          <count>]            multipath requirement for high availability(default: 1)\n"
       "    servers        <IP1,IP2,IP3...>   block servers, where targets are exported\n"
-      "\n"
-      " list                           List available gluster blocks\n"
-      "\n"
-      " info           <name>          Details about gluster block\n"
-      "\n"
-      " modify         <resize|auth>   Modify the metadata\n"
-      "\n"
-      " delete         <name>          Delete the gluster block\n"
-      "\n"
-      "    volume         <vol>              gluster volume name\n"
+      "  list                           List available gluster blocks\n"
+      "  info           <name>          Details about gluster block\n"
+      "  modify         <resize|auth>   Modify metadata\n"
+      "  delete         <name>          Delete gluster block\n"
+      "    volume         <volname>          gluster volume name(must option for all)\n"
+      "  help                           Show this message and exit\n"
+      "  version                        Show version info and exit\n"
       );
 }
 
@@ -162,14 +173,17 @@ glusterBlockCreate(int argcount, char **options)
 
   if(argcount <= optind) {
     MSG("%s\n", "Insufficient arguments for create:");
-    MSG("%s\n", "gluster-block create <block-name> volume <volume> "
-                "volserver <gluster-node> size <bytes> mpath <count>"
-                "servers <host1,host2,...>");
+    MSG("%s\n", "gluster-block create <block-name> volume <volname> "
+                "volserver <gluster-node> size <bytes> [mpath <count>]"
+                " servers <host1,host2,...>");
     return -1;
   }
 
   /* name of block */
   strcpy(cobj.block_name, options[optind++]);
+
+  /* default mpath */
+  cobj.mpath = 1;
 
   while (1) {
     if(argcount <= optind) {
@@ -198,7 +212,6 @@ glusterBlockCreate(int argcount, char **options)
 
     case GB_CLI_CREATE_MULTIPATH:
       sscanf(options[optind++], "%u", &cobj.mpath);
-      ret++;
       break;
 
     case GB_CLI_CREATE_SIZE:
@@ -228,11 +241,11 @@ glusterBlockCreate(int argcount, char **options)
   }
 
   /* check all options required by create command are specified */
-  if(ret < 4) {
+  if(ret < 3) {
     MSG("%s\n", "Insufficient arguments for create:");
-    MSG("%s\n", "gluster-block create <block-name> volume <volume> "
-                "volserver <gluster-node> size <bytes> mpath <count>"
-                "servers <host1,host2,...>");
+    MSG("%s\n", "gluster-block create <block-name> volume <volname> "
+                "volserver <gluster-node> size <bytes> [mpath <count>]"
+                " servers <host1,host2,...>");
     ret = -1;
     goto out;
   }
@@ -267,7 +280,7 @@ glusterBlockList(int argcount, char **options)
 
   if(argcount <= optind) {
     MSG("%s\n", "Insufficient arguments for list:");
-    MSG("%s\n", "gluster-block list volume <volume>");
+    MSG("%s\n", "gluster-block list volume <volname>");
     return -1;
   }
 
@@ -307,7 +320,7 @@ glusterBlockDelete(int argcount, char **options)
 
   if(argcount <= optind) {
     MSG("%s\n", "Insufficient arguments for delete:");
-    MSG("%s\n", "gluster-block delete <block-name> volume <volume>");
+    MSG("%s\n", "gluster-block delete <block-name> volume <volname>");
     return -1;
   }
 
@@ -349,7 +362,7 @@ glusterBlockInfo(int argcount, char **options)
 
   if(argcount <= optind) {
     MSG("%s\n", "Insufficient arguments for info:");
-    MSG("%s\n", "gluster-block info <block-name> volume <volume>");
+    MSG("%s\n", "gluster-block info <block-name> volume <volname>");
     return -1;
   }
 
@@ -428,6 +441,10 @@ glusterBlockParseArgs(int count, char **options)
 
     case GB_CLI_HELP:
       glusterBlockHelp();
+      goto out;
+
+    case GB_CLI_VERSION:
+      MSG("%s\n", argp_program_version);
       goto out;
     }
   }

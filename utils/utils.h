@@ -176,6 +176,7 @@ typedef enum gbCmdlineOption {
   GB_CLI_DELETE      = 4,
   GB_CLI_MODIFY      = 5,
   GB_CLI_HELP        = 6,
+  GB_CLI_VERSION     = 7,
 
   GB_CLI_OPT_MAX
 } gbCmdlineOption;
@@ -190,6 +191,7 @@ static const char *const gbCmdlineOptLookup[] = {
   [GB_CLI_DELETE]      = "delete",
   [GB_CLI_MODIFY]      = "modify",
   [GB_CLI_HELP]        = "help",
+  [GB_CLI_VERSION]     = "version",
 
   [GB_CLI_OPT_MAX]     = NULL,
 };
