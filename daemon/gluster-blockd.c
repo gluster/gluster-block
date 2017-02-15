@@ -154,7 +154,7 @@ main (int argc, char **argv)
   pthread_t cli_thread;
   pthread_t server_thread;
 
-  if (glusterBlockLogdirCreate()) {
+  if (!glusterBlockLogdirCreate()) {
     return -1;
   }
 

@@ -22,6 +22,7 @@
 
 # define  DAEMON_LOG_FILE  GB_LOGDIR "/gluster-blockd.log"
 # define  CLI_LOG_FILE     GB_LOGDIR "/gluster-block-cli.log"
+#define   DEVNULLPATH      "/dev/null"
 
 # define  GFAPI_LOG_FILE   GB_LOGDIR "/gluster-block-gfapi.log"
 # define  GFAPI_LOG_LEVEL  7

@@ -25,9 +25,9 @@
 # define   GLFS_PATH         "/backstores/user:glfs"
 # define   TARGETCLI_GLFS    "targetcli "GLFS_PATH
 # define   TARGETCLI_ISCSI   "targetcli /iscsi"
-# define   TARGETCLI_GLOBALS "targetcli set global auto_add_default_portal=false"
-# define   TARGETCLI_SAVE    "targetcli / saveconfig"
-# define   ATTRIBUTES        "generate_node_acls=1 demo_mode_write_protect=0"
+# define   TARGETCLI_GLOBALS "targetcli set global auto_add_default_portal=false > " DEVNULLPATH
+# define   TARGETCLI_SAVE    "targetcli / saveconfig > " DEVNULLPATH
+# define   ATTRIBUTES        "generate_node_acls=1 demo_mode_write_protect=0 > " DEVNULLPATH
 # define   IQN_PREFIX        "iqn.2016-12.org.gluster-block:"
 
 # define   MSERVER_DELIMITER ","
