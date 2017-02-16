@@ -51,6 +51,16 @@
 # define  FAILED_DELETING_FILE      "failed while deleting block file from gluster volume"
 
 
+# define LOCK(x)                                                     \
+         do {                                                        \
+            pthread_mutex_lock(&x);                                  \
+          } while (0)
+
+# define UNLOCK(x)                                                   \
+         do {                                                        \
+            pthread_mutex_unlock(&x);                                \
+          } while (0)
+
 # define ERROR(fmt, ...)                                             \
          do {                                                        \
            fprintf(stderr, "Error: " fmt " [at %s+%d :<%s>]\n",      \
@@ -92,9 +102,31 @@
             }                                                        \
           } while (0)
 
-# define  GB_METAUPDATE_OR_GOTO(tgmfd, fname, volume, ret, label,...)\
+# define  GB_METAUPDATE_OR_GOTO(lock, glfs, fname,                   \
+                                volume, ret, label,...)              \
           do {                                                       \
             char *write;                                             \
+            struct glfs_fd *tgmfd;                                   \
+            LOCK(lock);                                              \
+            ret = glfs_chdir (glfs, GB_METADIR);                     \
+            if (ret) {                                               \
+              LOG("gfapi", GB_LOG_ERROR, "glfs_chdir(%s) on "        \
+                  "volume %s failed[%s]", GB_METADIR, volume,        \
+                  strerror(errno));                                  \
+              UNLOCK(lock);                                          \
+              ret = -1;                                              \
+              goto label;                                            \
+            }                                                        \
+            tgmfd = glfs_creat(glfs, fname, O_WRONLY | O_APPEND,     \
+                               S_IRUSR | S_IWUSR);                   \
+            if (!tgmfd) {                                            \
+              LOG("mgmt", GB_LOG_ERROR, "glfs_creat(%s): on "        \
+                  "volume %s failed[%s]", fname, volume,             \
+                  strerror(errno));                                  \
+              UNLOCK(lock);                                          \
+              ret = -1;                                              \
+              goto label;                                            \
+            }                                                        \
             if (asprintf(&write, __VA_ARGS__) < 0) {                 \
               ret = -1;                                              \
               goto label;                                            \
@@ -103,10 +135,20 @@
               LOG("mgmt", GB_LOG_ERROR, "glfs_write(%s): on "        \
                   "volume %s failed[%s]", fname, volume,             \
                   strerror(errno));                                  \
+              UNLOCK(lock);                                          \
               ret = -1;                                              \
               goto label;                                            \
             }                                                        \
             GB_FREE(write);                                          \
+            if (tgmfd && glfs_close(tgmfd) != 0) {                   \
+              LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on "        \
+                  "volume %s failed[%s]", fname, volume,             \
+                  strerror(errno));                                  \
+              UNLOCK(lock);                                          \
+              ret = -1;                                              \
+              goto label;                                            \
+            }                                                        \
+            UNLOCK(lock);                                            \
           } while (0)
 
 # define  GB_METAUNLOCK(lkfd, volume, ret)                           \

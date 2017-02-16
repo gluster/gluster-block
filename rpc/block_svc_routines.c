@@ -33,8 +33,10 @@
 
 
 
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
 typedef struct blockRemoteObj {
-    struct glfs_fd *tgmfd;
+    struct glfs *glfs;
     void *obj;
     char *volume;
     char *addr;
@@ -221,19 +223,19 @@ glusterBlockCreateRemote(void *data)
   blockCreate cobj = *(blockCreate *)args->obj;
 
 
-  GB_METAUPDATE_OR_GOTO(args->tgmfd, cobj.gbid, cobj.volume, ret, out,
-                        "%s: CONFIGINPROGRESS\n", args->addr);
+  GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
+                        ret, out, "%s: CONFIGINPROGRESS\n", args->addr);
 
   ret = glusterBlockCallRPC_1(args->addr, &cobj, CREATE_SRV, &args->reply);
   if (ret) {
-    GB_METAUPDATE_OR_GOTO(args->tgmfd, cobj.gbid, cobj.volume, ret, out,
-                          "%s: CONFIGFAIL\n", args->addr);
+    GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
+                          ret, out, "%s: CONFIGFAIL\n", args->addr);
     LOG("mgmt", GB_LOG_ERROR, "%s on host: %s", FAILED_CREATE, args->addr);
     goto out;
   }
 
-  GB_METAUPDATE_OR_GOTO(args->tgmfd, cobj.gbid, cobj.volume, ret, out,
-                        "%s: CONFIGSUCCESS\n", args->addr);
+  GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
+                        ret, out, "%s: CONFIGSUCCESS\n", args->addr);
 
  out:
   pthread_exit(&ret);   /* collect ret in pthread_join 2nd arg */
@@ -243,7 +245,7 @@ glusterBlockCreateRemote(void *data)
 void
 glusterBlockCreateRemoteAsync(blockServerDefPtr list,
                             size_t listindex, size_t mpath,
-                            struct glfs_fd *tgmfd,
+                            struct glfs *glfs,
                             blockCreate *cobj,
                             char **savereply)
 {
@@ -268,7 +270,7 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
   }
 
   for (i = 0; i < mpath; i++) {
-    args[i]->tgmfd = tgmfd;
+    args[i]->glfs = glfs;
     args[i]->obj = (void *)cobj;
     args[i]->addr = list->hosts[i + listindex];
   }
@@ -300,7 +302,6 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
 
 static int
 glusterBlockAuditRequest(struct glfs *glfs,
-                         struct glfs_fd *tgmfd,
                          blockCreateCli *blk,
                          blockCreate *cobj,
                          blockServerDefPtr list,
@@ -362,11 +363,11 @@ glusterBlockAuditRequest(struct glfs *glfs,
           "Trying to serve request for (%s) from spare machines",
           blk->block_name);
         glusterBlockCreateRemoteAsync(list, spent, morereq,
-                                      tgmfd, cobj, reply);
+                                      glfs, cobj, reply);
     }
   }
 
-  ret = glusterBlockAuditRequest(glfs, tgmfd, blk, cobj, list, reply);
+  ret = glusterBlockAuditRequest(glfs, blk, cobj, list, reply);
 
  out:
   blockFreeMetaInfo(info);
@@ -382,18 +383,18 @@ glusterBlockDeleteRemote(void *data)
   blockDelete dobj = *(blockDelete *)args->obj;
 
 
-  GB_METAUPDATE_OR_GOTO(args->tgmfd, dobj.gbid, args->volume, ret, out,
-                        "%s: CLEANUPINPROGRESS\n", args->addr);
+  GB_METAUPDATE_OR_GOTO(lock, args->glfs, dobj.block_name, args->volume,
+                        ret, out, "%s: CLEANUPINPROGRESS\n", args->addr);
   ret = glusterBlockCallRPC_1(args->addr, &dobj, DELETE_SRV, &args->reply);
   if (ret) {
-    GB_METAUPDATE_OR_GOTO(args->tgmfd, dobj.gbid, args->volume, ret, out,
-                          "%s: CLEANUPFAIL\n", args->addr);
+    GB_METAUPDATE_OR_GOTO(lock, args->glfs, dobj.block_name, args->volume,
+                          ret, out, "%s: CLEANUPFAIL\n", args->addr);
     LOG("mgmt", GB_LOG_ERROR, "%s on host: %s",
         FAILED_GATHERING_INFO, args->addr);
     goto out;
   }
-  GB_METAUPDATE_OR_GOTO(args->tgmfd, dobj.gbid, args->volume, ret, out,
-                        "%s: CLEANUPSUCCESS\n", args->addr);
+  GB_METAUPDATE_OR_GOTO(lock, args->glfs, dobj.block_name, args->volume,
+                        ret, out, "%s: CLEANUPSUCCESS\n", args->addr);
 
  out:
   pthread_exit(&ret);   /* collect ret in pthread_join 2nd arg */
@@ -402,7 +403,7 @@ glusterBlockDeleteRemote(void *data)
 
 void
 glusterBlockDeleteRemoteAsync(MetaInfo *info,
-                              struct glfs_fd *tgmfd,
+                              struct glfs *glfs,
                               blockDelete *dobj,
                               bool deleteall,
                               char **savereply)
@@ -448,7 +449,7 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
     case GB_CLEANUP_FAIL:
     case GB_CONFIG_FAIL:
     case GB_CONFIG_INPROGRESS:
-      args[count]->tgmfd = tgmfd;
+      args[count]->glfs = glfs;
       args[count]->obj = (void *)dobj;
       args[count]->volume = info->volume;
       args[count]->addr = info->list[i]->addr;
@@ -457,7 +458,7 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
     }
     if (deleteall &&
         blockMetaStatusEnumParse(info->list[i]->status) == GB_CONFIG_SUCCESS) {
-      args[count]->tgmfd = tgmfd;
+      args[count]->glfs = glfs;
       args[count]->obj = (void *)dobj;
       args[count]->volume = info->volume;
       args[count]->addr = info->list[i]->addr;
@@ -497,7 +498,6 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
   int ret = -1;
   size_t i;
   static blockDelete dobj;
-  struct glfs_fd *tgmfd = NULL;
   size_t cleanupsuccess = 0;
   MetaInfo *info;
 
@@ -514,14 +514,7 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
   strcpy(dobj.block_name, blockname);
   strcpy(dobj.gbid, info->gbid);
 
-  tgmfd = glfs_open(glfs, blockname, O_WRONLY|O_APPEND);
-  if (!tgmfd) {
-    LOG("mgmt", GB_LOG_ERROR, "glfs_open(%s): on volume %s failed[%s]",
-        blockname, info->volume, strerror(errno));
-    goto out;
-  }
-
-  glusterBlockDeleteRemoteAsync(info, tgmfd, &dobj, deleteall, reply);
+  glusterBlockDeleteRemoteAsync(info, glfs, &dobj, deleteall, reply);
 
   blockFreeMetaInfo(info);
 
@@ -553,11 +546,6 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
  out:
   blockFreeMetaInfo(info);
 
-  if (tgmfd && glfs_close(tgmfd) != 0) {
-    LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
-        blockname, info->volume, strerror(errno));
-  }
-
   return ret;
 }
 
@@ -573,7 +561,6 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   static blockResponse *reply;
   struct glfs *glfs = NULL;
   struct glfs_fd *lkfd = NULL;
-  struct glfs_fd *tgmfd = NULL;
   blockServerDefPtr list = NULL;
 
 
@@ -622,32 +609,25 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
     goto exist;
   }
 
-  tgmfd = glfs_creat(glfs, blk->block_name, O_RDWR, S_IRUSR | S_IWUSR);
-  if (!tgmfd) {
-    LOG("mgmt", GB_LOG_ERROR, "glfs_creat(%s): on volume %s failed[%s]",
-        blk->block_name, blk->volume, strerror(errno));
-    goto exist;
-  }
-
   uuid_generate(uuid);
   uuid_unparse(uuid, gbid);
 
-  GB_METAUPDATE_OR_GOTO(tgmfd, blk->block_name, blk->volume, ret, exist,
-                        "VOLUME: %s\nGBID: %s\nSIZE: %zu\nHA: %d\n"
-                        "ENTRYCREATE: INPROGRESS\n",
+  GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
+                        ret, exist, "VOLUME: %s\nGBID: %s\nSIZE: %zu\n"
+                        "HA: %d\nENTRYCREATE: INPROGRESS\n",
                         blk->volume, gbid, blk->size, blk->mpath);
 
   ret = glusterBlockCreateEntry(glfs, blk, gbid);
   if (ret) {
-    GB_METAUPDATE_OR_GOTO(tgmfd, blk->block_name, blk->volume, ret,
-                          exist, "ENTRYCREATE: FAIL\n");
+    GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
+                          ret, exist, "ENTRYCREATE: FAIL\n");
     LOG("mgmt", GB_LOG_ERROR, "%s volume: %s host: %s",
         FAILED_CREATING_FILE, blk->volume, blk->volfileserver);
     goto out;
   }
 
-  GB_METAUPDATE_OR_GOTO(tgmfd, blk->block_name, blk->volume, ret, exist,
-                        "ENTRYCREATE: SUCCESS\n");
+  GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
+                        ret, exist, "ENTRYCREATE: SUCCESS\n");
 
   strcpy(cobj.volume, blk->volume);
   strcpy(cobj.volfileserver, blk->volfileserver);
@@ -656,11 +636,10 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   strcpy(cobj.gbid, gbid);
 
   glusterBlockCreateRemoteAsync(list, 0, blk->mpath,
-                              tgmfd, &cobj, &savereply);
+                                glfs, &cobj, &savereply);
 
   /* Check Point */
-  ret = glusterBlockAuditRequest(glfs, tgmfd, blk,
-                                 &cobj, list, &savereply);
+  ret = glusterBlockAuditRequest(glfs, blk, &cobj, list, &savereply);
   if (ret) {
       LOG("mgmt", GB_LOG_ERROR,
           "even spare nodes have exhausted for (%s) rewinding",
@@ -671,11 +650,6 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 
  out:
   reply->out = savereply;
-
-  if (tgmfd && glfs_close(tgmfd) != 0) {
-    LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
-        blk->block_name, blk->volume, strerror(errno));
-  }
 
  exist:
   GB_METAUNLOCK(lkfd, blk->volume, ret);
@@ -913,7 +887,7 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
   blockResponse *reply;
   struct glfs *glfs;
   struct glfs_fd *lkfd = NULL;
-  struct glfs_fd *tgmfd = NULL;
+  struct glfs_fd *tgmdfd = NULL;
   struct dirent *entry;
   char *tmp = NULL;
   char *filelist = NULL;
@@ -935,14 +909,14 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 
   GB_METALOCK_OR_GOTO(lkfd, blk->volume, ret, out);
 
-  tgmfd = glfs_opendir (glfs, GB_METADIR);
-  if (!tgmfd) {
+  tgmdfd = glfs_opendir (glfs, GB_METADIR);
+  if (!tgmdfd) {
     LOG("mgmt", GB_LOG_ERROR, "glfs_opendir(%s): on volume %s failed[%s]",
         GB_METADIR, blk->volume, strerror(errno));
     goto out;
   }
 
-  while ((entry = glfs_readdir (tgmfd))) {
+  while ((entry = glfs_readdir (tgmdfd))) {
     if (strcmp(entry->d_name, ".") &&
        strcmp(entry->d_name, "..") &&
        strcmp(entry->d_name, "meta.lock")) {
@@ -967,7 +941,7 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 
   reply->out = filelist? filelist:strdup("*Nil*\n");
 
-  if (tgmfd && glfs_closedir (tgmfd) != 0) {
+  if (tgmdfd && glfs_closedir (tgmdfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR, "glfs_closedir(%s): on volume %s failed[%s]",
         GB_METADIR, blk->volume, strerror(errno));
   }
