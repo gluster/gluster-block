@@ -152,7 +152,6 @@ glusterBlockHelp(void)
       "\n"
       "commands and arguments:\n"
       "  create         <name>          create block device\n"
-      "    volserver      <gluster-node>     node addr from gluster pool\n"
       "    size           <size>             size in KiB|MiB|GiB|TiB..\n"
       "    [mpath          <count>]          multipath requirement for high availability(default: 1)\n"
       "    servers        <IP1,IP2,IP3...>   servers in the pool where targets are exported\n"
@@ -174,15 +173,13 @@ glusterBlockCreate(int argcount, char **options)
   size_t optind = 2;
   int ret = 0;
   char *out = NULL;
-  bool volserver = FALSE;
   static blockCreateCli cobj = {0, };
 
 
   if(argcount <= optind) {
     MSG("%s\n", "Insufficient arguments for create:");
     MSG("%s\n", "gluster-block create <block-name> volume <volname> "
-                "volserver <gluster-node> size <bytes> [mpath <count>]"
-                " servers <host1,host2,...>");
+                "size <bytes> [mpath <count>] servers <IP1,IP2,...>");
     return -1;
   }
 
@@ -210,11 +207,6 @@ glusterBlockCreate(int argcount, char **options)
     case GB_CLI_CREATE_VOLUME:
       strcpy(cobj.volume, options[optind++]);
       ret++;
-      break;
-
-    case GB_CLI_CREATE_VOLSERVER:
-      strcpy(cobj.volfileserver, options[optind++]);
-      volserver = TRUE;
       break;
 
     case GB_CLI_CREATE_MULTIPATH:
@@ -251,14 +243,9 @@ glusterBlockCreate(int argcount, char **options)
   if(ret < 3) {
     MSG("%s\n", "Insufficient arguments for create:");
     MSG("%s\n", "gluster-block create <block-name> volume <volname> "
-                "volserver <gluster-node> size <bytes> [mpath <count>]"
-                " servers <host1,host2,...>");
+                "size <bytes> [mpath <count>] servers <IP1,IP2,...>");
     ret = -1;
     goto out;
-  }
-
-  if(!volserver) {
-    strcpy(cobj.volfileserver, "localhost");
   }
 
   ret = glusterBlockCliRPC_1(&cobj, CREATE_CLI, &out);

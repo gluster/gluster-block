@@ -584,7 +584,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
     goto optfail;
   }
 
-  glfs = glusterBlockVolumeInit(blk->volume, blk->volfileserver);
+  glfs = glusterBlockVolumeInit(blk->volume);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockVolumeInit failed");
     goto optfail;
@@ -622,7 +622,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
     GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
                           ret, exist, "ENTRYCREATE: FAIL\n");
     LOG("mgmt", GB_LOG_ERROR, "%s volume: %s host: %s",
-        FAILED_CREATING_FILE, blk->volume, blk->volfileserver);
+        FAILED_CREATING_FILE, blk->volume, blk->block_hosts);
     goto out;
   }
 
@@ -630,7 +630,6 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
                         ret, exist, "ENTRYCREATE: SUCCESS\n");
 
   strcpy(cobj.volume, blk->volume);
-  strcpy(cobj.volfileserver, blk->volfileserver);
   strcpy(cobj.block_name, blk->block_name);
   cobj.size = blk->size;
   strcpy(cobj.gbid, gbid);
@@ -696,7 +695,7 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
 
   if (asprintf(&backstore, "%s %s %s %zu %s@%s%s/%s %s", GB_TGCLI_GLFS,
                GB_CREATE, blk->block_name, blk->size, blk->volume,
-               blk->volfileserver, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
+               hostname, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
     reply->exit = -1;
     goto out;
   }
@@ -784,7 +783,7 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
     return NULL;
   }
 
-  glfs = glusterBlockVolumeInit(blk->volume, "localhost");
+  glfs = glusterBlockVolumeInit(blk->volume);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockVolumeInit failed");
     goto out;
@@ -894,7 +893,7 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
   int ret = -1;
 
 
-  glfs = glusterBlockVolumeInit(blk->volume, "localhost");
+  glfs = glusterBlockVolumeInit(blk->volume);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockVolumeInit failed");
     goto out;
@@ -974,7 +973,7 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
   size_t i;
 
 
-  glfs = glusterBlockVolumeInit(blk->volume, "localhost");
+  glfs = glusterBlockVolumeInit(blk->volume);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockVolumeInit failed");
     goto out;

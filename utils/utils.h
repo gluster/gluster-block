@@ -128,6 +128,7 @@
               goto label;                                            \
             }                                                        \
             if (asprintf(&write, __VA_ARGS__) < 0) {                 \
+              UNLOCK(lock);                                          \
               ret = -1;                                              \
               goto label;                                            \
             }                                                        \
@@ -192,10 +193,9 @@
 typedef enum gbCmdlineCreateOption {
   /* needed by create option  */
   GB_CLI_CREATE_VOLUME           = 11,
-  GB_CLI_CREATE_VOLSERVER        = 12,   /* optional (default: localhost)*/
-  GB_CLI_CREATE_SIZE             = 13,
-  GB_CLI_CREATE_MULTIPATH        = 14,
-  GB_CLI_CREATE_BACKEND_SERVESRS = 15,
+  GB_CLI_CREATE_SIZE             = 12,
+  GB_CLI_CREATE_MULTIPATH        = 13,
+  GB_CLI_CREATE_BACKEND_SERVESRS = 14,
 
   GB_CLI_CREATE_OPT_MAX
 } gbCmdlineCreateOption;
@@ -240,7 +240,6 @@ static const char *const gbCmdlineOptLookup[] = {
 
 static const char *const gbCmdlineCreateOptLookup[] = {
   [GB_CLI_CREATE_VOLUME]           = "volume",
-  [GB_CLI_CREATE_VOLSERVER]        = "volserver",
   [GB_CLI_CREATE_SIZE]             = "size",
   [GB_CLI_CREATE_MULTIPATH]        = "mpath",
   [GB_CLI_CREATE_BACKEND_SERVESRS] = "servers",

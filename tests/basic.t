@@ -77,7 +77,7 @@ TEST systemctl restart gluster-blockd.service
 sleep 1;
 
 # Block create
-TEST gluster-block create ${BLKNAME} volume ${VOLNAME} volserver ${HOST} mpath 1 size 1GiB servers ${HOST}
+TEST gluster-block create ${BLKNAME} volume ${VOLNAME} size 1GiB mpath 1 servers ${HOST}
 
 # Block list
 TEST gluster-block list volume ${VOLNAME}

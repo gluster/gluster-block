@@ -15,7 +15,6 @@ extern "C" {
 
 struct blockCreate {
 	char volume[255];
-	char volfileserver[255];
 	char gbid[127];
 	u_quad_t size;
 	char block_name[255];
@@ -24,7 +23,6 @@ typedef struct blockCreate blockCreate;
 
 struct blockCreateCli {
 	char volume[255];
-	char volfileserver[255];
 	u_quad_t size;
 	u_int mpath;
 	char block_name[255];

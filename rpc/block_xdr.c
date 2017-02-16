@@ -11,9 +11,6 @@ xdr_blockCreate (XDR *xdrs, blockCreate *objp)
 	 if (!xdr_vector (xdrs, (char *)objp->volume, 255,
 		sizeof (char), (xdrproc_t) xdr_char))
 		 return FALSE;
-	 if (!xdr_vector (xdrs, (char *)objp->volfileserver, 255,
-		sizeof (char), (xdrproc_t) xdr_char))
-		 return FALSE;
 	 if (!xdr_vector (xdrs, (char *)objp->gbid, 127,
 		sizeof (char), (xdrproc_t) xdr_char))
 		 return FALSE;
@@ -29,9 +26,6 @@ bool_t
 xdr_blockCreateCli (XDR *xdrs, blockCreateCli *objp)
 {
 	 if (!xdr_vector (xdrs, (char *)objp->volume, 255,
-		sizeof (char), (xdrproc_t) xdr_char))
-		 return FALSE;
-	 if (!xdr_vector (xdrs, (char *)objp->volfileserver, 255,
 		sizeof (char), (xdrproc_t) xdr_char))
 		 return FALSE;
 	 if (!xdr_u_quad_t (xdrs, &objp->size))

@@ -15,7 +15,7 @@
 
 
 struct glfs *
-glusterBlockVolumeInit(char *volume, char *volfileserver)
+glusterBlockVolumeInit(char *volume)
 {
   struct glfs *glfs;
   int ret;
@@ -24,14 +24,14 @@ glusterBlockVolumeInit(char *volume, char *volfileserver)
   glfs = glfs_new(volume);
   if (!glfs) {
     LOG("gfapi", GB_LOG_ERROR, "glfs_new(%s) from %s failed[%s]", volume,
-        volfileserver, strerror(errno));
+        "localhost", strerror(errno));
     return NULL;
   }
 
-  ret = glfs_set_volfile_server(glfs, "tcp", volfileserver, 24007);
+  ret = glfs_set_volfile_server(glfs, "tcp", "localhost", 24007);
   if (ret) {
     LOG("gfapi", GB_LOG_ERROR, "glfs_set_volfile_server(%s) of %s "
-        "failed[%s]", volfileserver, volume, strerror(errno));
+        "failed[%s]", "localhost", volume, strerror(errno));
     goto out;
   }
 
