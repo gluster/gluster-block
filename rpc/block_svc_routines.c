@@ -300,81 +300,6 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
 }
 
 
-static int
-glusterBlockAuditRequest(struct glfs *glfs,
-                         blockCreateCli *blk,
-                         blockCreate *cobj,
-                         blockServerDefPtr list,
-                         char **reply)
-{
-  int ret = -1;
-  size_t i;
-  size_t successcnt = 0;
-  size_t failcnt = 0;
-  size_t spent;
-  size_t spare;
-  size_t morereq;
-  MetaInfo *info;
-
-
-  if (GB_ALLOC(info) < 0) {
-    goto out;
-  }
-
-  ret = blockGetMetaInfo(glfs, blk->block_name, info);
-  if (ret) {
-    goto out;
-  }
-
-  for (i = 0; i < info->nhosts; i++) {
-    switch (blockMetaStatusEnumParse(info->list[i]->status)) {
-    case GB_CONFIG_SUCCESS:
-      successcnt++;
-      break;
-    case GB_CONFIG_INPROGRESS:
-    case GB_CONFIG_FAIL:
-      failcnt++;
-    }
-  }
-
-  /* check if mpath is satisfied */
-  if (blk->mpath == successcnt) {
-    ret = 0;
-    goto out;
-  } else {
-    spent = successcnt + failcnt;  /* total spent */
-    spare = list->nhosts  - spent;  /* spare after spent */
-    morereq = blk->mpath  - successcnt;  /* needed nodes to complete req */
-    if (spare == 0) {
-      LOG("mgmt", GB_LOG_WARNING,
-          "No Spare nodes to create (%s): rewinding creation of target",
-          blk->block_name);
-      ret = -1;
-      goto out;
-    } else if (spare < morereq) {
-      LOG("mgmt", GB_LOG_WARNING,
-          "Not enough Spare nodes for (%s): rewinding creation of target",
-          blk->block_name);
-      ret = -1;
-      goto out;
-    } else {
-      /* create on spare */
-      LOG("mgmt", GB_LOG_INFO,
-          "Trying to serve request for (%s) from spare machines",
-          blk->block_name);
-        glusterBlockCreateRemoteAsync(list, spent, morereq,
-                                      glfs, cobj, reply);
-    }
-  }
-
-  ret = glusterBlockAuditRequest(glfs, blk, cobj, list, reply);
-
- out:
-  blockFreeMetaInfo(info);
-  return ret;
-}
-
-
 void *
 glusterBlockDeleteRemote(void *data)
 {
@@ -550,6 +475,94 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
 }
 
 
+static int
+glusterBlockAuditRequest(struct glfs *glfs,
+                         blockCreateCli *blk,
+                         blockCreate *cobj,
+                         blockServerDefPtr list,
+                         char **reply)
+{
+  int ret = -1;
+  size_t i;
+  size_t successcnt = 0;
+  size_t failcnt = 0;
+  size_t spent;
+  size_t spare;
+  size_t morereq;
+  MetaInfo *info;
+  static bool needcleanup = FALSE;   /* partial failure on subset of nodes */
+
+
+  if (GB_ALLOC(info) < 0) {
+    goto out;
+  }
+
+  ret = blockGetMetaInfo(glfs, blk->block_name, info);
+  if (ret) {
+    goto out;
+  }
+
+  for (i = 0; i < info->nhosts; i++) {
+    switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+    case GB_CONFIG_SUCCESS:
+      successcnt++;
+      break;
+    case GB_CONFIG_INPROGRESS:
+    case GB_CONFIG_FAIL:
+      failcnt++;
+    }
+  }
+
+  /* check if mpath is satisfied */
+  if (blk->mpath == successcnt) {
+    ret = 0;
+    goto out;
+  } else {
+    spent = successcnt + failcnt;  /* total spent */
+    spare = list->nhosts  - spent;  /* spare after spent */
+    morereq = blk->mpath  - successcnt;  /* needed nodes to complete req */
+    if (spare == 0) {
+      LOG("mgmt", GB_LOG_WARNING,
+          "No Spare nodes to create (%s): rewinding creation of target",
+          blk->block_name);
+      ret = -1;
+      glusterBlockCleanUp(glfs,
+                          blk->block_name, TRUE, reply);
+      needcleanup = FALSE;   /* already clean attempted */
+      goto out;
+    } else if (spare < morereq) {
+      LOG("mgmt", GB_LOG_WARNING,
+          "Not enough Spare nodes for (%s): rewinding creation of target",
+          blk->block_name);
+      ret = -1;
+      glusterBlockCleanUp(glfs,
+                          blk->block_name, TRUE, reply);
+      needcleanup = FALSE;   /* already clean attempted */
+      goto out;
+    } else {
+      /* create on spare */
+      LOG("mgmt", GB_LOG_INFO,
+          "Trying to serve request for (%s) from spare machines",
+          blk->block_name);
+      glusterBlockCreateRemoteAsync(list, spent, morereq,
+                                    glfs, cobj, reply);
+      needcleanup = TRUE;
+    }
+  }
+
+  ret = glusterBlockAuditRequest(glfs, blk, cobj, list, reply);
+
+ out:
+  if (needcleanup) {
+      glusterBlockCleanUp(glfs,
+                          blk->block_name, FALSE, reply);
+  }
+
+  blockFreeMetaInfo(info);
+  return ret;
+}
+
+
 blockResponse *
 block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 {
@@ -639,13 +652,6 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 
   /* Check Point */
   ret = glusterBlockAuditRequest(glfs, blk, &cobj, list, &savereply);
-  if (ret) {
-      LOG("mgmt", GB_LOG_ERROR,
-          "even spare nodes have exhausted for (%s) rewinding",
-          blk->block_name);
-      ret = glusterBlockCleanUp(glfs,
-                                blk->block_name, FALSE, &savereply);
-  }
 
  out:
   reply->out = savereply;
