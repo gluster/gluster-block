@@ -54,167 +54,79 @@ managing the command ring buffers
 <pre>
 # git clone https://github.com/pkalever/gluster-block.git
 # cd gluster-block/
-# dnf install libssh-devel libuuid-devel glusterfs-api-devel tcmu-runner targetcli (on fedora)
+# dnf install libuuid-devel glusterfs-api-devel tcmu-runner targetcli (on fedora)
 # make -j install
 </pre>
 
 ### Usage
 ------
 **Prerequisites:** *this guide assume we already have*
-- [x] *A volume with name 'sampleVol'*
-- [x] *In all block nodes tcmu-runner.service is running*
-- [x] *There is passwordless access between the node that run gluster-block and nodes running tcmu-runner (ssh-copy-id)*
+- [x] *A gluster volume with name 'block-test'*
+- [x] *In all nodes gluster-blockd.service is running*
 
 ```script
-# gluster-block --help
-gluster-block (Version 0.1) 
- -c, --create      <name>          Create the gluster block
-     -v, --volume       <vol>            gluster volume name
-     -h, --host         <gluster-node>   node addr from gluster pool
-     -s, --size         <size>           block storage size in KiB|MiB|GiB|TiB..
- -l, --list                        List available gluster blocks
- -i, --info        <name>          Details about gluster block
- -m, --modify      <resize|auth>   Modify the metadata
- -d, --delete      <name>          Delete the gluster block
-[-b, --block-host <IP1,IP2,IP3...>]  block servers, clubbed with any option
+# gluster-block help
+gluster-block (57f0509)
+usage:
+  gluster-block <command> [<args>] <volume=volname>
+
+commands and arguments:
+  create         <name>          create block device
+    size           <size>             size in KiB|MiB|GiB|TiB..
+    [mpath          <count>]          multipath requirement for high availability(default: 1)
+    servers        <IP1,IP2,IP3...>   servers in the pool where targets are exported
+  list                           list available block devices
+  info           <name>          details about block device
+  modify         <resize|auth>   modify metadata
+  delete         <name>          delete block device
+    volume         <volname>          volume that hosts the block device
+  help                           show this message and exit
+  version                        show version info and exit
 ```
 
-#### Example 1. Choose to run tcmu-runner on the same node (gluster-block node)
+#### Example:
 ======
-*192.168.1.11: Node where gluster volume exist<br>
-192.168.1.12: Node where gluster-block installed as well as tcmu-runner.service is running<br>
-192.168.1.13: Initiator, iSCSI client*
-
-<pre>
-Create 2G gluster block storage
-<b># gluster-block --create TARGET1 --volume sampleVol --host 192.168.1.11 --size 2GiB</b>
-[OnHost: localhost]
-Created user-backed storage object TARGET1 size 2147483648.
-Created target iqn.2016-12.org.gluster-block:localhost-a1903cba-7556-4074-8031-530bb35c4236.
-Created TPG 1.
-Global pref auto_add_default_portal=true
-Created default portal listening on all IPs (0.0.0.0), port 3260.
-Created LUN 0.
-Parameter demo_mode_write_protect is now '0'.
-Parameter generate_node_acls is now '1'.
-Last 10 configs saved in /etc/target/backup.
-Configuration saved to /etc/target/saveconfig.json
-
-List available block devices
-<b># gluster-block --list</b>
-BlockName      Volname      Host      Size      Status
-[OnHost: localhost]
- TARGET1   sampleVol   192.168.1.11   2 GiB       Online
-
-Info about given block storage 
-<b># gluster-block --info TARGET1</b>
-[OnHost: localhost]
-config: glfs/sampleVol@192.168.1.11/a1903cba-7556-4074-8031-530bb35c4236
-name: TARGET1
-plugin: user
-size: 2147483648
-wwn: a1903cba-7556-4074-8031-530bb35c4236
-</pre>
-
-##### On the Initiator machine
-<pre>
-# dnf install iscsi-initiator-utils
-# lsblk (note the available devices)
-# iscsiadm -m discovery -t st -p 192.168.1.12 -l
-# lsblk (note the new device, lets say sdb)
-# mkfs.xfs /dev/sdb
-# mount /dev/sdb /mnt
-</pre>
-
-##### Delete the targets
-<pre>
-On initiator node 
-# umount /mnt
-# iscsiadm -m node -u
-
-On the gluster-block node
-<b># gluster-block --delete TARGET1</b>
-[OnHost: localhost]
-Deleted storage object TARGET1.
-Deleted Target iqn.2016-12.org.gluster-block:localhost-a1903cba-7556-4074-8031-530bb35c4236.
-</pre>
-
-#### Example 2. Choose to run tcmu-runner on the multiple different nodes
-======
-*192.168.1.11: Node where gluster volume exist<br>
-192.168.1.12: Node where gluster-block installed<br>
-192.168.1.13, 192.168.1.14, 192.168.1.15: All nodes run tcmu-runner.service (three nodes to achieve mutipath for HA)<br>
-192.168.1.16: Initiator, iSCSI client*
+*192.168.1.11, 192.168.1.12, 192.168.1.13: All nodes run gluster-blockd.service and glusterd.service (three nodes to achieve mutipath for HA)<br>
+192.168.1.14: Initiator, iSCSI client<br><br>
+Execute gluster-block CLI from any of the 3 nodes where glusterd and gluster-blockd are running <br>
+Create a gluster volume by pooling 3 nodes (192.168.1.11, 192.168.1.12 and 192.168.1.13) <br>
+Read More on how to [create a gluster volume](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/2.1/html/Administration_Guide/sect-User_Guide-Setting_Volumes-Replicated.html)
+*
 
 <pre>
 Create 1G gluster block storage
-<b># gluster-block --create TARGET1 --volume sampleVol --host 192.168.1.11 --size 1GiB --block-host 192.168.1.13,192.168.1.14,192.168.1.15</b>
-[OnHost: <b>192.168.1.13</b>]
-Created user-backed storage object TARGET1 size 1073741824.
-Created target iqn.2016-12.org.gluster-block:192.168.1.13-91b990b6-952c-4ded-b42a-dd238bce21b6.
+<b># gluster-block create sample-block volume block-test size 1GiB mpath 3 servers 192.168.1.11,192.168.1.12,192.168.1.13</b>
+Created user-backed storage object sample-block size 1073741824.
+Created target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
 Created TPG 1.
-Global pref auto_add_default_portal=true
-Created default portal listening on all IPs (0.0.0.0), port 3260.
 Created LUN 0.
-Parameter demo_mode_write_protect is now '0'.
-Parameter generate_node_acls is now '1'.
-Last 10 configs saved in /etc/target/backup.
-Configuration saved to /etc/target/saveconfig.json
+Using default IP port 3260
+Created network portal 192.168.1.11:3260.
 
-[OnHost: <b>192.168.1.14</b>]
-Created user-backed storage object TARGET1 size 1073741824.
-Created target iqn.2016-12.org.gluster-block:192.168.1.14-91b990b6-952c-4ded-b42a-dd238bce21b6.
+Created user-backed storage object sample-block size 1073741824.
+Created target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
 Created TPG 1.
-Global pref auto_add_default_portal=true
-Created default portal listening on all IPs (0.0.0.0), port 3260.
 Created LUN 0.
-Parameter demo_mode_write_protect is now '0'.
-Parameter generate_node_acls is now '1'.
-Last 10 configs saved in /etc/target/backup.
-Configuration saved to /etc/target/saveconfig.json
+Using default IP port 3260
+Created network portal 192.168.1.12:3260.
 
-[OnHost: <b>192.168.1.15</b>]
-Created user-backed storage object TARGET1 size 1073741824.
-Created target iqn.2016-12.org.gluster-block:192.168.1.15-91b990b6-952c-4ded-b42a-dd238bce21b6.
+Created user-backed storage object sample-block size 1073741824.
+Created target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
 Created TPG 1.
-Global pref auto_add_default_portal=true
-Created default portal listening on all IPs (0.0.0.0), port 3260.
 Created LUN 0.
-Parameter demo_mode_write_protect is now '0'.
-Parameter generate_node_acls is now '1'.
-Last 10 configs saved in /etc/target/backup.
-Configuration saved to /etc/target/saveconfig.json
+Using default IP port 3260
+Created network portal 192.168.1.13:3260.
 
-<b># gluster-block --list --block-host 192.168.1.13,192.168.1.14,192.168.1.15</b>
-BlockName      Volname      Host      Size      Status
-[OnHost: <b>192.168.1.13</b>]
- TARGET1   sampleVol   192.168.1.11   1 GiB       Online
-[OnHost: <b>192.168.1.14</b>]
- TARGET1   sampleVol   192.168.1.11   1 GiB       Online
-[OnHost: <b>192.168.1.15</b>]
- TARGET1   sampleVol   192.168.1.11   1 GiB       Online
+<b># gluster-block list volume block-test</b>
+sample-block
 
-<b># gluster-block --info TARGET1 --block-host 192.168.1.13,192.168.1.14,192.168.1.15</b>
-[OnHost: <b>192.168.1.13</b>]
-config: glfs/sampleVol@192.168.1.11/91b990b6-952c-4ded-b42a-dd238bce21b6
-name: TARGET1
-plugin: user
-size: 1073741824
-wwn: 91b990b6-952c-4ded-b42a-dd238bce21b6
-
-[OnHost: <b>192.168.1.14</b>]
-config: glfs/sampleVol@192.168.1.11/91b990b6-952c-4ded-b42a-dd238bce21b6
-name: TARGET1
-plugin: user
-size: 1073741824
-wwn: 91b990b6-952c-4ded-b42a-dd238bce21b6
-
-[OnHost: <b>192.168.1.15</b>]
-config: glfs/sampleVol@192.168.1.11/91b990b6-952c-4ded-b42a-dd238bce21b6
-name: TARGET1
-plugin: user
-size: 1073741824
-wwn: 91b990b6-952c-4ded-b42a-dd238bce21b6
+<b>#  gluster-block info sample-block volume block-test</b>
+NAME: sample-block
+VOLUME: block-test
+GBID: 6b60c53c-8ce0-4d8d-a42c-5b546bca3d09
+SIZE: 1073741824
+MULTIPATH: 3
+BLOCK CONFIG NODE(S): 192.168.1.11 192.168.1.12 192.168.1.13
 </pre>
 
 ##### On the Initiator machine
@@ -223,9 +135,9 @@ wwn: 91b990b6-952c-4ded-b42a-dd238bce21b6
 # lsblk (note the available devices)
 
 Make sure you have multipathd running and configured
+# iscsiadm -m discovery -t st -p 192.168.1.11 -l
+# iscsiadm -m discovery -t st -p 192.168.1.12 -l
 # iscsiadm -m discovery -t st -p 192.168.1.13 -l
-# iscsiadm -m discovery -t st -p 192.168.1.14 -l
-# iscsiadm -m discovery -t st -p 192.168.1.15 -l
 
 # lsblk (note the new devices, let's say sdb, sdc and sdd multipath to mpatha)
 # mkfs.xfs /dev/mapper/mpatha
@@ -239,14 +151,13 @@ On initiator node
 # iscsiadm -m node -u
 
 On the gluster-block node
-<b># gluster-block --delete TARGET1 --block-host 192.168.1.13,192.168.1.14,192.168.1.15</b>
-[OnHost: <b>192.168.1.13</b>]
-Deleted storage object TARGET1.
-Deleted Target iqn.2016-12.org.gluster-block:192.168.1.13-91b990b6-952c-4ded-b42a-dd238bce21b6.
-[OnHost: <b>192.168.1.14</b>]
-Deleted storage object TARGET1.
-Deleted Target iqn.2016-12.org.gluster-192.168.1.14-91b990b6-952c-4ded-b42a-dd238bce21b6.
-[OnHost: <b>192.168.1.15</b>]
-Deleted storage object TARGET1.
-Deleted Target iqn.2016-12.org.gluster-block:192.168.1.15-91b990b6-952c-4ded-b42a-dd238bce21b6.
+<b># gluster-block delete sample-block volume block-test</b>
+Deleted storage object sample-block.
+Deleted Target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
+
+Deleted storage object sample-block.
+Deleted Target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
+
+Deleted storage object sample-block.
+Deleted Target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
 </pre>
