@@ -90,8 +90,7 @@ commands and arguments:
 192.168.1.14: Initiator, iSCSI client<br><br>
 Execute gluster-block CLI from any of the 3 nodes where glusterd and gluster-blockd are running <br>
 Create a gluster volume by pooling 3 nodes (192.168.1.11, 192.168.1.12 and 192.168.1.13) <br>
-Read More on how to [create a gluster volume](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/2.1/html/Administration_Guide/sect-User_Guide-Setting_Volumes-Replicated.html)
-*
+Read More on how to [create a gluster volume](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/2.1/html/Administration_Guide/sect-User_Guide-Setting_Volumes-Replicated.html)*
 
 <pre>
 Create 1G gluster block storage

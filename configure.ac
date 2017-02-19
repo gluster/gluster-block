@@ -85,7 +85,7 @@ AC_TYPE_SSIZE_T
 
 # Checks for library functions.
 AC_FUNC_STRTOD
-AC_CHECK_FUNCS([bzero gethostbyname memset socket strchr strdup strerror])
+AC_CHECK_FUNCS([gethostbyname memset socket strchr strdup strerror])
 AC_OUTPUT
 
 cat <<EOF

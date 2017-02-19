@@ -33,6 +33,6 @@
 
 # define  SUN_PATH_MAX     (sizeof(struct sockaddr_un) - sizeof(unsigned short int)) /*sun_family*/
 
-ssize_t glusterBlockCreateParseSize(char *value);
+ssize_t glusterBlockCreateParseSize(const char *dom, char *value);
 
 # endif /* _COMMON_H */

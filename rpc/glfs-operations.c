@@ -87,18 +87,34 @@ glusterBlockCreateEntry(struct glfs *glfs,
   if (!tgfd) {
     LOG("gfapi", GB_LOG_ERROR, "glfs_creat(%s) on volume %s failed[%s]",
         gbid, blk->volume, strerror(errno));
+    ret = -1;
+    goto out;
   } else {
     ret = glfs_ftruncate(tgfd, blk->size);
     if (ret) {
       LOG("gfapi", GB_LOG_ERROR, "glfs_ftruncate(%s): on volume %s "
           "of size %zu failed[%s]", gbid, blk->volume, blk->size,
           strerror(errno));
+
+      if (tgfd && glfs_close(tgfd) != 0) {
+        LOG("gfapi", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
+            gbid, blk->volume, strerror(errno));
+      }
+
+      ret = glfs_unlink(glfs, gbid);
+      if (ret && errno != ENOENT) {
+        LOG("gfapi", GB_LOG_ERROR, "glfs_unlink(%s) on volume %s failed[%s]",
+            gbid, blk->volume, strerror(errno));
+      }
+
+      ret = -1;
       goto out;
     }
 
     if (tgfd && glfs_close(tgfd) != 0) {
       LOG("gfapi", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
           gbid, blk->volume, strerror(errno));
+      ret = -1;
       goto out;
     }
   }
@@ -201,8 +217,9 @@ blockFreeMetaInfo(MetaInfo *info)
   if (!info)
     return;
 
-  for (i = 0; i < info->nhosts; i++)
+  for (i = 0; i < info->nhosts; i++) {
     GB_FREE(info->list[i]);
+  }
 
   GB_FREE(info->list);
   GB_FREE(info);
@@ -282,7 +299,7 @@ blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info)
   struct glfs_fd *tgmfd = NULL;
   char line[1024];
   char *tmp;
-  int ret = 0;
+  int ret;
 
 
   ret = glfs_chdir (glfs, GB_METADIR);

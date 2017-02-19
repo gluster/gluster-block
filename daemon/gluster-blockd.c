@@ -114,7 +114,7 @@ void *
 glusterBlockServerThreadProc(void *vargp)
 {
   register SVCXPRT *transp = NULL;
-  struct sockaddr_in sain;
+  struct sockaddr_in sain = {0, };
   int sockfd;
 
 

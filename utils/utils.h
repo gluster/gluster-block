@@ -290,6 +290,7 @@ typedef enum Metakey {
   GB_META_SIZE        = 2,
   GB_META_HA          = 3,
   GB_META_ENTRYCREATE = 4,
+  GB_META_ENTRYDELETE = 5,
 
   GB_METAKEY_MAX
 } Metakey;
@@ -300,6 +301,7 @@ static const char *const MetakeyLookup[] = {
   [GB_META_SIZE]        = "SIZE",
   [GB_META_HA]          = "HA",
   [GB_META_ENTRYCREATE] = "ENTRYCREATE",
+  [GB_META_ENTRYDELETE] = "ENTRYDELETE",
 
   [GB_METAKEY_MAX]      = NULL
 };

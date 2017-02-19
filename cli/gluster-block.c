@@ -69,9 +69,9 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
     goto out;
   }
 
-  clnt = clntunix_create ((struct sockaddr_un *) &saun,
-                          GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS,
-                          &sockfd, 0, 0);
+  clnt = clntunix_create((struct sockaddr_un *) &saun,
+                         GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS,
+                         &sockfd, 0, 0);
   if (!clnt) {
     LOG("cli", GB_LOG_ERROR, "%s, unix addr %s",
         clnt_spcreateerror("client create failed"), GB_UNIX_ADDRESS);
@@ -214,7 +214,7 @@ glusterBlockCreate(int argcount, char **options)
       break;
 
     case GB_CLI_CREATE_SIZE:
-      cobj.size = glusterBlockCreateParseSize(options[optind++]);
+      cobj.size = glusterBlockCreateParseSize("cli", options[optind++]);
       if (cobj.size < 0) {
         LOG("cli", GB_LOG_ERROR, "%s", "failed while parsing size");
         ret = -1;
@@ -235,6 +235,7 @@ glusterBlockCreate(int argcount, char **options)
     default:
       MSG("unrecognized option '%s'\n", options[optind-1]);
       MSG("%s", "Hint: gluster-block help\n");
+      ret = -1;
       goto out;
     }
   }
@@ -289,7 +290,6 @@ glusterBlockList(int argcount, char **options)
   }
 
   strcpy(cobj.volume, options[optind]);
-
   ret = glusterBlockCliRPC_1(&cobj, LIST_CLI, &out);
 
   if(out) {

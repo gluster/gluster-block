@@ -14,7 +14,7 @@
 
 
 ssize_t
-glusterBlockCreateParseSize(char *value)
+glusterBlockCreateParseSize(const char *dom, char *value)
 {
   char *postfix;
   char *tmp;
@@ -26,7 +26,7 @@ glusterBlockCreateParseSize(char *value)
 
   sizef = strtod(value, &postfix);
   if (sizef < 0) {
-    ERROR("%s", "size cannot be negative number\n");
+    LOG(dom, GB_LOG_ERROR, "%s", "size cannot be negative number");
     return -1;
   }
 
@@ -66,9 +66,9 @@ glusterBlockCreateParseSize(char *value)
     return sizef;
     break;
   default:
-  /*TODO: Log this instead of printing
-     ERROR("%s", "You may use k/K, M, G or T suffixes for "
-           "kilobytes, megabytes, gigabytes and terabytes."); */
+    LOG(dom, GB_LOG_ERROR, "%s",
+         "You may use k/K, M, G or T suffixes for kilobytes, "
+         "megabytes, gigabytes and terabytes.");
     return -1;
   }
 }
