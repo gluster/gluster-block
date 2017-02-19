@@ -150,19 +150,6 @@ blockServerDefFree(blockServerDefPtr blkServers)
 }
 
 
-void
-blockRemoteObjFree(pthread_t *tid, blockRemoteObj **args, int count)
-{
-  size_t i;
-
-  for (i = 0; i < count; i++) {
-    GB_FREE(args[i]);
-  }
-  GB_FREE(args);
-  GB_FREE(tid);
-}
-
-
 static blockServerDefPtr
 blockServerParse(char *blkServers)
 {
@@ -218,7 +205,7 @@ void *
 glusterBlockCreateRemote(void *data)
 {
   int ret;
-  blockRemoteObj *args = *(blockRemoteObj**)data;
+  blockRemoteObj *args = (blockRemoteObj *)data;
   blockCreate cobj = *(blockCreate *)args->obj;
 
 
@@ -255,7 +242,7 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
                             char **savereply)
 {
   pthread_t  *tid = NULL;
-  static blockRemoteObj **args = NULL;
+  static blockRemoteObj *args = NULL;
   char *tmp = *savereply;
   int *status[mpath];
   int ret = -1;
@@ -263,26 +250,17 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
 
 
   if (GB_ALLOC_N(tid, mpath) < 0) {
-    mpath = 0;
     goto out;
   }
 
   if (GB_ALLOC_N(args, mpath) < 0) {
-    mpath = 0;
     goto out;
  }
 
   for (i = 0; i < mpath; i++) {
-    if (GB_ALLOC(args[i])< 0) {
-      mpath = i;
-      goto out;
-    }
-  }
-
-  for (i = 0; i < mpath; i++) {
-    args[i]->glfs = glfs;
-    args[i]->obj = (void *)cobj;
-    args[i]->addr = list->hosts[i + listindex];
+    args[i].glfs = glfs;
+    args[i].obj = (void *)cobj;
+    args[i].addr = list->hosts[i + listindex];
   }
 
   for (i = 0; i < mpath; i++) {
@@ -295,7 +273,7 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
   }
 
   for (i = 0; i < mpath; i++) {
-    if (asprintf(savereply, "%s%s\n", (tmp==NULL?"":tmp), args[i]->reply) == -1) {
+    if (asprintf(savereply, "%s%s\n", (tmp==NULL?"":tmp), args[i].reply) == -1) {
       /* TODO: Fail with vaild info, depends on mpath */
       *savereply = tmp;
       goto out;
@@ -314,7 +292,8 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
   }
 
  out:
-  blockRemoteObjFree(tid, args, mpath);
+  GB_FREE(args);
+  GB_FREE(tid);
 
   return ret;
 }
@@ -324,7 +303,7 @@ void *
 glusterBlockDeleteRemote(void *data)
 {
   int ret;
-  blockRemoteObj *args = *(blockRemoteObj**)data;
+  blockRemoteObj *args = (blockRemoteObj *)data;
   blockDelete dobj = *(blockDelete *)args->obj;
 
 
@@ -360,7 +339,7 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
                               char **savereply)
 {
   pthread_t  *tid = NULL;
-  static blockRemoteObj **args = NULL;
+  static blockRemoteObj *args = NULL;
   char *tmp = *savereply;
   int *status[count];
   int ret = -1;
@@ -368,20 +347,11 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
 
 
   if (GB_ALLOC_N(tid, count) < 0) {
-    count = 0;
     goto out;
   }
 
   if (GB_ALLOC_N(args, count) < 0) {
-    count = 0;
     goto out;
-  }
-
-  for (i = 0; i < count; i++) {
-    if (GB_ALLOC(args[i])< 0) {
-      count = i;
-      goto out;
-    }
   }
 
   for (i = 0, count = 0; i < info->nhosts; i++) {
@@ -390,19 +360,19 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
     case GB_CLEANUP_FAIL:
     case GB_CONFIG_FAIL:
     case GB_CONFIG_INPROGRESS:
-      args[count]->glfs = glfs;
-      args[count]->obj = (void *)dobj;
-      args[count]->volume = info->volume;
-      args[count]->addr = info->list[i]->addr;
+      args[count].glfs = glfs;
+      args[count].obj = (void *)dobj;
+      args[count].volume = info->volume;
+      args[count].addr = info->list[i]->addr;
       count++;
       break;
     }
     if (deleteall &&
         blockMetaStatusEnumParse(info->list[i]->status) == GB_CONFIG_SUCCESS) {
-      args[count]->glfs = glfs;
-      args[count]->obj = (void *)dobj;
-      args[count]->volume = info->volume;
-      args[count]->addr = info->list[i]->addr;
+      args[count].glfs = glfs;
+      args[count].obj = (void *)dobj;
+      args[count].volume = info->volume;
+      args[count].addr = info->list[i]->addr;
       count++;
     }
   }
@@ -416,7 +386,7 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
   }
 
   for (i = 0; i < count; i++) {
-    if (asprintf(savereply, "%s%s\n", (tmp==NULL?"":tmp), args[i]->reply) == -1) {
+    if (asprintf(savereply, "%s%s\n", (tmp==NULL?"":tmp), args[i].reply) == -1) {
       /* TODO: Fail with vaild info */
       *savereply = tmp;
       goto out;
@@ -435,7 +405,8 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
   }
 
  out:
-  blockRemoteObjFree(tid, args, count);
+  GB_FREE(args);
+  GB_FREE(tid);
 
   return ret;
 }
