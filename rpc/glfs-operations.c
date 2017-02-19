@@ -69,15 +69,17 @@ glusterBlockCreateEntry(struct glfs *glfs,
 
   ret = glfs_mkdir (glfs, GB_STOREDIR, 0);
   if (ret && errno != EEXIST) {
-    LOG("gfapi", GB_LOG_ERROR, "glfs_mkdir(%s) on volume %s failed[%s]",
-        GB_STOREDIR, blk->volume, strerror(errno));
+    LOG("gfapi", GB_LOG_ERROR,
+        "glfs_mkdir(%s) on volume %s for block %s failed[%s]",
+        GB_STOREDIR, blk->volume, blk->block_name, strerror(errno));
     goto out;
   }
 
   ret = glfs_chdir (glfs, GB_STOREDIR);
   if (ret) {
-    LOG("gfapi", GB_LOG_ERROR, "glfs_chdir(%s) on volume %s failed[%s]",
-        GB_STOREDIR, blk->volume, strerror(errno));
+    LOG("gfapi", GB_LOG_ERROR,
+        "glfs_chdir(%s) on volume %s for block %s failed[%s]",
+        GB_STOREDIR, blk->volume, blk->block_name, strerror(errno));
     goto out;
   }
 
@@ -85,26 +87,30 @@ glusterBlockCreateEntry(struct glfs *glfs,
                     O_WRONLY | O_CREAT | O_EXCL,
                     S_IRUSR | S_IWUSR);
   if (!tgfd) {
-    LOG("gfapi", GB_LOG_ERROR, "glfs_creat(%s) on volume %s failed[%s]",
-        gbid, blk->volume, strerror(errno));
+    LOG("gfapi", GB_LOG_ERROR,
+        "glfs_creat(%s) on volume %s for block %s failed[%s]",
+        gbid, blk->volume, blk->block_name, strerror(errno));
     ret = -1;
     goto out;
   } else {
     ret = glfs_ftruncate(tgfd, blk->size);
     if (ret) {
-      LOG("gfapi", GB_LOG_ERROR, "glfs_ftruncate(%s): on volume %s "
-          "of size %zu failed[%s]", gbid, blk->volume, blk->size,
-          strerror(errno));
+      LOG("gfapi", GB_LOG_ERROR,
+          "glfs_ftruncate(%s): on volume %s for block %s"
+          "of size %zu failed[%s]", gbid, blk->volume, blk->block_name,
+          blk->size, strerror(errno));
 
       if (tgfd && glfs_close(tgfd) != 0) {
-        LOG("gfapi", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
-            gbid, blk->volume, strerror(errno));
+        LOG("gfapi", GB_LOG_ERROR,
+            "glfs_close(%s): on volume %s for block %s failed[%s]",
+            gbid, blk->volume, blk->block_name, strerror(errno));
       }
 
       ret = glfs_unlink(glfs, gbid);
       if (ret && errno != ENOENT) {
-        LOG("gfapi", GB_LOG_ERROR, "glfs_unlink(%s) on volume %s failed[%s]",
-            gbid, blk->volume, strerror(errno));
+        LOG("gfapi", GB_LOG_ERROR,
+            "glfs_unlink(%s) on volume %s for block %s failed[%s]",
+            gbid, blk->volume, blk->block_name, strerror(errno));
       }
 
       ret = -1;
@@ -112,8 +118,9 @@ glusterBlockCreateEntry(struct glfs *glfs,
     }
 
     if (tgfd && glfs_close(tgfd) != 0) {
-      LOG("gfapi", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
-          gbid, blk->volume, strerror(errno));
+      LOG("gfapi", GB_LOG_ERROR,
+          "glfs_close(%s): on volume %s for block %s failed[%s]",
+          gbid, blk->volume, blk->block_name, strerror(errno));
       ret = -1;
       goto out;
     }
@@ -191,8 +198,9 @@ glusterBlockDeleteMetaFile(struct glfs *glfs,
 
   ret = glfs_chdir (glfs, GB_METADIR);
   if (ret) {
-    LOG("gfapi", GB_LOG_ERROR, "glfs_chdir(%s) on volume %s failed[%s]",
-        GB_METADIR, volume, strerror(errno));
+    LOG("gfapi", GB_LOG_ERROR,
+        "glfs_chdir(%s) on volume %s for block %s failed[%s]",
+        GB_METADIR, volume, blockname, strerror(errno));
     goto out;
   }
 
@@ -304,8 +312,9 @@ blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info)
 
   ret = glfs_chdir (glfs, GB_METADIR);
   if (ret) {
-    LOG("gfapi", GB_LOG_ERROR, "glfs_chdir(%s) on volume %s failed[%s]",
-        GB_METADIR, info->volume, strerror(errno));
+    LOG("gfapi", GB_LOG_ERROR,
+        "glfs_chdir(%s) on volume %s for block %s failed[%s]",
+        GB_METADIR, info->volume, metafile, strerror(errno));
     goto out;
   }
 
@@ -322,6 +331,9 @@ blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info)
     count += strlen(tmp) + 1;
     ret = blockStuffMetaInfo(info, tmp);
     if (ret) {
+      LOG("gfapi", GB_LOG_ERROR,
+          "blockStuffMetaInfo: on volume %s for block %s failed[%s]",
+          info->volume, metafile, strerror(errno));
       goto out;
     }
     glfs_lseek(tgmfd, count, SEEK_SET);

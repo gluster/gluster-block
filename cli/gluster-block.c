@@ -83,9 +83,10 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
     create_obj = cobj;
     reply = block_create_cli_1(create_obj, clnt);
     if (!reply) {
-      LOG("cli", GB_LOG_ERROR, "%sblock %s create on volume %s failed\n",
-          clnt_sperror(clnt, "block_create_cli_1"),
-          create_obj->block_name, create_obj->volume);
+      LOG("cli", GB_LOG_ERROR,
+          "%sblock %s create on volume %s with hosts %s failed\n",
+          clnt_sperror(clnt, "block_create_cli_1"), create_obj->block_name,
+          create_obj->volume, create_obj->block_hosts);
       goto out;
     }
     break;
@@ -128,12 +129,14 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
   }
 
  out:
-  if (clnt) {
-    if (!reply || !clnt_freeres(clnt, (xdrproc_t)xdr_blockResponse, (char *)reply))
-      LOG("cli", GB_LOG_ERROR, "%s", clnt_sperror(clnt, "clnt_freeres failed"));
-
+  if (clnt && reply) {
+    if (!clnt_freeres(clnt, (xdrproc_t)xdr_blockResponse, (char *)reply)) {
+      LOG("cli", GB_LOG_ERROR, "%s",
+          clnt_sperror(clnt, "clnt_freeres failed"));
+    }
     clnt_destroy (clnt);
   }
+
   if (sockfd != -1) {
     close (sockfd);
   }
@@ -216,7 +219,8 @@ glusterBlockCreate(int argcount, char **options)
     case GB_CLI_CREATE_SIZE:
       cobj.size = glusterBlockCreateParseSize("cli", options[optind++]);
       if (cobj.size < 0) {
-        LOG("cli", GB_LOG_ERROR, "%s", "failed while parsing size");
+        LOG("cli", GB_LOG_ERROR, "failed while parsing size for block %s",
+            cobj.block_name);
         ret = -1;
         goto out;
       }
@@ -225,7 +229,8 @@ glusterBlockCreate(int argcount, char **options)
 
     case GB_CLI_CREATE_BACKEND_SERVESRS:
       if (GB_STRDUP(cobj.block_hosts, options[optind++]) < 0) {
-        LOG("cli", GB_LOG_ERROR, "%s", "failed while parsing size");
+        LOG("cli", GB_LOG_ERROR, "failed while parsing servers for block %s",
+            cobj.block_name);
         ret = -1;
         goto out;
       }
@@ -250,6 +255,11 @@ glusterBlockCreate(int argcount, char **options)
   }
 
   ret = glusterBlockCliRPC_1(&cobj, CREATE_CLI, &out);
+  if (ret) {
+    LOG("cli", GB_LOG_ERROR,
+        "failed creating block %s on volume %s with hosts %s",
+        cobj.block_name, cobj.volume, cobj.block_hosts);
+  }
 
   if(out) {
     MSG("%s", out);
@@ -291,6 +301,10 @@ glusterBlockList(int argcount, char **options)
 
   strcpy(cobj.volume, options[optind]);
   ret = glusterBlockCliRPC_1(&cobj, LIST_CLI, &out);
+  if (ret) {
+    LOG("cli", GB_LOG_ERROR, "failed listing blocks from volume %s",
+        cobj.volume);
+  }
 
   if(out) {
     MSG("%s", out);
@@ -333,6 +347,10 @@ glusterBlockDelete(int argcount, char **options)
 
   strcpy(cobj.volume, options[optind]);
   ret = glusterBlockCliRPC_1(&cobj, DELETE_CLI, &out);
+  if (ret) {
+    LOG("cli", GB_LOG_ERROR, "failed deleting block %s on volume %s",
+        cobj.block_name, cobj.volume);
+  }
 
   if(out) {
     MSG("%s", out);
@@ -375,6 +393,11 @@ glusterBlockInfo(int argcount, char **options)
 
   strcpy(cobj.volume, options[optind]);
   ret = glusterBlockCliRPC_1(&cobj, INFO_CLI, &out);
+  if (ret) {
+    LOG("cli", GB_LOG_ERROR,
+        "failed getting info of block %s on volume %s",
+        cobj.block_name, cobj.volume);
+  }
 
   if(out) {
     MSG("%s", out);
