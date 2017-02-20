@@ -509,17 +509,17 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
     }
 
     if (cleanupsuccess == info->nhosts) {
-      GB_METAUPDATE_OR_GOTO(lock, glfs, info->gbid, info->volume,
+      GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
           ret, out, "ENTRYDELETE: INPROGRESS\n");
       if (glusterBlockDeleteEntry(glfs, info->volume, info->gbid)) {
-        GB_METAUPDATE_OR_GOTO(lock, glfs, info->gbid, info->volume,
+        GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
             ret, out, "ENTRYDELETE: FAIL\n");
         LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s", FAILED_DELETING_FILE,
             info->volume, blockname);
         ret = -1;
         goto out;
       }
-      GB_METAUPDATE_OR_GOTO(lock, glfs, info->gbid, info->volume,
+      GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
           ret, out, "ENTRYDELETE: SUCCESS\n");
       ret = glusterBlockDeleteMetaFile(glfs, info->volume, blockname);
       if (ret) {
