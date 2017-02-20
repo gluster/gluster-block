@@ -25,6 +25,7 @@
 
 # define   GB_TGCLI_GLFS_PATH   "/backstores/user:glfs"
 # define   GB_TGCLI_GLFS        "targetcli " GB_TGCLI_GLFS_PATH
+# define   GB_TGCLI_CHECK        GB_TGCLI_GLFS " ls | grep ' %s ' > " DEVNULLPATH
 # define   GB_TGCLI_ISCSI       "targetcli /iscsi"
 # define   GB_TGCLI_GLOBALS     "targetcli set global auto_add_default_portal=false > " DEVNULLPATH
 # define   GB_TGCLI_SAVE        "targetcli / saveconfig > " DEVNULLPATH
@@ -918,6 +919,20 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
     goto out;
   }
   reply->exit = -1;
+
+  if (asprintf(&exec, GB_TGCLI_CHECK, blk->block_name) == -1) {
+    goto out;
+  }
+
+  /* Check if block exist on this node ? */
+  if (WEXITSTATUS(system(exec))== 1) {
+    reply->exit = 0;
+    if (asprintf(&reply->out, "No %s.", blk->block_name) == -1) {
+      goto out;
+    }
+    goto out;
+  }
+  GB_FREE(exec);
 
   if (asprintf(&iqn, "%s %s %s%s", GB_TGCLI_ISCSI, GB_DELETE,
                GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
