@@ -52,6 +52,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   CLIENT *clnt = NULL;
   int ret = -1;
   int sockfd;
+  int errsv = 0;
   blockResponse *reply =  NULL;
   struct hostent *server;
   struct sockaddr_in sain = {0, };
@@ -78,6 +79,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   if (connect(sockfd, (struct sockaddr *) &sain, sizeof(sain)) < 0) {
     LOG("mgmt", GB_LOG_ERROR, "connect on %s failed (%s)", host,
         strerror (errno));
+    errsv = errno;
     goto out;
   }
 
@@ -127,6 +129,10 @@ glusterBlockCallRPC_1(char *host, void *cobj,
 
   if (sockfd != -1) {
     close(sockfd);
+  }
+
+  if (errsv) {
+    errno = errsv;
   }
 
   return ret;
@@ -215,6 +221,12 @@ glusterBlockCreateRemote(void *data)
 
   ret = glusterBlockCallRPC_1(args->addr, &cobj, CREATE_SRV, &args->reply);
   if (ret) {
+    if (errno == ENETUNREACH || errno == ECONNREFUSED  || errno == ETIMEDOUT) {
+      LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on"
+          "host %s volume %s", strerror(errno), FAILED_REMOTE_CREATE,
+          cobj.block_name, args->addr, args->volume);
+      goto out;
+    }
     GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
                           ret, out, "%s: CONFIGFAIL\n", args->addr);
     LOG("mgmt", GB_LOG_ERROR, "%s for block %s on host %s volume %s",
@@ -312,6 +324,12 @@ glusterBlockDeleteRemote(void *data)
                         ret, out, "%s: CLEANUPINPROGRESS\n", args->addr);
   ret = glusterBlockCallRPC_1(args->addr, &dobj, DELETE_SRV, &args->reply);
   if (ret) {
+    if (errno == ENETUNREACH || errno == ECONNREFUSED  || errno == ETIMEDOUT) {
+      LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on"
+          "host %s volume %s", strerror(errno), FAILED_REMOTE_DELETE,
+          dobj.block_name, args->addr, args->volume);
+      goto out;
+    }
     GB_METAUPDATE_OR_GOTO(lock, args->glfs, dobj.block_name, args->volume,
                           ret, out, "%s: CLEANUPFAIL\n", args->addr);
     LOG("mgmt", GB_LOG_ERROR, "%s for block %s on host %s volume %s",
@@ -357,10 +375,9 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
 
   for (i = 0, count = 0; i < info->nhosts; i++) {
     switch (blockMetaStatusEnumParse(info->list[i]->status)) {
-    case GB_CLEANUP_INPROGRES:
+    case GB_CLEANUP_INPROGRESS:
     case GB_CLEANUP_FAIL:
     case GB_CONFIG_FAIL:
-    case GB_CONFIG_INPROGRESS:
       args[count].glfs = glfs;
       args[count].obj = (void *)dobj;
       args[count].volume = info->volume;
@@ -439,10 +456,9 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
 
   for (i = 0; i < info->nhosts; i++) {
     switch (blockMetaStatusEnumParse(info->list[i]->status)) {
-    case GB_CLEANUP_INPROGRES:
+    case GB_CLEANUP_INPROGRESS:
     case GB_CLEANUP_FAIL:
     case GB_CONFIG_FAIL:
-    case GB_CONFIG_INPROGRESS:
       count++;
       break;
     }
@@ -475,8 +491,11 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
     }
 
     for (i = 0; i < info->nhosts; i++) {
-      if (blockMetaStatusEnumParse(info->list[i]->status) == GB_CLEANUP_SUCCESS) {
+      switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+      case GB_CONFIG_INPROGRESS:  /* un touched */
+      case GB_CLEANUP_SUCCESS:
         cleanupsuccess++;
+        break;
       }
     }
 
