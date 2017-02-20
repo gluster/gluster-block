@@ -8,6 +8,8 @@
   cases as published by the Free Software Foundation.
 */
 
+
+# include  <fcntl.h>
 # include  <dirent.h>
 # include  <sys/stat.h>
 # include  <pthread.h>
@@ -168,26 +170,54 @@ glusterBlockServerThreadProc(void *vargp)
 int
 main (int argc, char **argv)
 {
+  int fd;
   pthread_t cli_thread;
   pthread_t server_thread;
+  struct flock lock = {0, };
+  int errnosv = 0;
+
 
   if (!glusterBlockLogdirCreate()) {
     return -1;
   }
 
-	pmap_unset(GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS);
+  /* is gluster-blockd running ? */
+  fd = creat(GB_LOCK_FILE, S_IRUSR | S_IWUSR);
+  if (fd == -1) {
+    LOG("mgmt", GB_LOG_ERROR, "creat(%s) failed[%s]",
+        GB_LOCK_FILE, strerror(errno));
+    goto out;
+  }
+
+  lock.l_type = F_WRLCK;
+  if (fcntl(fd, F_SETLK, &lock) == -1) {
+    errnosv = errno;
+    LOG("mgmt", GB_LOG_ERROR, "%s",
+        "gluster-blockd is already running...");
+    close(fd);
+    exit(errnosv);
+  }
+
+  pmap_unset(GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS);
   pmap_unset(GLUSTER_BLOCK, GLUSTER_BLOCK_VERS);
 
-  pthread_create(&cli_thread, NULL, glusterBlockCliThreadProc , NULL);
-  pthread_create(&server_thread, NULL, glusterBlockServerThreadProc , NULL);
+  pthread_create(&cli_thread, NULL, glusterBlockCliThreadProc, NULL);
+  pthread_create(&server_thread, NULL, glusterBlockServerThreadProc, NULL);
 
   pthread_join(cli_thread, NULL);
   pthread_join(server_thread, NULL);
 
+  LOG("mgmt", GB_LOG_ERROR, "svc_run returned (%s)", strerror (errno));
 
-  LOG("mgmt", GB_LOG_ERROR, "svc_run returned (%s)",
-      strerror (errno));
+  lock.l_type = F_UNLCK;
+  if (fcntl(fd, F_SETLK, &lock) == -1) {
+    LOG("mgmt", GB_LOG_ERROR, "fcntl(UNLCK) on pidfile %s failed[%s]",
+        GB_LOCK_FILE, strerror(errno));
+  }
 
-  exit (errno);
+  close(fd);
+
+ out:
+  exit (1);
   /* NOTREACHED */
 }
