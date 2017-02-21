@@ -1,0 +1,124 @@
+.TH gluster-block 8 "command line utility" " 26 Feb 2017" "Red Hat, Inc."
+.PP
+
+
+.SH NAME
+gluster-block - Gluster Block Storage Console Manager (command line utility)
+.PP
+
+
+.SH SYNOPSIS
+.B gluster-block
+<\fBcreate|list|info|delete\fR>
+<\fBvolname\fR[\fB/blockname\fR]>
+[\fB<args>\fR]
+.PP
+
+
+.SH DESCRIPTION
+The Gluster Block Storage Console Manager(\fBgluster-block\fR) is a CLI utility, which aims at making gluster backed block storage creation and maintenance as simple as possible.
+
+Note that the gluster-blockd daemon is responsible for block management, hence the daemon must be running on all servers.
+.PP
+
+
+.SH COMMANDS
+.SS
+\fBcreate\fR <VOLNAME/NEW-BLOCKNAME> [ha <COUNT>] <HOST1[,HOST2,..]> <BYTES>
+create block device.
+.TP
+[ha <COUNT>]
+multipath requirement for high availability (default: 1)
+.TP
+<HOST1,[HOST2....]>
+servers in the pool where targets will be exported.
+.TP
+<BYTES>
+size in KiB|MiB|GiB|TiB|PiB ...
+.PP
+
+.SS
+\fBlist\fR <VOLNAME>
+list available block devices.
+.PP
+
+.SS
+\fBinfo\fR <VOLNAME/BLOCKNAME>
+details about block device.
+.PP
+
+.SS
+\fBdelete\fR <VOLNAME/BLOCKNAME>
+delete block device.
+.PP
+
+.SS
+.BR help
+show this message and exit.
+.PP
+
+.SS
+.BR version
+show version info and exit.
+.PP
+
+
+.SH EXAMPLES
+.nf
+To create a block device of size 1GiB
+.B # gluster-block create blockVol/sampleBlock ${HOST} 1GiB
+
+To create a block device of size 1GiB with multi-path(replica) 3
+.B # gluster-block create blockVol/sampleBlock ha 3 ${HOST1},${HOST2},${HOST3} 1GiB
+
+You can pass more no. of nodes than ha count, this will actually help create in recovering from
+failures, incase creation of block fails on any of scheduled(always first in list) ha count nodes.
+.B # gluster-block create blockVol/sampleBlock ha 3 ${HOST1},${HOST2},${HOST3},${HOST4},${HOST5} 1GiB
+
+To list available block devices
+.B # gluster-block list blockVol
+
+To get details of a block device
+.B # gluster-block info blockVol/sampleBlock
+
+To delete a block device
+.B # gluster-block delete blockVol/sampleBlock
+.fi
+.PP
+
+.SH FILES
+/var/log/gluster-block/*
+.br
+/var/run/gluster-block.socket
+.br
+/var/run/gluster-block.lock
+.PP
+
+
+.SH REPORTING BUGS
+Report bugs via gluster-devel <gluster-devel@gluster.org
+.br
+or <https://github.com/gluster/gluster-block/issues>
+
+
+.SH AUTHOR
+Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
+
+.SH THANKS
+Vijay Bellur <vbellur@redhat.com>
+.br
+Pranith Kumar Karampuri <pkarampu@redhat.com>
+
+
+
+.SH SEE ALSO
+.nf
+\fBtargetcli\fR(8), \fBtcmu-runner\fR(8), \fBglusterfs\fR(8), \fBglusterd\fR(8), \fBgluster\fR(8)
+.fi
+.PP
+
+
+.SH COPYRIGHT
+.nf
+Copyright (c) 2016 Red Hat, Inc. <http://www.redhat.com>
+.PP
