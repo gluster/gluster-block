@@ -1,5 +1,6 @@
 # gluster-block
-gluster-block is a CLI utility, which aims at making gluster backed block storage creation and maintenance as simple as possible.
+gluster-block is a CLI utility, which aims at making gluster backed block
+storage creation and maintenance as simple as possible.
 
 ## License
 gluster-block is licensed to you under your choice of the GNU Lesser General Public License, version 3 or any later version ([LGPLv3](https://opensource.org/licenses/lgpl-3.0.html) or later), or the GNU General Public License, version 2 ([GPLv2](https://opensource.org/licenses/GPL-2.0)), in all cases as published by the Free Software Foundation.
@@ -145,7 +146,7 @@ Make sure you have multipathd running and configured
 
 ##### Delete the targets
 <pre>
-On initiator node 
+On initiator node
 # umount /mnt
 # iscsiadm -m node -u
 
