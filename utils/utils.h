@@ -184,25 +184,6 @@
             gbFree(1 ? (void *) &(ptr) : (ptr))
 
 
-typedef enum gbCmdlineCreateOption {
-  /* needed by create option  */
-  GB_CLI_CREATE_VOLUME           = 11,
-  GB_CLI_CREATE_SIZE             = 12,
-  GB_CLI_CREATE_MULTIPATH        = 13,
-  GB_CLI_CREATE_BACKEND_SERVESRS = 14,
-
-  GB_CLI_CREATE_OPT_MAX
-} gbCmdlineCreateOption;
-
-
-typedef enum gbCmdlineCommonOption {
-  /* common to all the cli options */
-  GB_CLI_COMMON_VOLUME      = 21,
-
-  GB_CLI_COMMON_OPT_MAX
-} gbCmdlineCommonOption;
-
-
 typedef enum gbCmdlineOption {
   GB_CLI_UNKNOWN     = 0,
 
@@ -232,21 +213,6 @@ static const char *const gbCmdlineOptLookup[] = {
   [GB_CLI_OPT_MAX]     = NULL,
 };
 
-static const char *const gbCmdlineCreateOptLookup[] = {
-  [GB_CLI_CREATE_VOLUME]           = "volume",
-  [GB_CLI_CREATE_SIZE]             = "size",
-  [GB_CLI_CREATE_MULTIPATH]        = "mpath",
-  [GB_CLI_CREATE_BACKEND_SERVESRS] = "servers",
-
-
-  [GB_CLI_CREATE_OPT_MAX]   = NULL
-};
-
-static const char *const gbCmdlineCommonOptLookup[] = {
-  [GB_CLI_COMMON_VOLUME]           = "volume",
-
-  [GB_CLI_COMMON_OPT_MAX]   = NULL
-};
 
 typedef enum LogLevel {
   GB_LOG_NONE       = 0,
@@ -324,10 +290,6 @@ static const char *const MetaStatusLookup[] = {
 
 
 int glusterBlockCLIOptEnumParse(const char *opt);
-
-int glusterBlockCLICreateOptEnumParse(const char *opt);
-
-int glusterBlockCLICommonOptEnumParse(const char *opt);
 
 int blockMetaKeyEnumParse(const char *opt);
 

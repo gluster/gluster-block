@@ -32,6 +32,7 @@ const char *argp_program_version = ""                                 \
   "or later), or the GNU General Public License, version 2 (GPLv2),\n"\
   "in all cases as published by the Free Software Foundation.";
 
+
 static int
 glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
 {
@@ -151,20 +152,26 @@ glusterBlockHelp(void)
   MSG("%s",
       PACKAGE_NAME" ("PACKAGE_VERSION")\n"
       "usage:\n"
-      "  gluster-block <command> [<args>] <volume=volname>\n"
+      "  gluster-block <command> <volname[/blockname]> [<args>]\n"
       "\n"
-      "commands and arguments:\n"
-      "  create         <name>          create block device\n"
-      "    size           <size>             size in KiB|MiB|GiB|TiB..\n"
-      "    [mpath          <count>]          multipath requirement for high availability(default: 1)\n"
-      "    servers        <IP1,IP2,IP3...>   servers in the pool where targets are exported\n"
-      "  list                           list available block devices\n"
-      "  info           <name>          details about block device\n"
-      "  modify         <resize|auth>   modify metadata\n"
-      "  delete         <name>          delete block device\n"
-      "    volume         <volname>          volume that hosts the block device\n"
-      "  help                           show this message and exit\n"
-      "  version                        show version info and exit\n"
+      "commands:\n"
+      "  create  <volname/blockname> [ha <count>] <host1[,host2,...]> <size>\n"
+      "        create block device.\n"
+      "\n"
+      "  list    <volname>\n"
+      "        list available block devices.\n"
+      "\n"
+      "  info    <volname/blockname>\n"
+      "        details about block device.\n"
+      "\n"
+      "  delete  <volname/blockname>\n"
+      "        delete block device.\n"
+      "\n"
+      "  help\n"
+      "        show this message and exit.\n"
+      "\n"
+      "  version\n"
+      "        show version info and exit.\n"
       );
 }
 
@@ -172,87 +179,81 @@ glusterBlockHelp(void)
 static int
 glusterBlockCreate(int argcount, char **options)
 {
-  size_t opt;
   size_t optind = 2;
-  int ret = 0;
+  int ret = -1;
+  ssize_t sparse_ret;
   char *out = NULL;
-  static blockCreateCli cobj = {0, };
+  blockCreateCli cobj = {0, };
+  char *argcopy;
+  char *sep;
 
 
-  if(argcount <= optind) {
+  if (argcount <= optind) {
     MSG("%s\n", "Insufficient arguments for create:");
-    MSG("%s\n", "gluster-block create <block-name> volume <volname> "
-                "size <bytes> [mpath <count>] servers <IP1,IP2,...>");
+    MSG("%s\n", "gluster-block create <volname/blockname> [ha <count>]"
+                " <HOST1[,HOST2,...]> <size>");
     return -1;
   }
-
-  /* name of block */
-  strcpy(cobj.block_name, options[optind++]);
 
   /* default mpath */
   cobj.mpath = 1;
 
-  while (1) {
-    if(argcount <= optind) {
-      break;
-    }
-
-    opt = glusterBlockCLICreateOptEnumParse(options[optind++]);
-    if (opt == GB_CLI_CREATE_OPT_MAX) {
-      MSG("unrecognized option '%s'\n", options[optind-1]);
-      return -1;
-    } else if (opt && !options[optind]) {
-      MSG("%s: require argument\n", options[optind-1]);
-      return -1;
-    }
-
-    switch (opt) {
-    case GB_CLI_CREATE_VOLUME:
-      strcpy(cobj.volume, options[optind++]);
-      ret++;
-      break;
-
-    case GB_CLI_CREATE_MULTIPATH:
-      sscanf(options[optind++], "%u", &cobj.mpath);
-      break;
-
-    case GB_CLI_CREATE_SIZE:
-      cobj.size = glusterBlockCreateParseSize("cli", options[optind++]);
-      if (cobj.size < 0) {
-        LOG("cli", GB_LOG_ERROR, "failed while parsing size for block %s",
-            cobj.block_name);
-        ret = -1;
-        goto out;
-      }
-      ret++;
-      break;
-
-    case GB_CLI_CREATE_BACKEND_SERVESRS:
-      if (GB_STRDUP(cobj.block_hosts, options[optind++]) < 0) {
-        LOG("cli", GB_LOG_ERROR, "failed while parsing servers for block %s",
-            cobj.block_name);
-        ret = -1;
-        goto out;
-      }
-      ret++;
-      break;
-
-    default:
-      MSG("unrecognized option '%s'\n", options[optind-1]);
-      MSG("%s", "Hint: gluster-block help\n");
-      ret = -1;
-      goto out;
-    }
-  }
-
-  /* check all options required by create command are specified */
-  if(ret < 3) {
-    MSG("%s\n", "Insufficient arguments for create:");
-    MSG("%s\n", "gluster-block create <block-name> volume <volname> "
-                "size <bytes> [mpath <count>] servers <IP1,IP2,...>");
-    ret = -1;
+  if (GB_STRDUP (argcopy, options[optind++]) < 0) {
     goto out;
   }
+  /* part before '/' is the volume name */
+  sep = strchr(argcopy, '/');
+  if (!sep) {
+    MSG("%s\n",
+        "first argument '<volname/blockname>' doesn't seems to be right");
+    MSG("%s\n", "gluster-block create <volname/blockname> [ha <count>] "
+        " <HOST1[,HOST2,...]> <size>");
+    LOG("cli", GB_LOG_ERROR, "%s",
+        "create failed while parsing <volname/blockname>");
+    goto out;
+  }
+  *sep = '\0';
+  strcpy(cobj.volume, argcopy);
+
+  /* part after / is blockname */
+  strcpy(cobj.block_name, sep + 1);
+
+  if (argcount - optind >= 2) {  /* atleast 2 needed */
+    /* if ha given then collect count which is next by 'ha' arg */
+    if (!strcmp(options[optind], "ha")) {
+      optind++;
+      sscanf(options[optind++], "%u", &cobj.mpath);
+    }
+  }
+
+  if (argcount - optind < 2) {  /* left with servers and size so 2 */
+    MSG("%s\n", "Insufficient arguments for create");
+    MSG("%s\n", "gluster-block create <volname/blockname> [ha <count>]"
+                " <HOST1[,HOST2,...]> <size>");
+    LOG("cli", GB_LOG_ERROR,
+        "failed creating block %s on volume %s with hosts %s",
+        cobj.block_name, cobj.volume, cobj.block_hosts);
+    goto out;
+  }
+
+  /* next arg to 'ha count' will be servers */
+  if (GB_STRDUP(cobj.block_hosts, options[optind++]) < 0) {
+    LOG("cli", GB_LOG_ERROR, "failed while parsing servers for block %s",
+        cobj.block_name);
+    goto out;
+  }
+
+  /* last arg will be size */
+  sparse_ret = glusterBlockCreateParseSize("cli", options[optind]);
+  if (sparse_ret < 0) {
+    MSG("%s\n", "last argument '<size>' doesn't seems to be right");
+    MSG("%s\n", "gluster-block create <volname/blockname> [ha <count>] "
+                " <HOST1[,HOST2,...]> <size>");
+    LOG("cli", GB_LOG_ERROR, "failed while parsing size for block %s",
+        cobj.block_name);
+    goto out;
+  }
+  cobj.size = sparse_ret;  /* size is unsigned long long */
 
   ret = glusterBlockCliRPC_1(&cobj, CREATE_CLI, &out);
   if (ret) {
@@ -261,11 +262,12 @@ glusterBlockCreate(int argcount, char **options)
         cobj.block_name, cobj.volume, cobj.block_hosts);
   }
 
-  if(out) {
+  if (out) {
     MSG("%s", out);
   }
 
  out:
+  GB_FREE(argcopy);
   GB_FREE(cobj.block_hosts);
   GB_FREE(out);
 
@@ -276,37 +278,26 @@ glusterBlockCreate(int argcount, char **options)
 static int
 glusterBlockList(int argcount, char **options)
 {
-  size_t opt;
-  size_t optind = 2;
-  static blockListCli cobj;
+  blockListCli cobj;
   char *out = NULL;
   int ret = -1;
 
 
-  if(argcount <= optind) {
+  if (argcount != 3) {
     MSG("%s\n", "Insufficient arguments for list:");
-    MSG("%s\n", "gluster-block list volume <volname>");
+    MSG("%s\n", "gluster-block list <volname>");
     return -1;
   }
 
-  opt = glusterBlockCLICommonOptEnumParse(options[optind++]);
-  if (opt == GB_CLI_COMMON_OPT_MAX) {
-    MSG("unrecognized option '%s'\n", options[optind-1]);
-    MSG("%s\n", "List needs 'volume' option");
-    return -1;
-  } else if (!options[optind]) {
-    MSG("%s: require argument\n", options[optind-1]);
-    return -1;
-  }
+  strcpy(cobj.volume, options[2]);
 
-  strcpy(cobj.volume, options[optind]);
   ret = glusterBlockCliRPC_1(&cobj, LIST_CLI, &out);
   if (ret) {
     LOG("cli", GB_LOG_ERROR, "failed listing blocks from volume %s",
         cobj.volume);
   }
 
-  if(out) {
+  if (out) {
     MSG("%s", out);
   }
 
@@ -319,43 +310,50 @@ glusterBlockList(int argcount, char **options)
 static int
 glusterBlockDelete(int argcount, char **options)
 {
-  size_t opt;
-  size_t optind = 2;
-  static blockDeleteCli cobj;
+  blockDeleteCli cobj;
   char *out = NULL;
+  char *argcopy;
+  char *sep;
   int ret = -1;
 
 
-  if(argcount <= optind) {
+  if (argcount != 3) {
     MSG("%s\n", "Insufficient arguments for delete:");
-    MSG("%s\n", "gluster-block delete <block-name> volume <volname>");
+    MSG("%s\n", "gluster-block delete <volname/blockname>");
     return -1;
   }
 
-  /* name of block */
-  strcpy(cobj.block_name, options[optind++]);
 
-  opt = glusterBlockCLICommonOptEnumParse(options[optind++]);
-  if (opt == GB_CLI_COMMON_OPT_MAX) {
-    MSG("unrecognized option '%s'\n", options[optind-1]);
-    MSG("%s\n", "Delete needs 'volume' option");
-    return -1;
-  } else if (!options[optind]) {
-    MSG("%s: require argument\n", options[optind-1]);
-    return -1;
+  if (GB_STRDUP (argcopy, options[2]) < 0) {
+    goto out;
   }
+  /* part before '/' is the volume name */
+  sep = strchr(argcopy, '/');
+  if (!sep) {
+    MSG("%s\n", "argument '<volname/blockname>' doesn't seems to be right");
+    MSG("%s\n", "gluster-block delete <volname/blockname>");
+    LOG("cli", GB_LOG_ERROR, "%s",
+        "delete failed while parsing <volname/blockname>");
+    goto out;
+  }
+  *sep = '\0';
+  strcpy(cobj.volume, argcopy);
 
-  strcpy(cobj.volume, options[optind]);
+  /* part after / is blockname */
+  strcpy(cobj.block_name, sep + 1);
+
   ret = glusterBlockCliRPC_1(&cobj, DELETE_CLI, &out);
   if (ret) {
     LOG("cli", GB_LOG_ERROR, "failed deleting block %s on volume %s",
         cobj.block_name, cobj.volume);
   }
 
-  if(out) {
+  if (out) {
     MSG("%s", out);
   }
 
+ out:
+  GB_FREE(argcopy);
   GB_FREE(out);
 
   return ret;
@@ -365,33 +363,38 @@ glusterBlockDelete(int argcount, char **options)
 static int
 glusterBlockInfo(int argcount, char **options)
 {
-  size_t opt;
-  size_t optind = 2;
-  static blockInfoCli cobj;
+  blockInfoCli cobj;
   char *out = NULL;
+  char *argcopy;
+  char *sep;
   int ret = -1;
 
 
-  if(argcount <= optind) {
+  if (argcount != 3) {
     MSG("%s\n", "Insufficient arguments for info:");
-    MSG("%s\n", "gluster-block info <block-name> volume <volname>");
+    MSG("%s\n", "gluster-block info <volname/blockname>");
     return -1;
   }
 
-  /* name of block */
-  strcpy(cobj.block_name, options[optind++]);
 
-  opt = glusterBlockCLICommonOptEnumParse(options[optind++]);
-  if (opt == GB_CLI_COMMON_OPT_MAX) {
-    MSG("unrecognized option '%s'\n", options[optind-1]);
-    MSG("%s\n", "Info needs 'volume' option");
-    return -1;
-  } else if (!options[optind]) {
-    MSG("%s: require argument\n", options[optind-1]);
-    return -1;
+  if (GB_STRDUP (argcopy, options[2]) < 0) {
+    goto out;
   }
+  /* part before '/' is the volume name */
+  sep = strchr(argcopy, '/');
+  if (!sep) {
+    MSG("%s\n", "argument '<volname/blockname>' doesn't seems to be right");
+    MSG("%s\n", "gluster-block info <volname/blockname>");
+    LOG("cli", GB_LOG_ERROR, "%s",
+        "info failed while parsing <volname/blockname>");
+    goto out;
+  }
+  *sep = '\0';
+  strcpy(cobj.volume, argcopy);
 
-  strcpy(cobj.volume, options[optind]);
+  /* part after / is blockname */
+  strcpy(cobj.block_name, sep + 1);
+
   ret = glusterBlockCliRPC_1(&cobj, INFO_CLI, &out);
   if (ret) {
     LOG("cli", GB_LOG_ERROR,
@@ -399,10 +402,12 @@ glusterBlockInfo(int argcount, char **options)
         cobj.block_name, cobj.volume);
   }
 
-  if(out) {
+  if (out) {
     MSG("%s", out);
   }
 
+ out:
+  GB_FREE(argcopy);
   GB_FREE(out);
 
   return ret;

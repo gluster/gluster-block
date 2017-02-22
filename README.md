@@ -66,23 +66,28 @@ managing the command ring buffers
 - [x] *In all nodes gluster-blockd.service is running*
 
 ```script
-# gluster-block help
-gluster-block (57f0509)
+# gluster-block (3ba7ec5)
 usage:
-  gluster-block <command> [<args>] <volume=volname>
+  gluster-block <command> <volname[/blockname]> [<args>]
 
-commands and arguments:
-  create         <name>          create block device
-    size           <size>             size in KiB|MiB|GiB|TiB..
-    [mpath          <count>]          multipath requirement for high availability(default: 1)
-    servers        <IP1,IP2,IP3...>   servers in the pool where targets are exported
-  list                           list available block devices
-  info           <name>          details about block device
-  modify         <resize|auth>   modify metadata
-  delete         <name>          delete block device
-    volume         <volname>          volume that hosts the block device
-  help                           show this message and exit
-  version                        show version info and exit
+commands:
+  create  <volname/blockname> [ha <count>] <host1[,host2,...]> <size>
+        create block device.
+
+  list    <volname>
+        list available block devices.
+
+  info    <volname/blockname>
+        details about block device.
+
+  delete  <volname/blockname>
+        delete block device.
+
+  help
+        show this message and exit.
+
+  version
+        show version info and exit.
 ```
 
 #### Example:
@@ -94,8 +99,8 @@ Create a gluster volume by pooling 3 nodes (192.168.1.11, 192.168.1.12 and 192.1
 Read More on how to [create a gluster volume](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/2.1/html/Administration_Guide/sect-User_Guide-Setting_Volumes-Replicated.html)*
 
 <pre>
-Create 1G gluster block storage
-<b># gluster-block create sample-block volume block-test size 1GiB mpath 3 servers 192.168.1.11,192.168.1.12,192.168.1.13</b>
+Create 1G gluster block storage with name 'sample-block'
+<b># gluster-block create block-test/sample-block ha 3 192.168.1.11,192.168.1.12,192.168.1.13 1GiB</b>
 Created user-backed storage object sample-block size 1073741824.
 Created target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
 Created TPG 1.
@@ -117,10 +122,10 @@ Created LUN 0.
 Using default IP port 3260
 Created network portal 192.168.1.13:3260.
 
-<b># gluster-block list volume block-test</b>
+<b># gluster-block list block-test</b>
 sample-block
 
-<b>#  gluster-block info sample-block volume block-test</b>
+<b>#  gluster-block info block-test/sample-block</b>
 NAME: sample-block
 VOLUME: block-test
 GBID: 6b60c53c-8ce0-4d8d-a42c-5b546bca3d09
@@ -151,7 +156,7 @@ On initiator node
 # iscsiadm -m node -u
 
 On the gluster-block node
-<b># gluster-block delete sample-block volume block-test</b>
+<b># gluster-block delete block-test/sample-block</b>
 Deleted storage object sample-block.
 Deleted Target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
 

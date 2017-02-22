@@ -39,7 +39,7 @@ function cleanup()
   echo -e "\nRunning test cleanup ..."
 
   # Block delete
-  gluster-block delete ${BLKNAME} volume ${VOLNAME}
+  gluster-block delete ${VOLNAME}/${BLKNAME}
 
   gluster --mode=script vol stop ${VOLNAME}
   gluster --mode=script vol del ${VOLNAME}
@@ -77,12 +77,12 @@ TEST systemctl restart gluster-blockd.service
 sleep 1;
 
 # Block create
-TEST gluster-block create ${BLKNAME} volume ${VOLNAME} size 1GiB mpath 1 servers ${HOST}
+TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 ${HOST} 1GiB
 
 # Block list
-TEST gluster-block list volume ${VOLNAME}
+TEST gluster-block list ${VOLNAME}
 
 # Block info
-TEST gluster-block info ${BLKNAME} volume ${VOLNAME}
+TEST gluster-block info ${VOLNAME}/${BLKNAME}
 
 cleanup;
