@@ -8,9 +8,14 @@ CLEANFILES = *~ gluster-block.spec
 
 EXTRA_DIST = autogen.sh README.md COPYING-GPLV2 COPYING-LGPLV3
 
+if USE_SYSTEMD
+RPM_WITH_FLAGS = --with systemd
+endif
+
 rpms: prep
 	rpmbuild --define '_topdir $(abs_top_builddir)/build/rpmbuild' \
 		--define '_sourcedir $(abs_top_builddir)' \
+		$(RPM_WITH_FLAGS) \
 		-ba gluster-block.spec
 
 srpm: prep
