@@ -2,30 +2,25 @@
 Summary:          Gluster block storage utility
 Name:             @PACKAGE_NAME@
 Version:          @PACKAGE_VERSION@
-Vendor:           Gluster Community
 Release:          @PACKAGE_RELEASE@
 License:          GPLv2 or LGPLv3+
-Group:            System Environment/Base
-BuildRequires:    tcmu-runner >= 1.0.4
-BuildRequires:    targetcli >= 2.1.fb43
-BuildRequires:    glusterfs-api-devel >= 3.6.0
-BuildRequires:    help2man >= 1.36
-Requires:         tcmu-runner >= 1.0.4
-Requires:         targetcli >= 2.1.fb43
-Requires:         glusterfs-api >= 3.6.0
-%if ( 0%{?_with_systemd:1} )
-BuildRequires:    systemd
-%endif
-URL:              http://www.gluster.org/docs/index.php/GlusterFS
+URL:              https://github.com/gluster/gluster-block
 Source0:          @PACKAGE_NAME@-@PACKAGE_VERSION@.tar.gz
 
+BuildRequires:    glusterfs-api-devel >= 3.6.0
+BuildRequires:    help2man >= 1.36
+%if ( 0%{?_with_systemd:1} )
+BuildRequires:    systemd-units
+%endif
+
+Requires:         tcmu-runner >= 1.0.4
+Requires:         targetcli >= 2.1.fb43
+
 %description
-gluster-block is a CLI utility, which aims at making gluster backed
-block storage creation and maintenance as simple as possible.
+gluster-block is a CLI utility, which aims at making gluster backed block
+storage creation and maintenance as simple as possible.
 
 %prep
-rm -rf %{_topdir}/BUILD/*
-
 %setup
 
 %build
@@ -39,6 +34,17 @@ make DESTDIR=${RPM_BUILD_ROOT} install
 rm -rf ${RPM_BUILD_ROOT}
 
 %files
+%license COPYING-GPLV2 COPYING-LGPLV3
+%doc README.md
 %{_sbindir}/gluster-block
 %{_sbindir}/gluster-blockd
+%if ( 0%{?_with_systemd:1} )
 %{_unitdir}/gluster-blockd.service
+%endif
+
+%changelog
+* Thu Feb 23 2017 Niels de Vos <ndevos@redhat.com>
+- cleanup and add licenses and README.md to the package
+
+* Sun Feb 5 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
+- Initial spec file

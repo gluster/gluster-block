@@ -11,7 +11,7 @@ AC_PREREQ([2.69])
 AC_INIT([gluster-block],
         m4_esyscmd(echo -n `git describe --always --tags`),
         [pkalever@redhat.com],,
-        [https://github.com/pkalever/gluster-block.git])
+        [https://github.com/gluster/gluster-block.git])
 
 AC_SUBST([PACKAGE_RELEASE], 1)
 
@@ -51,26 +51,18 @@ AC_CHECK_HEADERS([stdio.h stdlib.h string.h stdbool.h stddef.h \
                   rpc/pmap_clnt.h ])
 
 # Checks for libraries.
-AC_CHECK_LIB([gfapi], [glfs_init], [GFAPI="-lgfapi"],
-             AC_MSG_ERROR([gfapi library is required to build gluster-block]))
-AC_SUBST(GFAPI)
+# glusterfs-api versions have a prefix of "7."
+PKG_CHECK_MODULES([GFAPI], [glusterfs-api >= 7.3.6],,
+                  [AC_MSG_ERROR([gfapi library >= 3.6 is required to build gluster-block])])
+AC_SUBST(GFAPI_CFLAGS)
+AC_SUBST(GFAPI_LIBS)
+
 AC_CHECK_LIB([uuid], [uuid_generate], [UUID="-luuid"],
              AC_MSG_ERROR([uuid library is required to build gluster-block]))
 AC_SUBST(UUID)
 AC_CHECK_LIB([pthread], [pthread_mutex_init],[PTHREAD="-lpthread"],
              AC_MSG_ERROR([Posix threads library is required to build gluster-block]))
 AC_SUBST(PTHREAD)
-
-AC_CHECK_PROG(TCMURUNNER, tcmu-runner, yes, no)
-if test "x$TCMURUNNER" = "xno"; then
-  AC_MSG_ERROR([tcmu-runner not found; try again after installing])
-fi
-
-# FIXME: version check, need atleast 'targetcli-2.1.fb43'
-AC_CHECK_PROG(TARGETCLI, targetcli, yes, no)
-if test "x$TARGETCLI" = "xno"; then
-  AC_MSG_ERROR([targetcli not found; try again after installing])
-fi
 
 # Dirty hacky stuff to make STATEDIR work
 if test "x$prefix" = xNONE; then
