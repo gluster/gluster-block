@@ -8,16 +8,18 @@ CLEANFILES = *~ gluster-block.spec
 
 EXTRA_DIST = autogen.sh README.md COPYING-GPLV2 COPYING-LGPLV3
 
-rpms:	prep
-	QA_RPATHS=17 rpmbuild --define '_topdir $(abs_top_builddir)/build/rpmbuild' \
-		-ba $(abs_top_builddir)/build/rpmbuild/SPECS/gluster-block.spec
+rpms: prep
+	rpmbuild --define '_topdir $(abs_top_builddir)/build/rpmbuild' \
+		--define '_sourcedir $(abs_top_builddir)' \
+		-ba gluster-block.spec
+
+srpm: prep
+	rpmbuild --define '_topdir $(abs_top_builddir)/build/rpmbuild' \
+		--define '_sourcedir $(abs_top_builddir)' \
+		-bs gluster-block.spec
 
 prep: dist
-	mkdir -p build/rpmbuild && cd build/rpmbuild \
-		&& mkdir BUILD SPECS RPMS SRPM SOURCES && cd ../..
-	rm -rf rpmbuild/SOURCES/*
-	cp *.tar.gz build/rpmbuild/SOURCES
-	cp gluster-block.spec build/rpmbuild/SPECS
+	@mkdir -p build/rpmbuild/{BUILD,SPECS,RPMS,SRPMS,SOURCES}
 
 uninstall-local:
 	cd $(DESTDIR)$(bindir) && rm -f gluster-block gluster-blockd
