@@ -72,6 +72,24 @@ blockMetaStatusEnumParse(const char *opt)
   return i;
 }
 
+int blockRemoteCreateRespEnumParse(const char *opt)
+{
+  int i;
+
+
+  if (!opt) {
+    return GB_REMOTE_CREATE_RESP_MAX;
+  }
+
+  for (i = 0; i < GB_REMOTE_CREATE_RESP_MAX; i++) {
+    if (strstr(opt, RemoteCreateRespLookup[i])) {
+      return i;
+    }
+  }
+
+  return i;
+}
+
 
 int
 gbAlloc(void *ptrptr, size_t size,

@@ -44,6 +44,8 @@
 # define  FAILED_DELETING_FILE      "failed while deleting block file from gluster volume"
 # define  FAILED_DELETING_META      "failed while deleting block meta file from volume"
 
+# define  FAILED_DEPENDENCY         "failed dependency, check if you have targetcli and tcmu-runner installed"
+
 
 # define LOCK(x)                                                     \
          do {                                                        \
@@ -296,12 +298,40 @@ static const char *const MetaStatusLookup[] = {
   [GB_METASTATUS_MAX]     = NULL,
 };
 
+typedef enum RemoteCreateResp {
+  GB_BACKEND_RESP   = 0,
+  GB_IQN_RESP       = 1,
+  GB_TPG_NO_RESP    = 2,
+  GB_LUN_NO_RESP    = 3,
+  GB_IP_PORT_RESP   = 4,
+  GB_PORTAL_RESP    = 5,
+  GB_FAILED_RESP    = 6,
+  GB_FAILED_DEPEND  = 7,
+
+  GB_REMOTE_CREATE_RESP_MAX
+} RemoteCreateResp;
+
+static const char *const RemoteCreateRespLookup[] = {
+  [GB_BACKEND_RESP]  = "Created user-backed storage object ",
+  [GB_IQN_RESP]      = "Created target ",
+  [GB_TPG_NO_RESP]   = "Created TPG ",
+  [GB_LUN_NO_RESP]   = "Created LUN ",
+  [GB_IP_PORT_RESP]  = "Using default IP port ",
+  [GB_PORTAL_RESP]   = "Created network portal ",
+  [GB_FAILED_RESP]   = "failed to configure on ",
+  [GB_FAILED_DEPEND] = "check if targetcli and tcmu-runner are installed.",
+
+  [GB_REMOTE_CREATE_RESP_MAX] = NULL,
+};
+
 
 int glusterBlockCLIOptEnumParse(const char *opt);
 
 int blockMetaKeyEnumParse(const char *opt);
 
 int blockMetaStatusEnumParse(const char *opt);
+
+int blockRemoteCreateRespEnumParse(const char *opt);
 
 int gbAlloc(void *ptrptr, size_t size,
             const char *filename, const char *funcname, size_t linenr);

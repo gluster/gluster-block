@@ -25,7 +25,8 @@
 
 # define   GB_TGCLI_GLFS_PATH   "/backstores/user:glfs"
 # define   GB_TGCLI_GLFS        "targetcli " GB_TGCLI_GLFS_PATH
-# define   GB_TGCLI_CHECK        GB_TGCLI_GLFS " ls | grep ' %s ' > " DEVNULLPATH
+# define   GB_TGCLI_GLFS_CHECK  GB_TGCLI_GLFS " ls > " DEVNULLPATH
+# define   GB_TGCLI_CHECK       GB_TGCLI_GLFS " ls | grep ' %s ' > " DEVNULLPATH
 # define   GB_TGCLI_ISCSI       "targetcli /iscsi"
 # define   GB_TGCLI_GLOBALS     "targetcli set global auto_add_default_portal=false > " DEVNULLPATH
 # define   GB_TGCLI_SAVE        "targetcli / saveconfig > " DEVNULLPATH
@@ -42,7 +43,186 @@ typedef struct blockRemoteObj {
     char *volume;
     char *addr;
     char *reply;
+    int  exit;
 } blockRemoteObj;
+
+
+typedef struct blockRemoteDeleteResp {
+  char *d_attempt;
+  char *d_success;
+} blockRemoteDeleteResp;
+
+
+typedef struct blockRemoteCreateResp {
+  char *backend_size;
+  char *iqn;
+  char *tpg_no;
+  char *lun_no;
+  char *port;
+  size_t nportal;
+  char **portal;
+  blockRemoteDeleteResp *obj;
+} blockRemoteCreateResp;
+
+
+static char *
+getLastWordNoDot(char *line)
+{
+  char *tptr = line;
+  char *sptr = NULL;
+
+
+  if (!tptr) {
+    return NULL;
+  }
+
+  /* get last word i.e last space char in the line + 1 */
+  while(*tptr) {
+    if (*tptr == ' ') {
+      sptr = tptr + 1;
+    }
+    tptr++;
+  }
+
+  /* remove last char i.e. dot, if exist*/
+  if (sptr && *(sptr + strlen(sptr) - 1) == '.') {
+    *(sptr + strlen(sptr) - 1) = '\0';
+  }
+
+  return sptr;
+}
+
+
+static void
+blockCreateParsedRespFree(blockRemoteCreateResp *savereply)
+{
+  size_t i;
+
+
+  if (!savereply) {
+    return;
+  }
+
+  GB_FREE(savereply->backend_size);
+  GB_FREE(savereply->iqn);
+  GB_FREE(savereply->tpg_no);
+  GB_FREE(savereply->lun_no);
+  GB_FREE(savereply->port);
+
+  for (i = 0; i < savereply->nportal; i++) {
+    GB_FREE(savereply->portal[i]);
+  }
+  GB_FREE(savereply->portal);
+
+  if (savereply->obj) {
+    GB_FREE(savereply->obj->d_attempt);
+    GB_FREE(savereply->obj->d_success);
+    GB_FREE(savereply->obj);
+  }
+
+  GB_FREE(savereply);
+}
+
+
+static int
+blockRemoteCreateRespParse(char *output /* create output on one node */,
+                           blockRemoteCreateResp **savereply)
+{
+  char *line;
+  blockRemoteCreateResp *local = *savereply;
+
+
+  if (!local) {
+    if (GB_ALLOC(local) < 0) {
+      goto out;
+    }
+    if (GB_ALLOC(local->obj) < 0) {
+      GB_FREE(local);
+      goto out;
+    }
+  }
+
+  /* get the first line */
+  line = strtok(output, "\n");
+  while (line)
+  {
+    switch (blockRemoteCreateRespEnumParse(line)) {
+    case GB_BACKEND_RESP:
+      if (!local->backend_size) {
+        if (GB_STRDUP(local->backend_size, getLastWordNoDot(line)) < 0) {
+          goto out;
+        }
+      }
+      break;
+    case GB_IQN_RESP:
+      if (!local->iqn) {
+        if (GB_STRDUP(local->iqn, getLastWordNoDot(line)) < 0) {
+          goto out;
+        }
+      }
+      break;
+    case GB_TPG_NO_RESP:
+      if (!local->tpg_no) {
+        if (GB_STRDUP(local->tpg_no, getLastWordNoDot(line)) < 0) {
+          goto out;
+        }
+      }
+      break;
+    case GB_LUN_NO_RESP:
+      if (!local->lun_no) {
+        if (GB_STRDUP(local->lun_no, getLastWordNoDot(line)) < 0) {
+          goto out;
+        }
+      }
+      break;
+    case GB_IP_PORT_RESP:
+      if (!local->port) {
+        if (GB_STRDUP(local->port, getLastWordNoDot(line)) < 0) {
+          goto out;
+        }
+      }
+      break;
+    case GB_PORTAL_RESP:
+      if (!local->nportal) {
+        if (GB_ALLOC(local->portal) < 0) {
+          goto out;
+        }
+        if (GB_STRDUP(local->portal[local->nportal],
+                      getLastWordNoDot(line)) < 0) {
+          goto out;
+        }
+        local->nportal++;
+      } else {
+        if (GB_REALLOC_N(local->portal, local->nportal + 1) < 0) {
+          goto out;
+        }
+        if (GB_STRDUP(local->portal[local->nportal],
+                      getLastWordNoDot(line)) < 0) {
+          goto out;
+        }
+        local->nportal++;
+      }
+      break;
+    case GB_FAILED_RESP:
+    case GB_FAILED_DEPEND:
+      /* do nothing, this node will be mentioned in FAILED ON: while delete */
+      break;
+    case GB_REMOTE_CREATE_RESP_MAX:
+      goto out;
+    }
+
+    line = strtok(NULL, "\n");
+  }
+
+  *savereply = local;
+
+  return 0;
+
+ out:
+  *savereply = local;
+
+  return -1;
+}
 
 
 int
@@ -110,7 +290,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     break;
   }
 
-  if(reply) {
+  if (reply) {
     if (GB_STRDUP(*out, reply->out) < 0) {
       goto out;
     }
@@ -139,7 +319,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
 }
 
 
-void
+static void
 blockServerDefFree(blockServerDefPtr blkServers)
 {
   size_t i;
@@ -227,6 +407,14 @@ glusterBlockCreateRemote(void *data)
           cobj.block_name, args->addr, args->volume);
       goto out;
     }
+
+    if (ret == EKEYEXPIRED) {
+      LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence create block %s on"
+          "host %s volume %s failed", FAILED_DEPENDENCY, strerror(errno),
+          cobj.block_name, args->addr, args->volume);
+      goto out;
+    }
+
     GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
                           ret, out, "%s: CONFIGFAIL\n", args->addr);
     LOG("mgmt", GB_LOG_ERROR, "%s for block %s on host %s volume %s",
@@ -238,12 +426,14 @@ glusterBlockCreateRemote(void *data)
                         ret, out, "%s: CONFIGSUCCESS\n", args->addr);
 
  out:
-  if(!args->reply) {
+  if (!args->reply) {
     if (asprintf(&args->reply, "failed to config on %s", args->addr) == -1) {
       ret = -1;
     }
   }
-  pthread_exit(&ret);   /* collect ret in pthread_join 2nd arg */
+  args->exit = ret;
+
+  return NULL;
 }
 
 
@@ -252,12 +442,10 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
                             size_t listindex, size_t mpath,
                             struct glfs *glfs,
                             blockCreate *cobj,
-                            char **savereply)
+                            blockRemoteCreateResp **savereply)
 {
   pthread_t  *tid = NULL;
   static blockRemoteObj *args = NULL;
-  char *tmp = *savereply;
-  int *status[mpath];
   int ret = -1;
   size_t i;
 
@@ -282,25 +470,23 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
 
   for (i = 0; i < mpath; i++) {
     /* collect exit code */
-    pthread_join(tid[i], (void**)&(status[i]));
+    pthread_join(tid[i], NULL);
   }
 
   for (i = 0; i < mpath; i++) {
-    if (asprintf(savereply, "%s%s\n", (tmp==NULL?"":tmp), args[i].reply) == -1) {
-      /* TODO: Fail with vaild info, depends on mpath */
-      *savereply = tmp;
+    ret = blockRemoteCreateRespParse(args[i].reply, savereply);
+    if (ret) {
       goto out;
-    } else {
-      GB_FREE(tmp);
-      tmp = *savereply;
     }
   }
 
   ret = 0;
   for (i = 0; i < mpath; i++) {
-    if (*status[i]) {
+    if (args[i].exit == EKEYEXPIRED) {
+      ret = EKEYEXPIRED;
+      goto out; /* important to catch */
+    } else if (args[i].exit) {
       ret = -1;
-      goto out;
     }
   }
 
@@ -330,6 +516,14 @@ glusterBlockDeleteRemote(void *data)
           dobj.block_name, args->addr, args->volume);
       goto out;
     }
+
+    if (ret == EKEYEXPIRED) {
+      LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence delete block %s on"
+          "host %s volume %s failed", FAILED_DEPENDENCY, strerror(errno),
+          dobj.block_name, args->addr, args->volume);
+      goto out;
+    }
+
     GB_METAUPDATE_OR_GOTO(lock, args->glfs, dobj.block_name, args->volume,
                           ret, out, "%s: CLEANUPFAIL\n", args->addr);
     LOG("mgmt", GB_LOG_ERROR, "%s for block %s on host %s volume %s",
@@ -340,12 +534,15 @@ glusterBlockDeleteRemote(void *data)
                         ret, out, "%s: CLEANUPSUCCESS\n", args->addr);
 
  out:
-  if(!args->reply) {
-    if (asprintf(&args->reply, "failed to delete config on %s", args->addr) == -1) {
+  if (!args->reply) {
+    if (asprintf(&args->reply, "failed to delete config on %s",
+                 args->addr) == -1) {
       ret = -1;
     }
   }
-  pthread_exit(&ret);   /* collect ret in pthread_join 2nd arg */
+  args->exit = ret;
+
+  return NULL;
 }
 
 
@@ -355,12 +552,15 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
                               blockDelete *dobj,
                               size_t count,
                               bool deleteall,
-                              char **savereply)
+                              blockRemoteDeleteResp **savereply)
 {
   pthread_t  *tid = NULL;
+  blockRemoteDeleteResp *local = *savereply;
   static blockRemoteObj *args = NULL;
-  char *tmp = *savereply;
-  int *status[count];
+  char *d_attempt = NULL;
+  char *d_success = NULL;
+  char *a_tmp = NULL;
+  char *s_tmp = NULL;
   int ret = -1;
   size_t i;
 
@@ -400,29 +600,63 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
   }
 
   for (i = 0; i < count; i++) {
-    pthread_join(tid[i], (void**)&(status[i]));
+    pthread_join(tid[i], NULL);
   }
 
+  /* collect return */
   for (i = 0; i < count; i++) {
-    if (asprintf(savereply, "%s%s\n", (tmp==NULL?"":tmp), args[i].reply) == -1) {
-      /* TODO: Fail with vaild info */
-      *savereply = tmp;
-      goto out;
+    if (args[i].exit) {
+      if (asprintf(&d_attempt, "%s %s",
+                   (a_tmp==NULL?"":a_tmp), args[i].addr) == -1) {
+        goto out;
+      }
+      GB_FREE(a_tmp);
+      a_tmp = d_attempt;
     } else {
-      GB_FREE(tmp);
-      tmp = *savereply;
+      if (asprintf(&d_success, "%s %s",
+                   (s_tmp==NULL?"":s_tmp), args[i].addr) == -1) {
+        goto out;
+      }
+      GB_FREE(s_tmp);
+      s_tmp = d_success;
     }
+  }
+
+  if (d_attempt) {
+    a_tmp = local->d_attempt;
+    if (asprintf(&local->d_attempt, "%s %s",
+                 (a_tmp==NULL?"":a_tmp), d_attempt) == -1) {
+      goto out;
+    }
+    GB_FREE(a_tmp);
+    a_tmp = local->d_attempt;
+  }
+
+  if (d_success) {
+    s_tmp = local->d_success;
+    if (asprintf(&local->d_success, "%s %s",
+                 (s_tmp==NULL?"":s_tmp), d_success) == -1) {
+      goto out;
+    }
+    GB_FREE(s_tmp);
+    s_tmp = local->d_success;
   }
 
   ret = 0;
   for (i = 0; i < count; i++) {
-    if (*status[i]) {
+    if (args[i].exit == EKEYEXPIRED) {
+      ret = EKEYEXPIRED;
+      break; /* important to catch */
+    } else if (args[i].exit) {
       ret = -1;
-      goto out;
     }
   }
 
+  *savereply = local;
+
  out:
+  GB_FREE(d_attempt);
+  GB_FREE(d_success);
   GB_FREE(args);
   GB_FREE(tid);
 
@@ -431,15 +665,30 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
 
 
 static int
-glusterBlockCleanUp(struct glfs *glfs, char *blockname,
-                    bool deleteall, char **reply)
+glusterBlockCleanUp(operations opt, struct glfs *glfs, char *blockname,
+                    bool deleteall, void *reply)
 {
   int ret = -1;
   size_t i;
   static blockDelete dobj;
   size_t cleanupsuccess = 0;
   size_t count = 0;
-  MetaInfo *info;
+  MetaInfo *info = NULL;
+  blockRemoteDeleteResp *drobj;
+  blockRemoteCreateResp *crobj;
+  int asyncret = 0;
+
+  switch(opt) {
+  case CREATE_SRV:
+    crobj = *(blockRemoteCreateResp **)reply;
+    drobj = crobj->obj;
+  break;
+  case DELETE_SRV:
+    drobj = *(blockRemoteDeleteResp **)reply;
+  break;
+  default:
+    goto out;
+  }
 
 
   if (GB_ALLOC(info) < 0) {
@@ -468,11 +717,12 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
     }
   }
 
-  ret = glusterBlockDeleteRemoteAsync(info, glfs, &dobj, count, deleteall, reply);
-  if (ret) {
-    LOG("mgmt", GB_LOG_WARNING, "glusterBlockDeleteRemoteAsync: return %d"
-        " %s for block %s on volume %s", ret, FAILED_REMOTE_AYNC_DELETE,
-        blockname, info->volume);
+  asyncret = glusterBlockDeleteRemoteAsync(info, glfs, &dobj, count,
+                                      deleteall, &drobj);
+  if (asyncret) {
+    LOG("mgmt", GB_LOG_WARNING,
+        "glusterBlockDeleteRemoteAsync: return %d %s for block %s on volume %s",
+        asyncret, FAILED_REMOTE_AYNC_DELETE, blockname, info->volume);
     /* No action ? */
   }
 
@@ -481,7 +731,6 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
     blockFreeMetaInfo(info);
 
     if (GB_ALLOC(info) < 0) {
-      ret = -1;
       goto out;
     }
 
@@ -501,17 +750,17 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
 
     if (cleanupsuccess == info->nhosts) {
       GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
-          ret, out, "ENTRYDELETE: INPROGRESS\n");
+                            ret, out, "ENTRYDELETE: INPROGRESS\n");
       if (glusterBlockDeleteEntry(glfs, info->volume, info->gbid)) {
         GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
-            ret, out, "ENTRYDELETE: FAIL\n");
+                              ret, out, "ENTRYDELETE: FAIL\n");
         LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s", FAILED_DELETING_FILE,
             info->volume, blockname);
         ret = -1;
         goto out;
       }
       GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
-          ret, out, "ENTRYDELETE: SUCCESS\n");
+                            ret, out, "ENTRYDELETE: SUCCESS\n");
       ret = glusterBlockDeleteMetaFile(glfs, info->volume, blockname);
       if (ret) {
         LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s",
@@ -524,7 +773,7 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
  out:
   blockFreeMetaInfo(info);
 
-  return ret;
+  return asyncret?asyncret:ret;
 }
 
 
@@ -533,7 +782,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
                          blockCreateCli *blk,
                          blockCreate *cobj,
                          blockServerDefPtr list,
-                         char **reply)
+                         blockRemoteCreateResp **reply)
 {
   int ret = -1;
   size_t i;
@@ -582,7 +831,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
           "No Spare nodes to create (%s): rewinding creation of target"
           " on volume %s with given hosts %s",
           blk->block_name, blk->volume, blk->block_hosts);
-      glusterBlockCleanUp(glfs,
+      glusterBlockCleanUp(CREATE_SRV, glfs,
                           blk->block_name, TRUE, reply);
       needcleanup = FALSE;   /* already clean attempted */
       ret = -1;
@@ -592,7 +841,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
           "Not enough Spare nodes for (%s): rewinding creation of target"
           " on volume %s with given hosts %s",
           blk->block_name, blk->volume, blk->block_hosts);
-      glusterBlockCleanUp(glfs,
+      glusterBlockCleanUp(CREATE_SRV, glfs,
                           blk->block_name, TRUE, reply);
       needcleanup = FALSE;   /* already clean attempted */
       ret = -1;
@@ -624,7 +873,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
 
  out:
   if (needcleanup) {
-      glusterBlockCleanUp(glfs,
+      glusterBlockCleanUp(CREATE_SRV, glfs,
                           blk->block_name, FALSE, reply);
   }
 
@@ -637,14 +886,17 @@ blockResponse *
 block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 {
   int ret = -1;
+  size_t i;
   uuid_t uuid;
-  char *savereply = NULL;
+  blockRemoteCreateResp *savereply = NULL;
   char gbid[UUID_BUF_SIZE];
   static blockCreate cobj;
   static blockResponse *reply;
   struct glfs *glfs = NULL;
   struct glfs_fd *lkfd = NULL;
   blockServerDefPtr list = NULL;
+  char *tmp = NULL;
+  char *portals = NULL;
 
 
   if (GB_ALLOC(reply) < 0) {
@@ -711,7 +963,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
                           ret, exist, "ENTRYCREATE: FAIL\n");
     LOG("mgmt", GB_LOG_ERROR, "%s volume: %s host: %s",
         FAILED_CREATING_FILE, blk->volume, blk->block_hosts);
-    goto out;
+    goto exist;
   }
 
   GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
@@ -725,6 +977,15 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   ret = glusterBlockCreateRemoteAsync(list, 0, blk->mpath,
                                       glfs, &cobj, &savereply);
   if (ret) {
+    if (ret == EKEYEXPIRED) {
+      LOG("mgmt", GB_LOG_ERROR, "glusterBlockCreateRemoteAsync: return %d"
+          " rewinding the create request for block %s on volume %s with hosts %s",
+          ret, blk->block_name, blk->volume, blk->block_hosts);
+
+      glusterBlockCleanUp(CREATE_SRV, glfs, blk->block_name, TRUE, &savereply);
+
+      goto exist;
+    }
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockCreateRemoteAsync: return %d"
         " %s for block %s on volume %s with hosts %s", ret,
         FAILED_REMOTE_AYNC_CREATE, blk->block_name,
@@ -739,12 +1000,47 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
         blk->volume, blk->block_hosts, blk->block_name);
   }
 
- out:
-  reply->out = savereply;
+  for (i = 0; i < savereply->nportal; i++) {
+    if (asprintf(&portals, "%s %s",
+                 tmp!=NULL?tmp:"", savereply->portal[i]) == -1) {
+      portals = tmp;
+      goto exist;
+    }
+    GB_FREE(tmp);
+    tmp = portals;
+  }
+
+  /* save 'failed on'*/
+  tmp = NULL;
+  if (savereply->obj->d_attempt || savereply->obj->d_success) {
+    if (asprintf(&tmp, "REWIND ON: %s %s\n",
+                 savereply->obj->d_attempt?savereply->obj->d_attempt:"",
+                 savereply->obj->d_success?savereply->obj->d_success:""
+                ) == -1) {
+      ret = -1;
+      goto exist;
+    }
+  }
+
+  if (asprintf(&reply->out,
+               "IQN: %s\nPORTAL(S): %s\n%sRESULT: %s\n",
+               savereply->iqn, portals, tmp?tmp:"",
+               ret?"FAIL":"SUCCESS") == -1) {
+    ret = -1;
+    goto exist;
+  }
 
  exist:
+  if (ret == EKEYEXPIRED) {
+    if (asprintf(&reply->out,
+                 "Looks like targetcli and tcmu-runner are not installed on few nodes.\n"
+                 "RESULT:FAIL\n") == -1) {
+      ret = -1;
+    }
+  }
   GB_METAUNLOCK(lkfd, blk->volume, ret);
 
+ out:
   reply->exit = ret;
 
   if (lkfd && glfs_close(lkfd) != 0) {
@@ -754,6 +1050,8 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   }
 
   glfs_fini(glfs);
+  blockCreateParsedRespFree(savereply);
+  GB_FREE(tmp);
 
  optfail:
   blockServerDefFree(list);
@@ -766,6 +1064,7 @@ blockResponse *
 block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
 {
   FILE *fp;
+  int  ret;
   char hostname[255];
   char *backstore = NULL;
   char *iqn = NULL;
@@ -780,6 +1079,17 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
     goto out;
   }
   reply->exit = -1;
+
+  /* Check if targetcli and tcmu-runner installed ? */
+  ret = WEXITSTATUS(system(GB_TGCLI_GLFS_CHECK));
+  if (ret == EKEYEXPIRED || ret == 1) {
+    reply->exit = EKEYEXPIRED;
+    if (asprintf(&reply->out,
+                 "check if targetcli and tcmu-runner are installed.") == -1) {
+      goto out;
+    }
+    goto out;
+  }
 
   if (gethostname(hostname, HOST_NAME_MAX)) {
     LOG("mgmt", GB_LOG_ERROR,
@@ -863,13 +1173,19 @@ blockResponse *
 block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 {
   int ret = -1;
-  char *savereply = NULL;
+  char *tmp = NULL;
+  blockRemoteDeleteResp *savereply = NULL;
   static blockResponse *reply = NULL;
   struct glfs *glfs;
   struct glfs_fd *lkfd = NULL;
 
 
   if (GB_ALLOC(reply) < 0) {
+    return NULL;
+  }
+
+  if (GB_ALLOC(savereply) < 0) {
+    GB_FREE(reply);
     return NULL;
   }
 
@@ -899,14 +1215,34 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  ret = glusterBlockCleanUp(glfs, blk->block_name, TRUE, &savereply);
+  ret = glusterBlockCleanUp(DELETE_SRV, glfs, blk->block_name, TRUE, &savereply);
   if (ret) {
-    LOG("mgmt", GB_LOG_WARNING, "glusterBlockCleanUp: return %d"
-        " on block %s for volume %s", ret, blk->block_name, blk->volume);
+    LOG("mgmt", GB_LOG_WARNING, "glusterBlockCleanUp: return %d "
+        "on block %s for volume %s", ret, blk->block_name, blk->volume);
   }
 
  out:
-  reply->out = savereply;
+  if (ret == EKEYEXPIRED) {
+    if (asprintf(&reply->out,
+                 "Looks like targetcli and tcmu-runner are not installed on few nodes.\n"
+                 "RESULT:FAIL\n") == -1) {
+      ret = -1;
+    }
+  } else {
+     /* save 'failed on'*/
+    if (savereply->d_attempt) {
+      if (asprintf(&tmp, "FAILED ON: %s\n", savereply->d_attempt) == -1) {
+        ret = -1;
+      }
+    }
+
+    if (asprintf(&reply->out,
+                 "%sSUCCESSFUL ON: %s\nRESULT: %s\n", tmp?tmp:"",
+                 savereply->d_success?savereply->d_success:"None",
+                 ret?"FAIL":"SUCCESS") == -1) {
+      ret = -1;
+    }
+  }
 
   GB_METAUNLOCK(lkfd, blk->volume, ret);
 
@@ -920,6 +1256,13 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 
   glfs_fini(glfs);
 
+  if (savereply) {
+    GB_FREE(savereply->d_attempt);
+    GB_FREE(savereply->d_success);
+    GB_FREE(savereply);
+  }
+  GB_FREE(tmp);
+
   return reply;
 }
 
@@ -931,6 +1274,7 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
   char *iqn = NULL;
   char *backstore = NULL;
   char *exec = NULL;
+  int ret;
   blockResponse *reply = NULL;
 
 
@@ -939,12 +1283,23 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
+  /* Check if targetcli and tcmu-runner installed ? */
+  ret = WEXITSTATUS(system(GB_TGCLI_GLFS_CHECK));
+  if (ret == EKEYEXPIRED || ret == 1) {
+    reply->exit = EKEYEXPIRED;
+    if (asprintf(&reply->out,
+                 "check if targetcli and tcmu-runner are installed.") == -1) {
+      goto out;
+    }
+    goto out;
+  }
+
   if (asprintf(&exec, GB_TGCLI_CHECK, blk->block_name) == -1) {
     goto out;
   }
 
   /* Check if block exist on this node ? */
-  if (WEXITSTATUS(system(exec))== 1) {
+  if (WEXITSTATUS(system(exec)) == 1) {
     reply->exit = 0;
     if (asprintf(&reply->out, "No %s.", blk->block_name) == -1) {
       goto out;
@@ -1120,7 +1475,7 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
   }
 
   if (asprintf(&tmp, "NAME: %s\nVOLUME: %s\nGBID: %s\nSIZE: %zu\n"
-                     "MULTIPATH: %zu\nBLOCK CONFIG NODE(S):",
+                     "HA: %zu\nBLOCK CONFIG NODE(S):",
                blk->block_name, info->volume, info->gbid,
                info->size, info->mpath) == -1) {
     ret = -1;

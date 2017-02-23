@@ -24,7 +24,7 @@ typedef enum clioperations {
 
 const char *argp_program_version = ""                                 \
   PACKAGE_NAME" ("PACKAGE_VERSION")"                                  \
-  "\nRepository rev: https://github.com/pkalever/gluster-block.git\n" \
+  "\nRepository rev: https://github.com/gluster/gluster-block.git\n"  \
   "Copyright (c) 2016 Red Hat, Inc. <https://redhat.com/>\n"          \
   "gluster-block comes with ABSOLUTELY NO WARRANTY.\n"                \
   "It is licensed to you under your choice of the GNU Lesser\n"       \

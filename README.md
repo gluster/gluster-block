@@ -53,7 +53,7 @@ managing the command ring buffers
 ### Install
 ------
 <pre>
-# git clone https://github.com/pkalever/gluster-block.git
+# git clone https://github.com/gluster/gluster-block.git
 # cd gluster-block/
 # dnf install libuuid-devel glusterfs-api-devel tcmu-runner targetcli (on fedora)
 # make -j install
@@ -101,26 +101,9 @@ Read More on how to [create a gluster volume](https://access.redhat.com/document
 <pre>
 Create 1G gluster block storage with name 'sample-block'
 <b># gluster-block create block-test/sample-block ha 3 192.168.1.11,192.168.1.12,192.168.1.13 1GiB</b>
-Created user-backed storage object sample-block size 1073741824.
-Created target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
-Created TPG 1.
-Created LUN 0.
-Using default IP port 3260
-Created network portal 192.168.1.11:3260.
-
-Created user-backed storage object sample-block size 1073741824.
-Created target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
-Created TPG 1.
-Created LUN 0.
-Using default IP port 3260
-Created network portal 192.168.1.12:3260.
-
-Created user-backed storage object sample-block size 1073741824.
-Created target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
-Created TPG 1.
-Created LUN 0.
-Using default IP port 3260
-Created network portal 192.168.1.13:3260.
+IQN: iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea
+PORTAL(S): 192.168.1.11:3260 192.168.1.12:3260 192.168.1.13:3260
+RESULT: SUCCESS
 
 <b># gluster-block list block-test</b>
 sample-block
@@ -130,9 +113,10 @@ NAME: sample-block
 VOLUME: block-test
 GBID: 6b60c53c-8ce0-4d8d-a42c-5b546bca3d09
 SIZE: 1073741824
-MULTIPATH: 3
+HA: 3
 BLOCK CONFIG NODE(S): 192.168.1.11 192.168.1.12 192.168.1.13
 </pre>
+<b>NOTE:</b> Block targets created using gluster-block utility will use TPG: 1 and LUN: 0.
 
 ##### On the Initiator machine
 <pre>
@@ -157,12 +141,8 @@ On initiator node
 
 On the gluster-block node
 <b># gluster-block delete block-test/sample-block</b>
-Deleted storage object sample-block.
-Deleted Target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
-
-Deleted storage object sample-block.
-Deleted Target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
-
-Deleted storage object sample-block.
-Deleted Target iqn.2016-12.org.gluster-block:6b60c53c-8ce0-4d8d-a42c-5b546bca3d09.
+SUCCESSFUL ON: 192.168.1.11 192.168.1.12 192.168.1.13
+RESULT: SUCCESS
 </pre>
+
+<b>NOTE:</b> gluster-block cannot track iSCSI targets created manually using targetcli.
