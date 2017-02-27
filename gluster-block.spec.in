@@ -35,7 +35,7 @@ rm -rf ${RPM_BUILD_ROOT}
 
 %files
 %license COPYING-GPLV2 COPYING-LGPLV3
-%doc README.md
+%doc README.md INSTALL
 %{_sbindir}/gluster-block
 %{_sbindir}/gluster-blockd
 %{_mandir}/man8/gluster-block*.8*
@@ -44,6 +44,9 @@ rm -rf ${RPM_BUILD_ROOT}
 %endif
 
 %changelog
+* Mon Feb 27 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
+- add INSTALL
+
 * Mon Feb 27 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - add Man page entry
 

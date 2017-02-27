@@ -6,7 +6,8 @@ DISTCLEANFILES = Makefile.in gluster-block.spec autom4te.cache
 
 CLEANFILES = *~ gluster-block.spec
 
-EXTRA_DIST = autogen.sh README.md COPYING-GPLV2 COPYING-LGPLV3
+EXTRA_DIST = autogen.sh README.md COPYING-GPLV2 COPYING-LGPLV3 \
+						 gluster-block.spec INSTALL
 
 if USE_SYSTEMD
 RPM_WITH_FLAGS = --with systemd
