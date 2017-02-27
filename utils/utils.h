@@ -185,32 +185,40 @@
 
 
 typedef enum gbCmdlineOption {
-  GB_CLI_UNKNOWN     = 0,
+  GB_CLI_UNKNOWN        = 0,
 
-  GB_CLI_CREATE      = 1,
-  GB_CLI_LIST        = 2,
-  GB_CLI_INFO        = 3,
-  GB_CLI_DELETE      = 4,
-  GB_CLI_MODIFY      = 5,
-  GB_CLI_HELP        = 6,
-  GB_CLI_VERSION     = 7,
+  GB_CLI_CREATE         = 1,
+  GB_CLI_LIST           = 2,
+  GB_CLI_INFO           = 3,
+  GB_CLI_DELETE         = 4,
+  GB_CLI_MODIFY         = 5,
+  GB_CLI_HELP           = 6,
+  GB_CLI_HYPHEN_HELP    = 7,
+  GB_CLI_VERSION        = 8,
+  GB_CLI_HYPHEN_VERSION = 9,
+  GB_CLI_USAGE          = 10,
+  GB_CLI_HYPHEN_USAGE   = 11,
 
   GB_CLI_OPT_MAX
 } gbCmdlineOption;
 
 
 static const char *const gbCmdlineOptLookup[] = {
-  [GB_CLI_UNKNOWN]     = "NONE",
+  [GB_CLI_UNKNOWN]        = "NONE",
 
-  [GB_CLI_CREATE]      = "create",
-  [GB_CLI_LIST]        = "list",
-  [GB_CLI_INFO]        = "info",
-  [GB_CLI_DELETE]      = "delete",
-  [GB_CLI_MODIFY]      = "modify",
-  [GB_CLI_HELP]        = "help",
-  [GB_CLI_VERSION]     = "version",
+  [GB_CLI_CREATE]         = "create",
+  [GB_CLI_LIST]           = "list",
+  [GB_CLI_INFO]           = "info",
+  [GB_CLI_DELETE]         = "delete",
+  [GB_CLI_MODIFY]         = "modify",
+  [GB_CLI_HELP]           = "help",
+  [GB_CLI_HYPHEN_HELP]    = "--help",
+  [GB_CLI_VERSION]        = "version",
+  [GB_CLI_HYPHEN_VERSION] = "--version",
+  [GB_CLI_USAGE]          = "usage",
+  [GB_CLI_HYPHEN_USAGE]   = "--usage",
 
-  [GB_CLI_OPT_MAX]     = NULL,
+  [GB_CLI_OPT_MAX]        = NULL,
 };
 
 

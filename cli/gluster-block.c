@@ -462,10 +462,14 @@ glusterBlockParseArgs(int count, char **options)
       goto out;
 
     case GB_CLI_HELP:
+    case GB_CLI_HYPHEN_HELP:
+    case GB_CLI_USAGE:
+    case GB_CLI_HYPHEN_USAGE:
       glusterBlockHelp();
       goto out;
 
     case GB_CLI_VERSION:
+    case GB_CLI_HYPHEN_VERSION:
       MSG("%s\n", argp_program_version);
       goto out;
     }
