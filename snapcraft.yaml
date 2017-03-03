@@ -1,0 +1,30 @@
+name: gluster-block
+version: '0.1'
+summary: gluster block storage management 
+description: |
+  gluster-block is a CLI utility, which aims at making gluster backed 
+  block storage creation and maintenance as simple as possible.
+grade: devel # must be 'stable' to release into candidate/stable channels
+confinement: devmode
+
+apps:
+  blockd:
+    command: sbin/gluster-blockd
+    plugs: [network-bind, network]        
+    daemon: simple
+  gluster-block:
+    command: sbin/gluster-block
+    plugs: [network]        
+parts:
+  gluster-block:
+    stage-packages:
+      - libc6
+    build-packages:
+      - build-essential
+      - pkg-config
+      - patch
+      - glusterfs-common
+      - uuid-dev
+      - libacl1-dev
+    plugin: autotools
+    source: .
