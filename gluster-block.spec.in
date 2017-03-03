@@ -1,4 +1,15 @@
 
+##-----------------------------------------------------------------------------
+## All %%global definitions should be placed here and keep them sorted
+##
+%if ( 0%{?fedora} ) || ( 0%{?rhel} && 0%{?rhel} > 6 )
+%global _with_systemd true
+%endif
+
+
+##-----------------------------------------------------------------------------
+## All package definitions should be placed here
+##
 Summary:          Gluster block storage utility
 Name:             @PACKAGE_NAME@
 Version:          @PACKAGE_VERSION@
@@ -44,6 +55,9 @@ rm -rf ${RPM_BUILD_ROOT}
 %endif
 
 %changelog
+* Mon Mar 6 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
+- conditionally enable with_systemd flag
+
 * Mon Feb 27 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - add INSTALL
 
