@@ -1,16 +1,17 @@
-noinst_LTLIBRARIES = libgbxdr.la
+SUBDIRS = rpcl
 
-libgbxdr_la_SOURCES = block_clnt.c block_xdr.c block_svc.c           \
-											block_svc_routines.c glfs-operations.c
+noinst_LTLIBRARIES = libgbrpc.la
 
-noinst_HEADERS = block.h glfs-operations.h
+libgbrpc_la_SOURCES = block_svc_routines.c glfs-operations.c
 
-libgbxdr_la_CFLAGS = $(GFAPI_CFLAGS) -DDATADIR=\"$(localstatedir)\"  \
-										 -I$(top_srcdir)/utils/
+noinst_HEADERS = glfs-operations.h
 
-libgbxdr_la_LIBADD = $(GFAPI_LIBS) $(UUID)
+libgbrpc_la_CFLAGS = $(GFAPI_CFLAGS) -DDATADIR=\"$(localstatedir)\"  \
+										 -I$(top_srcdir)/utils/ -I$(top_builddir)/rpc/rpcl
 
-libgbxdr_ladir = $(includedir)/gluster-block/rpc
+libgbrpc_la_LIBADD = $(GFAPI_LIBS) $(UUID) rpcl/libgbrpcxdr.la
+
+libgbrpc_ladir = $(includedir)/gluster-block/rpc
 
 DISTCLEANFILES = Makefile.in
 

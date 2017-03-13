@@ -37,6 +37,12 @@
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
+typedef enum operations {
+  CREATE_SRV = 1,
+  DELETE_SRV = 2
+} operations;
+
+
 typedef struct blockRemoteObj {
     struct glfs *glfs;
     void *obj;
@@ -63,6 +69,13 @@ typedef struct blockRemoteCreateResp {
   char **portal;
   blockRemoteDeleteResp *obj;
 } blockRemoteCreateResp;
+
+
+typedef struct blockServerDef {
+  size_t nhosts;
+  char   **hosts;
+} blockServerDef;
+typedef blockServerDef *blockServerDefPtr;
 
 
 static char *

@@ -1,3 +1,8 @@
+/* rpcgen generates code that results in unused-variable warnings */
+#ifdef RPC_XDR
+%#include "rpc-pragmas.h"
+#endif
+
 struct blockCreate {
   char      ipaddr[255];
   char      volume[255];

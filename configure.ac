@@ -27,6 +27,7 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([gluster-block.spec
                  Makefile
                  rpc/Makefile
+                 rpc/rpcl/Makefile
                  cli/Makefile
                  daemon/Makefile
                  utils/Makefile
@@ -43,6 +44,11 @@ LT_INIT
 
 # Checks for programs.
 AC_PROG_CC
+
+AC_CHECK_PROG(RPCGEN, rpcgen, yes, no)
+if test "x$RPCGEN" = "xno"; then
+  AC_MSG_ERROR([rpcgen not found, needed for building])
+fi
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdio.h stdlib.h string.h stdbool.h stddef.h \
