@@ -8,6 +8,9 @@
 bool_t
 xdr_blockCreate (XDR *xdrs, blockCreate *objp)
 {
+	 if (!xdr_vector (xdrs, (char *)objp->ipaddr, 255,
+		sizeof (char), (xdrproc_t) xdr_char))
+		 return FALSE;
 	 if (!xdr_vector (xdrs, (char *)objp->volume, 255,
 		sizeof (char), (xdrproc_t) xdr_char))
 		 return FALSE;

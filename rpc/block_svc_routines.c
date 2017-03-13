@@ -273,6 +273,8 @@ glusterBlockCallRPC_1(char *host, void *cobj,
 
   switch(opt) {
   case CREATE_SRV:
+    strcpy(((blockCreate *)cobj)->ipaddr, host);
+
     reply = block_create_1((blockCreate *)cobj, clnt);
     if (!reply) {
       LOG("mgmt", GB_LOG_ERROR, "%son host %s",
@@ -1065,7 +1067,6 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
 {
   FILE *fp;
   int  ret;
-  char hostname[255];
   char *backstore = NULL;
   char *iqn = NULL;
   char *lun = NULL;
@@ -1091,16 +1092,9 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  if (gethostname(hostname, HOST_NAME_MAX)) {
-    LOG("mgmt", GB_LOG_ERROR,
-        "gethostname on localhost for block %s on volume %s failed (%s)",
-        blk->block_name, blk->volume, strerror(errno));
-    goto out;
-  }
-
   if (asprintf(&backstore, "%s %s %s %zu %s@%s%s/%s %s", GB_TGCLI_GLFS,
                GB_CREATE, blk->block_name, blk->size, blk->volume,
-               hostname, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
+               blk->ipaddr, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
     goto out;
   }
 
@@ -1118,7 +1112,7 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
 
   if (asprintf(&portal, "%s/%s%s/tpg1/portals create %s",
                GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid,
-               hostname) == -1) {
+               blk->ipaddr) == -1) {
     goto out;
   }
 

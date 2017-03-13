@@ -8,12 +8,14 @@
 
 #include <rpc/rpc.h>
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
 struct blockCreate {
+	char ipaddr[255];
 	char volume[255];
 	char gbid[127];
 	u_quad_t size;
