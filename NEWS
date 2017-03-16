@@ -1,4 +1,11 @@
-gluster-block initial release 0.1 is tagged.
+gluster-block release 0.1.1 is tagged.
+
+Fixes:
+-----
+* Login failues at initiator side.
+  https://review.gluster.org/#/c/16894/
+
+
 Read more at [1] and [2]
 
 [1] https://github.com/gluster/gluster-block/blob/master/README.md
