@@ -64,6 +64,11 @@ PKG_CHECK_MODULES([GFAPI], [glusterfs-api >= 7.3.6],,
 AC_SUBST(GFAPI_CFLAGS)
 AC_SUBST(GFAPI_LIBS)
 
+PKG_CHECK_MODULES([JSONC], [json-c],,
+                  [AC_MSG_ERROR([json-c library is required to build gluster-block])])
+AC_SUBST(JSONC_CFLAGS)
+AC_SUBST(JSONC_LIBS)
+
 AC_CHECK_LIB([uuid], [uuid_generate], [UUID="-luuid"],
              AC_MSG_ERROR([uuid library is required to build gluster-block]))
 AC_SUBST(UUID)

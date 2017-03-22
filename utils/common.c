@@ -12,6 +12,30 @@
 # include "common.h"
 
 
+enum JsonResponseFormat
+jsonResponseFormatParse(const char *opt)
+{
+  int i;
+
+
+  if (!opt) {
+    return GB_JSON_MAX;
+  }
+
+  if (strlen (opt) < 2 || opt[0] != '-' || opt[1] != '-') {
+    /*json option is not given*/
+    return GB_JSON_NONE;
+  }
+
+  for (i = 0; i < GB_JSON_MAX; i++) {
+    if (!strcmp(opt, JsonResponseFormatLookup[i])) {
+      return i;
+    }
+  }
+
+  return i;
+}
+
 
 ssize_t
 glusterBlockCreateParseSize(const char *dom, char *value)

@@ -13,6 +13,7 @@
 # define   _COMMON_H   1
 
 # include "utils.h"
+# include "block.h"
 
 # define  GB_LOGDIR              DATADIR "/log/gluster-block"
 # define  GB_INFODIR             DATADIR "/run"
@@ -36,6 +37,20 @@
 
 # define  SUN_PATH_MAX           (sizeof(struct sockaddr_un) - sizeof(unsigned short int)) /*sun_family*/
 
+
+static const char *const JsonResponseFormatLookup[] = {
+  [GB_JSON_NONE]            = "",
+
+  [GB_JSON_PLAIN]    = "--json-plain",
+  [GB_JSON_SPACED]   = "--json-spaced",
+  [GB_JSON_PRETTY]   = "--json-pretty",
+  [GB_JSON_DEFAULT]  = "--json",
+
+  [GB_JSON_MAX]             = NULL,
+};
+
+
+enum JsonResponseFormat jsonResponseFormatParse(const char *opt);
 
 ssize_t glusterBlockCreateParseSize(const char *dom, char *value);
 

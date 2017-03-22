@@ -32,6 +32,12 @@ const char *argp_program_version = ""                                 \
   "or later), or the GNU General Public License, version 2 (GPLv2),\n"\
   "in all cases as published by the Free Software Foundation.";
 
+#define GB_CREATE_HELP_STR "gluster-block create <volname/blockname> "\
+                           "[ha <count>] <HOST1[,HOST2,...]> <size> [--json*]"
+
+#define GB_DELETE_HELP_STR "gluster-block delete <volname/blockname> [--json*]"
+#define GB_INFO_HELP_STR  "gluster-block info <volname/blockname> [--json*]"
+#define GB_LIST_HELP_STR  "gluster-block list <volname> [--json*]"
 
 static int
 glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
@@ -159,7 +165,7 @@ glusterBlockHelp(void)
   MSG("%s",
       PACKAGE_NAME" ("PACKAGE_VERSION")\n"
       "usage:\n"
-      "  gluster-block <command> <volname[/blockname]> [<args>]\n"
+      "  gluster-block <command> <volname[/blockname]> [<args>] [--json*]\n"
       "\n"
       "commands:\n"
       "  create  <volname/blockname> [ha <count>] <host1[,host2,...]> <size>\n"
@@ -179,12 +185,15 @@ glusterBlockHelp(void)
       "\n"
       "  version\n"
       "        show version info and exit.\n"
+      "\n"
+      "supported JSON formats:\n"
+      "  --json|--json-plain|--json-spaced|--json-pretty\n"
       );
 }
 
 
 static int
-glusterBlockCreate(int argcount, char **options)
+glusterBlockCreate(int argcount, char **options, int json)
 {
   size_t optind = 2;
   int ret = -1;
@@ -195,10 +204,10 @@ glusterBlockCreate(int argcount, char **options)
   char *sep;
 
 
+  cobj.json_resp = json;
   if (argcount <= optind) {
     MSG("%s\n", "Insufficient arguments for create:");
-    MSG("%s\n", "gluster-block create <volname/blockname> [ha <count>]"
-                " <HOST1[,HOST2,...]> <size>");
+    MSG("%s\n", GB_CREATE_HELP_STR);
     return -1;
   }
 
@@ -213,8 +222,7 @@ glusterBlockCreate(int argcount, char **options)
   if (!sep) {
     MSG("%s\n",
         "first argument '<volname/blockname>' doesn't seems to be right");
-    MSG("%s\n", "gluster-block create <volname/blockname> [ha <count>] "
-        " <HOST1[,HOST2,...]> <size>");
+    MSG("%s\n", GB_CREATE_HELP_STR);
     LOG("cli", GB_LOG_ERROR, "%s",
         "create failed while parsing <volname/blockname>");
     goto out;
@@ -235,8 +243,7 @@ glusterBlockCreate(int argcount, char **options)
 
   if (argcount - optind < 2) {  /* left with servers and size so 2 */
     MSG("%s\n", "Insufficient arguments for create");
-    MSG("%s\n", "gluster-block create <volname/blockname> [ha <count>]"
-                " <HOST1[,HOST2,...]> <size>");
+    MSG("%s\n", GB_CREATE_HELP_STR);
     LOG("cli", GB_LOG_ERROR,
         "failed creating block %s on volume %s with hosts %s",
         cobj.block_name, cobj.volume, cobj.block_hosts);
@@ -245,8 +252,8 @@ glusterBlockCreate(int argcount, char **options)
 
   /* next arg to 'ha count' will be servers */
   if (GB_STRDUP(cobj.block_hosts, options[optind++]) < 0) {
-    LOG("cli", GB_LOG_ERROR, "failed while parsing servers for block %s",
-        cobj.block_name);
+    LOG("cli", GB_LOG_ERROR, "failed while parsing servers for block <%s/%s>",
+        cobj.volume, cobj.block_name);
     goto out;
   }
 
@@ -254,10 +261,9 @@ glusterBlockCreate(int argcount, char **options)
   sparse_ret = glusterBlockCreateParseSize("cli", options[optind]);
   if (sparse_ret < 0) {
     MSG("%s\n", "last argument '<size>' doesn't seems to be right");
-    MSG("%s\n", "gluster-block create <volname/blockname> [ha <count>] "
-                " <HOST1[,HOST2,...]> <size>");
-    LOG("cli", GB_LOG_ERROR, "failed while parsing size for block %s",
-        cobj.block_name);
+    MSG("%s\n", GB_CREATE_HELP_STR);
+    LOG("cli", GB_LOG_ERROR, "failed while parsing size for block <%s/%s>",
+        cobj.volume, cobj.block_name);
     goto out;
   }
   cobj.size = sparse_ret;  /* size is unsigned long long */
@@ -283,16 +289,17 @@ glusterBlockCreate(int argcount, char **options)
 
 
 static int
-glusterBlockList(int argcount, char **options)
+glusterBlockList(int argcount, char **options, int json)
 {
   blockListCli cobj;
   char *out = NULL;
   int ret = -1;
 
 
+  cobj.json_resp = json;
   if (argcount != 3) {
     MSG("%s\n", "Insufficient arguments for list:");
-    MSG("%s\n", "gluster-block list <volname>");
+    MSG("%s\n", GB_LIST_HELP_STR);
     return -1;
   }
 
@@ -315,7 +322,7 @@ glusterBlockList(int argcount, char **options)
 
 
 static int
-glusterBlockDelete(int argcount, char **options)
+glusterBlockDelete(int argcount, char **options, int json)
 {
   blockDeleteCli cobj;
   char *out = NULL;
@@ -324,9 +331,10 @@ glusterBlockDelete(int argcount, char **options)
   int ret = -1;
 
 
+  cobj.json_resp = json;
   if (argcount != 3) {
     MSG("%s\n", "Insufficient arguments for delete:");
-    MSG("%s\n", "gluster-block delete <volname/blockname>");
+    MSG("%s\n", GB_DELETE_HELP_STR);
     return -1;
   }
 
@@ -338,7 +346,7 @@ glusterBlockDelete(int argcount, char **options)
   sep = strchr(argcopy, '/');
   if (!sep) {
     MSG("%s\n", "argument '<volname/blockname>' doesn't seems to be right");
-    MSG("%s\n", "gluster-block delete <volname/blockname>");
+    MSG("%s\n", GB_DELETE_HELP_STR);
     LOG("cli", GB_LOG_ERROR, "%s",
         "delete failed while parsing <volname/blockname>");
     goto out;
@@ -368,7 +376,7 @@ glusterBlockDelete(int argcount, char **options)
 
 
 static int
-glusterBlockInfo(int argcount, char **options)
+glusterBlockInfo(int argcount, char **options, int json)
 {
   blockInfoCli cobj;
   char *out = NULL;
@@ -377,9 +385,10 @@ glusterBlockInfo(int argcount, char **options)
   int ret = -1;
 
 
+  cobj.json_resp = json;
   if (argcount != 3) {
     MSG("%s\n", "Insufficient arguments for info:");
-    MSG("%s\n", "gluster-block info <volname/blockname>");
+    MSG("%s\n", GB_INFO_HELP_STR);
     return -1;
   }
 
@@ -391,7 +400,7 @@ glusterBlockInfo(int argcount, char **options)
   sep = strchr(argcopy, '/');
   if (!sep) {
     MSG("%s\n", "argument '<volname/blockname>' doesn't seems to be right");
-    MSG("%s\n", "gluster-block info <volname/blockname>");
+    MSG("%s\n", GB_INFO_HELP_STR);
     LOG("cli", GB_LOG_ERROR, "%s",
         "info failed while parsing <volname/blockname>");
     goto out;
@@ -426,6 +435,7 @@ glusterBlockParseArgs(int count, char **options)
 {
   int ret = 0;
   size_t opt = 0;
+  int json = GB_JSON_NONE;
 
 
   opt = glusterBlockCLIOptEnumParse(options[1]);
@@ -434,24 +444,35 @@ glusterBlockParseArgs(int count, char **options)
     return -1;
   }
 
+  if (opt > 0 && opt < GB_CLI_HELP) {
+          json = jsonResponseFormatParse (options[count-1]);
+          if (json == GB_JSON_MAX) {
+            MSG("expecting '--json*', but argument %s doesn't seem to be matching",
+                options[count-1]);
+            return -1;
+          } else if (json != GB_JSON_NONE) {
+                  count--;/*Commands don't need to handle json*/
+          }
+  }
+
   while (1) {
     switch (opt) {
     case GB_CLI_CREATE:
-      ret = glusterBlockCreate(count, options);
+      ret = glusterBlockCreate(count, options, json);
       if (ret && ret != EEXIST) {
         LOG("cli", GB_LOG_ERROR, "%s", FAILED_CREATE);
       }
       goto out;
 
     case GB_CLI_LIST:
-      ret = glusterBlockList(count, options);
+      ret = glusterBlockList(count, options, json);
       if (ret) {
         LOG("cli", GB_LOG_ERROR, "%s", FAILED_LIST);
       }
       goto out;
 
     case GB_CLI_INFO:
-      ret = glusterBlockInfo(count, options);
+      ret = glusterBlockInfo(count, options, json);
       if (ret) {
         LOG("cli", GB_LOG_ERROR, "%s", FAILED_INFO);
       }
@@ -462,7 +483,7 @@ glusterBlockParseArgs(int count, char **options)
       goto out;
 
     case GB_CLI_DELETE:
-      ret = glusterBlockDelete(count, options);
+      ret = glusterBlockDelete(count, options, json);
       if (ret) {
         LOG("cli", GB_LOG_ERROR, "%s", FAILED_DELETE);
       }

@@ -39,7 +39,7 @@ function cleanup()
   echo -e "\nRunning test cleanup ..."
 
   # Block delete
-  gluster-block delete ${VOLNAME}/${BLKNAME}
+  gluster-block delete ${VOLNAME}/${BLKNAME} --json-pretty
 
   gluster --mode=script vol stop ${VOLNAME}
   gluster --mode=script vol del ${VOLNAME}
@@ -84,5 +84,19 @@ TEST gluster-block list ${VOLNAME}
 
 # Block info
 TEST gluster-block info ${VOLNAME}/${BLKNAME}
+
+# Block delete
+gluster-block delete ${VOLNAME}/${BLKNAME}
+
+echo -e "\n*** JSON responses ***\n"
+
+# Block create and expect json response
+TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 ${HOST} 1GiB --json-pretty
+
+# Block list and expect json response
+TEST gluster-block list ${VOLNAME} --json-pretty
+
+# Block info and expect json response
+TEST gluster-block info ${VOLNAME}/${BLKNAME} --json-pretty
 
 cleanup;

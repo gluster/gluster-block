@@ -15,7 +15,7 @@
 
 
 struct glfs *
-glusterBlockVolumeInit(char *volume)
+glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg)
 {
   struct glfs *glfs;
   int ret;
@@ -23,29 +23,36 @@ glusterBlockVolumeInit(char *volume)
 
   glfs = glfs_new(volume);
   if (!glfs) {
+    *errCode = errno;
+    GB_ASPRINTF (errMsg, "Not able to Initialize volume %s [%s]", volume,
+                 strerror(*errCode));
     LOG("gfapi", GB_LOG_ERROR, "glfs_new(%s) from %s failed[%s]", volume,
-        "localhost", strerror(errno));
+        "localhost", strerror(*errCode));
     return NULL;
   }
 
   ret = glfs_set_volfile_server(glfs, "tcp", "localhost", 24007);
   if (ret) {
+    *errCode = errno;
+    GB_ASPRINTF (errMsg, "Not able to add Volfile server for volume %s[%s]",
+                 volume, strerror(*errCode));
     LOG("gfapi", GB_LOG_ERROR, "glfs_set_volfile_server(%s) of %s "
-        "failed[%s]", "localhost", volume, strerror(errno));
+        "failed[%s]", "localhost", volume, strerror(*errCode));
     goto out;
   }
 
   ret = glfs_set_logging(glfs, GFAPI_LOG_FILE, GFAPI_LOG_LEVEL);
   if (ret) {
+    *errCode = errno;
+    GB_ASPRINTF (errMsg, "Not able to add logging for volume %s[%s]", volume,
+                 strerror(*errCode));
     LOG("gfapi", GB_LOG_ERROR, "glfs_set_logging(%s, %d) on %s failed[%s]",
-        GFAPI_LOG_FILE, GFAPI_LOG_LEVEL, volume, strerror(errno));
+        GFAPI_LOG_FILE, GFAPI_LOG_LEVEL, volume, strerror(*errCode));
     goto out;
   }
 
   ret = glfs_init(glfs);
   if (ret) {
-    LOG("gfapi", GB_LOG_ERROR, "glfs_init() on %s failed[%s]", volume,
-        strerror(errno) );
     goto out;
   }
 
@@ -59,16 +66,15 @@ glusterBlockVolumeInit(char *volume)
 
 
 int
-glusterBlockCreateEntry(struct glfs *glfs,
-                        blockCreateCli *blk,
-                        char *gbid)
+glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
+                        int *errCode, char **errMsg)
 {
   struct glfs_fd *tgfd;
   int ret;
 
-
   ret = glfs_mkdir (glfs, GB_STOREDIR, 0);
   if (ret && errno != EEXIST) {
+    *errCode = errno;
     LOG("gfapi", GB_LOG_ERROR,
         "glfs_mkdir(%s) on volume %s for block %s failed[%s]",
         GB_STOREDIR, blk->volume, blk->block_name, strerror(errno));
@@ -77,6 +83,7 @@ glusterBlockCreateEntry(struct glfs *glfs,
 
   ret = glfs_chdir (glfs, GB_STOREDIR);
   if (ret) {
+    *errCode = errno;
     LOG("gfapi", GB_LOG_ERROR,
         "glfs_chdir(%s) on volume %s for block %s failed[%s]",
         GB_STOREDIR, blk->volume, blk->block_name, strerror(errno));
@@ -87,6 +94,7 @@ glusterBlockCreateEntry(struct glfs *glfs,
                     O_WRONLY | O_CREAT | O_EXCL,
                     S_IRUSR | S_IWUSR);
   if (!tgfd) {
+    *errCode = errno;
     LOG("gfapi", GB_LOG_ERROR,
         "glfs_creat(%s) on volume %s for block %s failed[%s]",
         gbid, blk->volume, blk->block_name, strerror(errno));
@@ -95,6 +103,7 @@ glusterBlockCreateEntry(struct glfs *glfs,
   } else {
     ret = glfs_ftruncate(tgfd, blk->size);
     if (ret) {
+      *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
           "glfs_ftruncate(%s): on volume %s for block %s"
           "of size %zu failed[%s]", gbid, blk->volume, blk->block_name,
@@ -118,6 +127,7 @@ glusterBlockCreateEntry(struct glfs *glfs,
     }
 
     if (tgfd && glfs_close(tgfd) != 0) {
+      *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
           "glfs_close(%s): on volume %s for block %s failed[%s]",
           gbid, blk->volume, blk->block_name, strerror(errno));
@@ -127,6 +137,10 @@ glusterBlockCreateEntry(struct glfs *glfs,
   }
 
  out:
+  if (ret) {
+    GB_ASPRINTF (errMsg, "Not able to create metadata for %s/%s[%s]", blk->volume,
+                 blk->block_name, strerror(*errCode));
+  }
   return ret;
 }
 
@@ -156,7 +170,8 @@ glusterBlockDeleteEntry(struct glfs *glfs, char *volume, char *gbid)
 
 
 struct glfs_fd *
-glusterBlockCreateMetaLockFile(struct glfs *glfs, char *volume)
+glusterBlockCreateMetaLockFile(struct glfs *glfs, char *volume, int *errCode,
+                               char **errMsg)
 {
   struct glfs_fd *lkfd;
   int ret;
@@ -164,28 +179,33 @@ glusterBlockCreateMetaLockFile(struct glfs *glfs, char *volume)
 
   ret = glfs_mkdir (glfs, GB_METADIR, 0);
   if (ret && errno != EEXIST) {
+    *errCode = errno;
     LOG("gfapi", GB_LOG_ERROR, "glfs_mkdir(%s) on volume %s failed[%s]",
-        GB_METADIR, volume, strerror(errno));
+        GB_METADIR, volume, strerror(*errCode));
     goto out;
   }
 
   ret = glfs_chdir (glfs, GB_METADIR);
   if (ret) {
+    *errCode = errno;
     LOG("gfapi", GB_LOG_ERROR, "glfs_chdir(%s) on volume %s failed[%s]",
-        GB_METADIR, volume, strerror(errno));
+        GB_METADIR, volume, strerror(*errCode));
     goto out;
   }
 
   lkfd = glfs_creat(glfs, GB_TXLOCKFILE, O_RDWR, S_IRUSR | S_IWUSR);
   if (!lkfd) {
+    *errCode = errno;
     LOG("gfapi", GB_LOG_ERROR, "glfs_creat(%s) on volume %s failed[%s]",
-        GB_TXLOCKFILE, volume, strerror(errno));
+        GB_TXLOCKFILE, volume, strerror(*errCode));
     goto out;
   }
 
   return lkfd;
 
  out:
+  GB_ASPRINTF (errMsg, "Not able to create Metadata on volume %s[%s]", volume,
+               strerror (*errCode));
   return NULL;
 }
 
@@ -301,42 +321,46 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
 
 
 int
-blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info)
+blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info,
+                 int *errCode)
 {
   size_t count = 0;
   struct glfs_fd *tgmfd = NULL;
   char line[1024];
+  char fpath[PATH_MAX] = {0};
   char *tmp;
   int ret;
 
-
-  ret = glfs_chdir (glfs, GB_METADIR);
-  if (ret) {
-    LOG("gfapi", GB_LOG_ERROR,
-        "glfs_chdir(%s) on volume %s for block %s failed[%s]",
-        GB_METADIR, info->volume, metafile, strerror(errno));
-    goto out;
-  }
-
-  tgmfd = glfs_open(glfs, metafile, O_RDONLY);
+  snprintf(fpath, sizeof fpath, "%s/%s", GB_METADIR, metafile);
+  tgmfd = glfs_open(glfs, fpath, O_RDONLY);
   if (!tgmfd) {
+    if (errCode) {
+      *errCode = errno;
+    }
     LOG("gfapi", GB_LOG_ERROR, "glfs_open(%s) on volume %s failed[%s]",
         metafile, info->volume, strerror(errno));
     ret = -1;
     goto out;
   }
 
-  while (glfs_read (tgmfd, line, sizeof(line), 0) > 0) {
+  while ((ret = glfs_read (tgmfd, line, sizeof(line), 0)) > 0) {
     tmp = strtok(line,"\n");
     count += strlen(tmp) + 1;
     ret = blockStuffMetaInfo(info, tmp);
     if (ret) {
+      if (errCode) {
+        *errCode = errno;
+      }
       LOG("gfapi", GB_LOG_ERROR,
           "blockStuffMetaInfo: on volume %s for block %s failed[%s]",
           info->volume, metafile, strerror(errno));
       goto out;
     }
     glfs_lseek(tgmfd, count, SEEK_SET);
+  }
+  if (ret < 0 && errCode) {/*Failure from glfs_read*/
+    *errCode = errno;
+    goto out;
   }
 
  out:

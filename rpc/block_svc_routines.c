@@ -15,6 +15,7 @@
 # include  <pthread.h>
 # include  <netdb.h>
 # include  <uuid/uuid.h>
+# include  <json-c/json.h>
 
 
 # define   UUID_BUF_SIZE     38
@@ -105,6 +106,26 @@ getLastWordNoDot(char *line)
   }
 
   return sptr;
+}
+
+
+static int
+mapJsonFlagToJsonCstring(int jsonflag)
+{
+  switch (jsonflag) {
+    case GB_JSON_PLAIN:
+      return JSON_C_TO_STRING_PLAIN;
+
+    case GB_JSON_DEFAULT:
+    case GB_JSON_SPACED:
+      return JSON_C_TO_STRING_SPACED;
+
+    case GB_JSON_PRETTY:
+      return JSON_C_TO_STRING_PRETTY;
+
+    default:
+      return JSON_C_TO_STRING_SPACED;
+  }
 }
 
 
@@ -411,10 +432,11 @@ glusterBlockCreateRemote(void *data)
   int ret;
   blockRemoteObj *args = (blockRemoteObj *)data;
   blockCreate cobj = *(blockCreate *)args->obj;
+  char *errMsg = NULL;
 
 
   GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
-                        ret, out, "%s: CONFIGINPROGRESS\n", args->addr);
+                        ret, errMsg, out, "%s: CONFIGINPROGRESS\n", args->addr);
 
   ret = glusterBlockCallRPC_1(args->addr, &cobj, CREATE_SRV, &args->reply);
   if (ret) {
@@ -433,23 +455,25 @@ glusterBlockCreateRemote(void *data)
     }
 
     GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
-                          ret, out, "%s: CONFIGFAIL\n", args->addr);
+                          ret, errMsg, out, "%s: CONFIGFAIL\n", args->addr);
     LOG("mgmt", GB_LOG_ERROR, "%s for block %s on host %s volume %s",
         FAILED_REMOTE_CREATE, cobj.block_name, args->addr, args->volume);
     goto out;
   }
 
   GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
-                        ret, out, "%s: CONFIGSUCCESS\n", args->addr);
+                        ret, errMsg, out, "%s: CONFIGSUCCESS\n", args->addr);
 
  out:
   if (!args->reply) {
-    if (asprintf(&args->reply, "failed to config on %s", args->addr) == -1) {
+    if (GB_ASPRINTF(&args->reply, "failed to config on %s %s\n", args->addr,
+                    errMsg?errMsg:"") == -1) {
       ret = -1;
     }
   }
   args->exit = ret;
 
+  GB_FREE (errMsg);
   return NULL;
 }
 
@@ -521,10 +545,11 @@ glusterBlockDeleteRemote(void *data)
   int ret;
   blockRemoteObj *args = (blockRemoteObj *)data;
   blockDelete dobj = *(blockDelete *)args->obj;
+  char *errMsg = NULL;
 
 
   GB_METAUPDATE_OR_GOTO(lock, args->glfs, dobj.block_name, args->volume,
-                        ret, out, "%s: CLEANUPINPROGRESS\n", args->addr);
+                        ret, errMsg, out, "%s: CLEANUPINPROGRESS\n", args->addr);
   ret = glusterBlockCallRPC_1(args->addr, &dobj, DELETE_SRV, &args->reply);
   if (ret) {
     if (errno == ENETUNREACH || errno == ECONNREFUSED  || errno == ETIMEDOUT) {
@@ -542,21 +567,22 @@ glusterBlockDeleteRemote(void *data)
     }
 
     GB_METAUPDATE_OR_GOTO(lock, args->glfs, dobj.block_name, args->volume,
-                          ret, out, "%s: CLEANUPFAIL\n", args->addr);
+                          ret, errMsg, out, "%s: CLEANUPFAIL\n", args->addr);
     LOG("mgmt", GB_LOG_ERROR, "%s for block %s on host %s volume %s",
         FAILED_REMOTE_DELETE, dobj.block_name, args->addr, args->volume);
     goto out;
   }
   GB_METAUPDATE_OR_GOTO(lock, args->glfs, dobj.block_name, args->volume,
-                        ret, out, "%s: CLEANUPSUCCESS\n", args->addr);
+                        ret, errMsg, out, "%s: CLEANUPSUCCESS\n", args->addr);
 
  out:
   if (!args->reply) {
-    if (asprintf(&args->reply, "failed to delete config on %s",
-                 args->addr) == -1) {
+    if (GB_ASPRINTF(&args->reply, "failed to delete config on %s",
+                    args->addr) == -1) {
       ret = -1;
     }
   }
+  GB_FREE(errMsg);
   args->exit = ret;
 
   return NULL;
@@ -623,15 +649,15 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
   /* collect return */
   for (i = 0; i < count; i++) {
     if (args[i].exit) {
-      if (asprintf(&d_attempt, "%s %s",
-                   (a_tmp==NULL?"":a_tmp), args[i].addr) == -1) {
+      if (GB_ASPRINTF(&d_attempt, "%s %s",
+                      (a_tmp==NULL?"":a_tmp), args[i].addr) == -1) {
         goto out;
       }
       GB_FREE(a_tmp);
       a_tmp = d_attempt;
     } else {
-      if (asprintf(&d_success, "%s %s",
-                   (s_tmp==NULL?"":s_tmp), args[i].addr) == -1) {
+      if (GB_ASPRINTF(&d_success, "%s %s",
+                      (s_tmp==NULL?"":s_tmp), args[i].addr) == -1) {
         goto out;
       }
       GB_FREE(s_tmp);
@@ -641,8 +667,8 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
 
   if (d_attempt) {
     a_tmp = local->d_attempt;
-    if (asprintf(&local->d_attempt, "%s %s",
-                 (a_tmp==NULL?"":a_tmp), d_attempt) == -1) {
+    if (GB_ASPRINTF(&local->d_attempt, "%s %s",
+                    (a_tmp==NULL?"":a_tmp), d_attempt) == -1) {
       goto out;
     }
     GB_FREE(a_tmp);
@@ -651,8 +677,8 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
 
   if (d_success) {
     s_tmp = local->d_success;
-    if (asprintf(&local->d_success, "%s %s",
-                 (s_tmp==NULL?"":s_tmp), d_success) == -1) {
+    if (GB_ASPRINTF(&local->d_success, "%s %s",
+                    (s_tmp==NULL?"":s_tmp), d_success) == -1) {
       goto out;
     }
     GB_FREE(s_tmp);
@@ -694,6 +720,7 @@ glusterBlockCleanUp(operations opt, struct glfs *glfs, char *blockname,
   blockRemoteDeleteResp *drobj;
   blockRemoteCreateResp *crobj;
   int asyncret = 0;
+  char *errMsg = NULL;
 
   switch(opt) {
   case CREATE_SRV:
@@ -712,7 +739,7 @@ glusterBlockCleanUp(operations opt, struct glfs *glfs, char *blockname,
     goto out;
   }
 
-  ret = blockGetMetaInfo(glfs, blockname, info);
+  ret = blockGetMetaInfo(glfs, blockname, info, NULL);
   if (ret) {
     goto out;
   }
@@ -751,7 +778,7 @@ glusterBlockCleanUp(operations opt, struct glfs *glfs, char *blockname,
       goto out;
     }
 
-    ret = blockGetMetaInfo(glfs, blockname, info);
+    ret = blockGetMetaInfo(glfs, blockname, info, NULL);
     if (ret) {
       goto out;
     }
@@ -767,17 +794,17 @@ glusterBlockCleanUp(operations opt, struct glfs *glfs, char *blockname,
 
     if (cleanupsuccess == info->nhosts) {
       GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
-                            ret, out, "ENTRYDELETE: INPROGRESS\n");
+                            ret, errMsg, out, "ENTRYDELETE: INPROGRESS\n");
       if (glusterBlockDeleteEntry(glfs, info->volume, info->gbid)) {
         GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
-                              ret, out, "ENTRYDELETE: FAIL\n");
+                              ret, errMsg, out, "ENTRYDELETE: FAIL\n");
         LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s", FAILED_DELETING_FILE,
             info->volume, blockname);
         ret = -1;
         goto out;
       }
       GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
-                            ret, out, "ENTRYDELETE: SUCCESS\n");
+                            ret, errMsg, out, "ENTRYDELETE: SUCCESS\n");
       ret = glusterBlockDeleteMetaFile(glfs, info->volume, blockname);
       if (ret) {
         LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s",
@@ -789,6 +816,7 @@ glusterBlockCleanUp(operations opt, struct glfs *glfs, char *blockname,
 
  out:
   blockFreeMetaInfo(info);
+  GB_FREE (errMsg);
 
   return asyncret?asyncret:ret;
 }
@@ -816,7 +844,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
     goto out;
   }
 
-  ret = blockGetMetaInfo(glfs, blk->block_name, info);
+  ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
   if (ret) {
     goto out;
   }
@@ -898,12 +926,130 @@ glusterBlockAuditRequest(struct glfs *glfs,
   return ret;
 }
 
+void
+block_format_error_response (int json_resp, int errCode, char *errMsg,
+                             struct blockResponse *reply)
+{
+  json_object *json_obj = NULL;
+  reply->exit = errCode;
+  if (json_resp) {
+    json_obj = json_object_new_object();
+    json_object_object_add(json_obj, "RESULT", json_object_new_string("FAIL"));
+    json_object_object_add(json_obj, "errCode", json_object_new_int(errCode));
+    json_object_object_add(json_obj, "errMsg", json_object_new_string(errMsg));
+    GB_ASPRINTF(&reply->out, "%s\n",
+                json_object_to_json_string_ext(json_obj,
+                                     mapJsonFlagToJsonCstring(json_resp)));
+    json_object_put(json_obj);
+  } else {
+    GB_ASPRINTF (&reply->out, "%s\nRESULT:FAIL\n", errMsg);
+  }
+}
+
+void
+block_create_cli_format_response(blockCreateCli *blk, int errCode,
+                                 char *errMsg, blockRemoteCreateResp *savereply,
+                                 struct blockResponse *reply)
+{
+  json_object *json_obj = NULL;
+  json_object *json_array = NULL;
+  char         *tmp      = NULL;
+  char         *portals  = NULL;
+  int          i         = 0;
+
+  if (!reply) {
+    return;
+  }
+
+  if (errCode < 0) {
+    errCode = 255;
+  }
+
+  if (errMsg) {
+    block_format_error_response(blk->json_resp, errCode, errMsg, reply);
+    return;
+  }
+
+  if (blk->json_resp) {
+    json_obj = json_object_new_object();
+    json_object_object_add(json_obj, "IQN",
+                           json_object_new_string(savereply->iqn));
+
+    json_array = json_object_new_array();
+
+    for (i = 0; i < savereply->nportal; i++) {
+      json_object_array_add(json_array,
+                            json_object_new_string(savereply->portal[i]));
+    }
+
+    json_object_object_add(json_obj, "PORTAL(S)", json_array);
+
+    if (savereply->obj->d_attempt || savereply->obj->d_success) {
+      json_object_put(json_array);
+      json_array = json_object_new_array();
+
+      if (savereply->obj->d_attempt) {
+        tmp = strtok (savereply->obj->d_attempt, " ");
+        while (tmp!= NULL)
+        {
+          json_object_array_add(json_array, json_object_new_string(tmp));
+          tmp = strtok (NULL, " ");
+        }
+      }
+
+      if (savereply->obj->d_success) {
+        tmp = strtok (savereply->obj->d_success, " ");
+        while (tmp!= NULL)
+        {
+          json_object_array_add(json_array, json_object_new_string(tmp));
+          tmp = strtok (NULL, " ");
+        }
+      }
+      tmp = NULL;
+      json_object_object_add(json_obj, "REWIND ON", json_array);
+    }
+
+    json_object_object_add(json_obj, "RESULT",
+      errCode?json_object_new_string("FAIL"):json_object_new_string("SUCCESS"));
+
+    GB_ASPRINTF(&reply->out, "%s\n",
+                json_object_to_json_string_ext(json_obj,
+                                     mapJsonFlagToJsonCstring(blk->json_resp)));
+    json_object_put(json_array);
+    json_object_put(json_obj);
+  } else {
+    for (i = 0; i < savereply->nportal; i++) {
+      if (GB_ASPRINTF(&portals, "%s %s",
+                      tmp!=NULL?tmp:"", savereply->portal[i]) == -1) {
+        goto out;
+      }
+      GB_FREE(tmp);
+      tmp = portals;
+    }
+
+    /* save 'failed on'*/
+    tmp = NULL;
+    if (savereply->obj->d_attempt || savereply->obj->d_success) {
+      if (GB_ASPRINTF(&tmp, "REWIND ON: %s %s\n",
+            savereply->obj->d_attempt?savereply->obj->d_attempt:"",
+            savereply->obj->d_success?savereply->obj->d_success:"") == -1) {
+        goto out;
+      }
+    }
+
+    GB_ASPRINTF(&reply->out, "IQN: %s\nPORTAL(S): %s\n%sRESULT: %s\n",
+                savereply->iqn, portals, tmp?tmp:"", errCode?"FAIL":"SUCCESS");
+  }
+
+ out:
+  GB_FREE(tmp);
+  return;
+}
 
 blockResponse *
 block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 {
-  int ret = -1;
-  size_t i;
+  int errCode = -1;
   uuid_t uuid;
   blockRemoteCreateResp *savereply = NULL;
   char gbid[UUID_BUF_SIZE];
@@ -912,8 +1058,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   struct glfs *glfs = NULL;
   struct glfs_fd *lkfd = NULL;
   blockServerDefPtr list = NULL;
-  char *tmp = NULL;
-  char *portals = NULL;
+  char *errMsg = NULL;
 
 
   if (GB_ALLOC(reply) < 0) {
@@ -927,8 +1072,8 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
     LOG("mgmt", GB_LOG_ERROR, "for block %s multipath request:%d is greater "
                               "than provided block-hosts:%s on volume %s",
          blk->block_name, blk->mpath, blk->block_hosts, blk->volume);
-    if (asprintf(&reply->out, "multipath req: %d > block-hosts: %s\n",
-                 blk->mpath, blk->block_hosts) == -1) {
+    if (GB_ASPRINTF(&errMsg, "multipath req: %d > block-hosts: %s\n",
+                    blk->mpath, blk->block_hosts) == -1) {
       reply->exit = -1;
       goto optfail;
     }
@@ -936,7 +1081,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
     goto optfail;
   }
 
-  glfs = glusterBlockVolumeInit(blk->volume);
+  glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR,
         "glusterBlockVolumeInit(%s) for block %s with hosts %s failed",
@@ -944,25 +1089,25 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
     goto optfail;
   }
 
-  lkfd = glusterBlockCreateMetaLockFile(glfs, blk->volume);
+  lkfd = glusterBlockCreateMetaLockFile(glfs, blk->volume, &errCode, &errMsg);
   if (!lkfd) {
     LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s with hosts %s",
         FAILED_CREATING_META, blk->volume, blk->block_name, blk->block_hosts);
     goto optfail;
   }
 
-  GB_METALOCK_OR_GOTO(lkfd, blk->volume, ret, out);
+  GB_METALOCK_OR_GOTO(lkfd, blk->volume, errCode, errMsg, out);
 
   if (!glfs_access(glfs, blk->block_name, F_OK)) {
     LOG("mgmt", GB_LOG_ERROR,
         "block with name %s already exist in the volume %s",
         blk->block_name, blk->volume);
-    if (asprintf(&reply->out, "BLOCK with name: '%s' already EXIST\n",
-                 blk->block_name) == -1) {
-      ret = -1;
+    if (GB_ASPRINTF(&errMsg, "BLOCK with name: '%s' already EXIST\n",
+                    blk->block_name) == -1) {
+            errCode = ENOMEM;
       goto exist;
     }
-    ret = EEXIST;
+    errCode = EEXIST;
     goto exist;
   }
 
@@ -970,95 +1115,61 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   uuid_unparse(uuid, gbid);
 
   GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
-                        ret, exist, "VOLUME: %s\nGBID: %s\nSIZE: %zu\n"
+                        errCode, errMsg, exist,
+                        "VOLUME: %s\nGBID: %s\nSIZE: %zu\n"
                         "HA: %d\nENTRYCREATE: INPROGRESS\n",
                         blk->volume, gbid, blk->size, blk->mpath);
 
-  ret = glusterBlockCreateEntry(glfs, blk, gbid);
-  if (ret) {
+  if (glusterBlockCreateEntry(glfs, blk, gbid, &errCode, &errMsg)) {
     GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
-                          ret, exist, "ENTRYCREATE: FAIL\n");
+                          errCode, errMsg, exist, "ENTRYCREATE: FAIL\n");
     LOG("mgmt", GB_LOG_ERROR, "%s volume: %s host: %s",
         FAILED_CREATING_FILE, blk->volume, blk->block_hosts);
     goto exist;
   }
 
   GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
-                        ret, exist, "ENTRYCREATE: SUCCESS\n");
+                        errCode, errMsg, exist, "ENTRYCREATE: SUCCESS\n");
 
   strcpy(cobj.volume, blk->volume);
   strcpy(cobj.block_name, blk->block_name);
   cobj.size = blk->size;
   strcpy(cobj.gbid, gbid);
 
-  ret = glusterBlockCreateRemoteAsync(list, 0, blk->mpath,
-                                      glfs, &cobj, &savereply);
-  if (ret) {
-    if (ret == EKEYEXPIRED) {
+  errCode = glusterBlockCreateRemoteAsync(list, 0, blk->mpath,
+                                          glfs, &cobj, &savereply);
+  if (errCode) {
+    if (errCode == EKEYEXPIRED) {
       LOG("mgmt", GB_LOG_ERROR, "glusterBlockCreateRemoteAsync: return %d"
           " rewinding the create request for block %s on volume %s with hosts %s",
-          ret, blk->block_name, blk->volume, blk->block_hosts);
+          errCode, blk->block_name, blk->volume, blk->block_hosts);
 
       glusterBlockCleanUp(CREATE_SRV, glfs, blk->block_name, TRUE, &savereply);
 
       goto exist;
     }
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockCreateRemoteAsync: return %d"
-        " %s for block %s on volume %s with hosts %s", ret,
+        " %s for block %s on volume %s with hosts %s", errCode,
         FAILED_REMOTE_AYNC_CREATE, blk->block_name,
         blk->volume, blk->block_hosts);
   }
 
   /* Check Point */
-  ret = glusterBlockAuditRequest(glfs, blk, &cobj, list, &savereply);
-  if (ret) {
+  errCode = glusterBlockAuditRequest(glfs, blk, &cobj, list, &savereply);
+  if (errCode) {
     LOG("mgmt", GB_LOG_ERROR, "glusterBlockAuditRequest: return %d"
-        "volume: %s hosts: %s blockname %s", ret,
+        "volume: %s hosts: %s blockname %s", errCode,
         blk->volume, blk->block_hosts, blk->block_name);
   }
 
-  for (i = 0; i < savereply->nportal; i++) {
-    if (asprintf(&portals, "%s %s",
-                 tmp!=NULL?tmp:"", savereply->portal[i]) == -1) {
-      portals = tmp;
-      goto exist;
-    }
-    GB_FREE(tmp);
-    tmp = portals;
-  }
-
-  /* save 'failed on'*/
-  tmp = NULL;
-  if (savereply->obj->d_attempt || savereply->obj->d_success) {
-    if (asprintf(&tmp, "REWIND ON: %s %s\n",
-                 savereply->obj->d_attempt?savereply->obj->d_attempt:"",
-                 savereply->obj->d_success?savereply->obj->d_success:""
-                ) == -1) {
-      ret = -1;
-      goto exist;
-    }
-  }
-
-  if (asprintf(&reply->out,
-               "IQN: %s\nPORTAL(S): %s\n%sRESULT: %s\n",
-               savereply->iqn, portals, tmp?tmp:"",
-               ret?"FAIL":"SUCCESS") == -1) {
-    ret = -1;
-    goto exist;
-  }
-
  exist:
-  if (ret == EKEYEXPIRED) {
-    if (asprintf(&reply->out,
-                 "Looks like targetcli and tcmu-runner are not installed on few nodes.\n"
-                 "RESULT:FAIL\n") == -1) {
-      ret = -1;
+  if (errCode == EKEYEXPIRED) {
+    GB_ASPRINTF(&errMsg, "Looks like targetcli and tcmu-runner are not "
+                "installed on few nodes.\n");
     }
-  }
-  GB_METAUNLOCK(lkfd, blk->volume, ret);
+  GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
  out:
-  reply->exit = ret;
 
   if (lkfd && glfs_close(lkfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s for "
@@ -1066,12 +1177,12 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
         blk->block_name, strerror(errno));
   }
 
+ optfail:
+  block_create_cli_format_response(blk, errCode, errMsg, savereply, reply);
+  GB_FREE(errMsg);
+  blockServerDefFree(list);
   glfs_fini(glfs);
   blockCreateParsedRespFree(savereply);
-  GB_FREE(tmp);
-
- optfail:
-  blockServerDefFree(list);
 
   return reply;
 }
@@ -1100,47 +1211,47 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   ret = WEXITSTATUS(system(GB_TGCLI_GLFS_CHECK));
   if (ret == EKEYEXPIRED || ret == 1) {
     reply->exit = EKEYEXPIRED;
-    if (asprintf(&reply->out,
+    if (GB_ASPRINTF(&reply->out,
                  "check if targetcli and tcmu-runner are installed.") == -1) {
       goto out;
     }
     goto out;
   }
 
-  if (asprintf(&backstore, "%s %s %s %zu %s@%s%s/%s %s", GB_TGCLI_GLFS,
-               GB_CREATE, blk->block_name, blk->size, blk->volume,
-               blk->ipaddr, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
+  if (GB_ASPRINTF(&backstore, "%s %s %s %zu %s@%s%s/%s %s", GB_TGCLI_GLFS,
+                  GB_CREATE, blk->block_name, blk->size, blk->volume,
+                  blk->ipaddr, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
     goto out;
   }
 
-  if (asprintf(&iqn, "%s %s %s%s", GB_TGCLI_ISCSI, GB_CREATE,
-               GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
-    goto out;
-  }
-
-
-  if (asprintf(&lun, "%s/%s%s/tpg1/luns %s %s/%s",  GB_TGCLI_ISCSI,
-               GB_TGCLI_IQN_PREFIX, blk->gbid, GB_CREATE,
-               GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
-    goto out;
-  }
-
-  if (asprintf(&portal, "%s/%s%s/tpg1/portals create %s",
-               GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid,
-               blk->ipaddr) == -1) {
-    goto out;
-  }
-
-  if (asprintf(&attr, "%s/%s%s/tpg1 set attribute %s",
-               GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid,
-               GB_TGCLI_ATTRIBUTES) == -1) {
+  if (GB_ASPRINTF(&iqn, "%s %s %s%s", GB_TGCLI_ISCSI, GB_CREATE,
+                  GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
     goto out;
   }
 
 
-  if (asprintf(&exec, "%s && %s && %s && %s && %s && %s && %s",
-               GB_TGCLI_GLOBALS, backstore, iqn, lun, portal, attr,
-               GB_TGCLI_SAVE) == -1) {
+  if (GB_ASPRINTF(&lun, "%s/%s%s/tpg1/luns %s %s/%s",  GB_TGCLI_ISCSI,
+                  GB_TGCLI_IQN_PREFIX, blk->gbid, GB_CREATE,
+                  GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
+    goto out;
+  }
+
+  if (GB_ASPRINTF(&portal, "%s/%s%s/tpg1/portals create %s",
+                  GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid,
+                  blk->ipaddr) == -1) {
+    goto out;
+  }
+
+  if (GB_ASPRINTF(&attr, "%s/%s%s/tpg1 set attribute %s",
+                  GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid,
+                  GB_TGCLI_ATTRIBUTES) == -1) {
+    goto out;
+  }
+
+
+  if (GB_ASPRINTF(&exec, "%s && %s && %s && %s && %s && %s && %s",
+                  GB_TGCLI_GLOBALS, backstore, iqn, lun, portal, attr,
+                  GB_TGCLI_SAVE) == -1) {
     goto out;
   }
 
@@ -1177,17 +1288,96 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   return reply;
 }
 
+void
+block_delete_cli_format_response(blockDeleteCli *blk, int errCode, char *errMsg,
+                                 blockRemoteDeleteResp *savereply,
+                                 struct blockResponse *reply)
+{
+  json_object *json_obj = NULL;
+  json_object *json_array1 = NULL;
+  json_object *json_array2 = NULL;
+  char *tmp = NULL;
+
+  if (!reply) {
+    return;
+  }
+
+  if (errCode < 0) {
+    errCode = 255;
+  }
+
+  reply->exit = errCode;
+
+  if (errMsg) {
+    block_format_error_response(blk->json_resp, errCode, errMsg, reply);
+    return;
+  }
+
+  if (blk->json_resp) {
+    json_obj = json_object_new_object();
+
+    if (savereply->d_attempt) {
+      json_array1 = json_object_new_array();
+      tmp = strtok (savereply->d_attempt, " ");
+      while (tmp!= NULL)
+      {
+        json_object_array_add(json_array1, json_object_new_string(tmp));
+        tmp = strtok (NULL, " ");
+      }
+      tmp = NULL;
+      json_object_object_add(json_obj, "FAILED ON", json_array1);
+    }
+
+    if (savereply->d_success) {
+      json_array2 = json_object_new_array();
+      tmp = strtok (savereply->d_success, " ");
+      while (tmp!= NULL)
+      {
+        json_object_array_add(json_array2, json_object_new_string(tmp));
+        tmp = strtok (NULL, " ");
+      }
+      tmp = NULL;
+      json_object_object_add(json_obj, "SUCCESSFUL ON", json_array2);
+    }
+
+    json_object_object_add(json_obj, "RESULT",
+        errCode?json_object_new_string("FAIL"):json_object_new_string("SUCCESS"));
+
+    GB_ASPRINTF(&reply->out, "%s\n",
+                json_object_to_json_string_ext(json_obj,
+                                     mapJsonFlagToJsonCstring(blk->json_resp)));
+
+    json_object_put(json_array1);
+    json_object_put(json_array2);
+    json_object_put(json_obj);
+  } else {
+    /* save 'failed on'*/
+    if (savereply->d_attempt) {
+      if (GB_ASPRINTF(&tmp, "FAILED ON: %s\n", savereply->d_attempt) == -1)
+        goto out;
+    }
+
+    if (GB_ASPRINTF(&reply->out,
+          "%sSUCCESSFUL ON: %s\nRESULT: %s\n", tmp?tmp:"",
+          savereply->d_success?savereply->d_success:"None",
+          errCode?"FAIL":"SUCCESS") == -1) {
+            goto out;
+    }
+  }
+ out:
+  GB_FREE (tmp);
+  return;
+}
 
 blockResponse *
 block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 {
-  int ret = -1;
-  char *tmp = NULL;
   blockRemoteDeleteResp *savereply = NULL;
   static blockResponse *reply = NULL;
   struct glfs *glfs;
   struct glfs_fd *lkfd = NULL;
-
+  char *errMsg = NULL;
+  int errCode = 0;
 
   if (GB_ALLOC(reply) < 0) {
     return NULL;
@@ -1198,71 +1388,57 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
     return NULL;
   }
 
-  glfs = glusterBlockVolumeInit(blk->volume);
+  glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR,
         "glusterBlockVolumeInit(%s) for block %s failed",
         blk->volume, blk->block_name);
-    goto out;
+    goto optfail;
   }
 
-  lkfd = glusterBlockCreateMetaLockFile(glfs, blk->volume);
+  lkfd = glusterBlockCreateMetaLockFile(glfs, blk->volume, &errCode, &errMsg);
   if (!lkfd) {
     LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s",
         FAILED_CREATING_META, blk->volume, blk->block_name);
-    goto out;
+    goto optfail;
   }
 
-  GB_METALOCK_OR_GOTO(lkfd, blk->volume, ret, out);
+  GB_METALOCK_OR_GOTO(lkfd, blk->volume, errCode, errMsg, optfail);
 
   if (glfs_access(glfs, blk->block_name, F_OK)) {
     LOG("mgmt", GB_LOG_ERROR,
         "block with name %s doesn't exist in the volume %s",
         blk->block_name, blk->volume);
-    GB_STRDUP(reply->out, "BLOCK doesn't EXIST");
-    reply->exit = ENOENT;
+    GB_ASPRINTF(&errMsg, "block %s/%s doesn't exist", blk->volume,
+                blk->block_name);
+    errCode = ENOENT;
     goto out;
   }
 
-  ret = glusterBlockCleanUp(DELETE_SRV, glfs, blk->block_name, TRUE, &savereply);
-  if (ret) {
+  errCode = glusterBlockCleanUp(DELETE_SRV, glfs, blk->block_name, TRUE,
+                                &savereply);
+  if (errCode) {
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockCleanUp: return %d "
-        "on block %s for volume %s", ret, blk->block_name, blk->volume);
+        "on block %s for volume %s", errCode, blk->block_name, blk->volume);
   }
 
  out:
-  if (ret == EKEYEXPIRED) {
-    if (asprintf(&reply->out,
-                 "Looks like targetcli and tcmu-runner are not installed on few nodes.\n"
-                 "RESULT:FAIL\n") == -1) {
-      ret = -1;
-    }
-  } else {
-     /* save 'failed on'*/
-    if (savereply->d_attempt) {
-      if (asprintf(&tmp, "FAILED ON: %s\n", savereply->d_attempt) == -1) {
-        ret = -1;
-      }
-    }
-
-    if (asprintf(&reply->out,
-                 "%sSUCCESSFUL ON: %s\nRESULT: %s\n", tmp?tmp:"",
-                 savereply->d_success?savereply->d_success:"None",
-                 ret?"FAIL":"SUCCESS") == -1) {
-      ret = -1;
-    }
+  if (errCode == EKEYEXPIRED) {
+    GB_ASPRINTF(&errMsg, "Looks like targetcli and tcmu-runner are not "
+                "installed on few nodes.\n");
   }
 
-  GB_METAUNLOCK(lkfd, blk->volume, ret);
+  GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
-  reply->exit = ret;
-
+ optfail:
   if (lkfd && glfs_close(lkfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR,
         "glfs_close(%s): for block %s on volume %s failed[%s]",
         GB_TXLOCKFILE, blk->block_name, blk->volume, strerror(errno));
   }
 
+
+  block_delete_cli_format_response(blk, errCode, errMsg, savereply, reply);
   glfs_fini(glfs);
 
   if (savereply) {
@@ -1270,7 +1446,6 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
     GB_FREE(savereply->d_success);
     GB_FREE(savereply);
   }
-  GB_FREE(tmp);
 
   return reply;
 }
@@ -1296,39 +1471,39 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
   ret = WEXITSTATUS(system(GB_TGCLI_GLFS_CHECK));
   if (ret == EKEYEXPIRED || ret == 1) {
     reply->exit = EKEYEXPIRED;
-    if (asprintf(&reply->out,
-                 "check if targetcli and tcmu-runner are installed.") == -1) {
+    if (GB_ASPRINTF(&reply->out,
+                    "check if targetcli and tcmu-runner are installed.") == -1) {
       goto out;
     }
     goto out;
   }
 
-  if (asprintf(&exec, GB_TGCLI_CHECK, blk->block_name) == -1) {
+  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name) == -1) {
     goto out;
   }
 
   /* Check if block exist on this node ? */
   if (WEXITSTATUS(system(exec)) == 1) {
     reply->exit = 0;
-    if (asprintf(&reply->out, "No %s.", blk->block_name) == -1) {
+    if (GB_ASPRINTF(&reply->out, "No %s.", blk->block_name) == -1) {
       goto out;
     }
     goto out;
   }
   GB_FREE(exec);
 
-  if (asprintf(&iqn, "%s %s %s%s", GB_TGCLI_ISCSI, GB_DELETE,
-               GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
+  if (GB_ASPRINTF(&iqn, "%s %s %s%s", GB_TGCLI_ISCSI, GB_DELETE,
+                  GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
     goto out;
   }
 
-  if (asprintf(&backstore, "%s %s %s", GB_TGCLI_GLFS,
-               GB_DELETE, blk->block_name) == -1) {
+  if (GB_ASPRINTF(&backstore, "%s %s %s", GB_TGCLI_GLFS,
+                  GB_DELETE, blk->block_name) == -1) {
     goto out;
   }
 
-  if (asprintf(&exec, "%s && %s && %s", backstore, iqn,
-               GB_TGCLI_SAVE) == -1) {
+  if (GB_ASPRINTF(&exec, "%s && %s && %s", backstore, iqn,
+                  GB_TGCLI_SAVE) == -1) {
     goto out;
   }
 
@@ -1373,27 +1548,41 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
   struct dirent *entry;
   char *tmp = NULL;
   char *filelist = NULL;
-  int ret = -1;
+  json_object *json_obj = NULL;
+  json_object *json_array = NULL;
+  int errCode = 0;
+  char *errMsg = NULL;
 
 
-  glfs = glusterBlockVolumeInit(blk->volume);
+  if (GB_ALLOC(reply) < 0) {
+    return NULL;
+  }
+
+  if (blk->json_resp) {
+    json_obj = json_object_new_object();
+    json_array = json_object_new_array();
+  }
+
+  glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR,
         "glusterBlockVolumeInit(%s) failed", blk->volume);
-    goto out;
+    goto optfail;
   }
 
-  lkfd = glusterBlockCreateMetaLockFile(glfs, blk->volume);
+  lkfd = glusterBlockCreateMetaLockFile(glfs, blk->volume, &errCode, &errMsg);
   if (!lkfd) {
-    LOG("mgmt", GB_LOG_ERROR, "%s %s",
-        FAILED_CREATING_META, blk->volume);
-    goto out;
+    LOG("mgmt", GB_LOG_ERROR, "%s %s", FAILED_CREATING_META, blk->volume);
+    goto optfail;
   }
 
-  GB_METALOCK_OR_GOTO(lkfd, blk->volume, ret, out);
+  GB_METALOCK_OR_GOTO(lkfd, blk->volume, errCode, errMsg, optfail);
 
   tgmdfd = glfs_opendir (glfs, GB_METADIR);
   if (!tgmdfd) {
+    errCode = errno;
+    GB_ASPRINTF (&errMsg, "Not able to open metadata directory for volume "
+                 "%s[%s]", blk->volume, strerror(errCode));
     LOG("mgmt", GB_LOG_ERROR, "glfs_opendir(%s): on volume %s failed[%s]",
         GB_METADIR, blk->volume, strerror(errno));
     goto out;
@@ -1403,35 +1592,72 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
     if (strcmp(entry->d_name, ".") &&
        strcmp(entry->d_name, "..") &&
        strcmp(entry->d_name, "meta.lock")) {
-      if (asprintf(&filelist, "%s%s\n", (tmp==NULL?"":tmp),
-                   entry->d_name)  == -1) {
-        filelist = NULL;
+      if (blk->json_resp) {
+        json_object_array_add(json_array,
+                                    json_object_new_string(entry->d_name));
+      } else {
+        if (GB_ASPRINTF(&filelist, "%s%s\n", (tmp==NULL?"":tmp),
+                        entry->d_name)  == -1) {
+          filelist = NULL;
+          GB_FREE(tmp);
+          errCode = ENOMEM;
+          goto out;
+        }
         GB_FREE(tmp);
-        ret = -1;
-        goto out;
+        tmp = filelist;
       }
-      GB_FREE(tmp);
-      tmp = filelist;
     }
   }
 
-  ret = 0;
+  errCode = 0;
+
+  if (blk->json_resp)
+    json_object_object_add(json_obj, "blocks", json_array);
 
  out:
-  if (GB_ALLOC(reply) < 0) {
-    return NULL;
-  }
+  GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
-  reply->out = filelist? filelist:strdup("*Nil*\n");
-
+ optfail:
   if (tgmdfd && glfs_closedir (tgmdfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR, "glfs_closedir(%s): on volume %s failed[%s]",
         GB_METADIR, blk->volume, strerror(errno));
   }
 
-  GB_METAUNLOCK(lkfd, blk->volume, ret);
+  if (errCode < 0) {
+    errCode = 255;
+  }
+  reply->exit = errCode;
 
-  reply->exit = ret;
+  errCode = reply->exit;
+  if (blk->json_resp) {
+    if (errCode) {
+      json_object_object_add(json_obj, "RESULT",
+                             json_object_new_string("FAIL"));
+      json_object_object_add(json_obj, "errCode",
+                             json_object_new_int(errCode));
+      json_object_object_add(json_obj, "errMsg",
+                             json_object_new_string(errMsg));
+    } else {
+            json_object_object_add(json_obj, "RESULT",
+                                   json_object_new_string("SUCCESS"));
+    }
+    GB_ASPRINTF(&reply->out, "%s\n",
+                json_object_to_json_string_ext(json_obj,
+                                mapJsonFlagToJsonCstring(blk->json_resp)));
+    json_object_put(json_array);
+    json_object_put(json_obj);
+  } else {
+    if (errCode) {
+      if (errMsg) {
+        GB_ASPRINTF (&reply->out, "%s\n", errMsg);
+      } else {
+        GB_ASPRINTF (&reply->out, "Not able to complete operation "
+                     "successfully\n");
+      }
+    } else {
+      reply->out = filelist? filelist:strdup("*Nil*\n");
+    }
+  }
 
   if (lkfd && glfs_close(lkfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
@@ -1443,97 +1669,139 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
   return reply;
 }
 
+void
+block_info_cli_format_response(blockInfoCli *blk, int errCode,
+                               char *errMsg, MetaInfo *info,
+                               struct blockResponse *reply)
+{
+  json_object  *json_obj   = NULL;
+  json_object  *json_array = NULL;
+  char         *tmp        = NULL;
+  char         *out        = NULL;
+  int          i           = 0;
+
+  if (!reply) {
+    return;
+  }
+
+  if (errCode < 0) {
+    errCode = 255;
+  }
+  if (errMsg) {
+    block_format_error_response(blk->json_resp, errCode, errMsg, reply);
+    return;
+  }
+
+  if (blk->json_resp) {
+    json_obj = json_object_new_object();
+    json_object_object_add(json_obj, "NAME", json_object_new_string(blk->block_name));
+    json_object_object_add(json_obj, "VOLUME", json_object_new_string(info->volume));
+    json_object_object_add(json_obj, "GBID", json_object_new_string(info->gbid));
+    json_object_object_add(json_obj, "SIZE", json_object_new_int64(info->size));
+    json_object_object_add(json_obj, "HA", json_object_new_int(info->mpath));
+
+    json_array = json_object_new_array();
+
+    for (i = 0; i < info->nhosts; i++) {
+      if (blockMetaStatusEnumParse(info->list[i]->status) == GB_CONFIG_SUCCESS) {
+        json_object_array_add(json_array, json_object_new_string(info->list[i]->addr));
+      }
+    }
+
+    json_object_object_add(json_obj, "BLOCK CONFIG NODE(S)", json_array);
+
+    GB_ASPRINTF(&reply->out, "%s\n",
+                json_object_to_json_string_ext(json_obj,
+                                mapJsonFlagToJsonCstring(blk->json_resp)));
+    json_object_put(json_array);
+    json_object_put(json_obj);
+  } else {
+    if (GB_ASPRINTF(&tmp, "NAME: %s\nVOLUME: %s\nGBID: %s\nSIZE: %zu\n"
+          "HA: %zu\nBLOCK CONFIG NODE(S):",
+          blk->block_name, info->volume, info->gbid,
+          info->size, info->mpath) == -1) {
+      goto out;
+    }
+    for (i = 0; i < info->nhosts; i++) {
+      if (blockMetaStatusEnumParse(info->list[i]->status) == GB_CONFIG_SUCCESS) {
+        if (GB_ASPRINTF(&out, "%s %s", tmp, info->list[i]->addr) == -1) {
+          GB_FREE (tmp);
+          goto out;
+        }
+        tmp = out;
+      }
+    }
+    if (GB_ASPRINTF(&reply->out, "%s\n", tmp) == -1) {
+      GB_FREE (tmp);
+      goto out;
+    }
+    GB_FREE (tmp);
+  }
+ out:
+  return;
+}
 
 blockResponse *
 block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
 {
   blockResponse *reply;
-  char *out = NULL;
-  char *tmp = NULL;
   struct glfs *glfs;
   struct glfs_fd *lkfd = NULL;
   MetaInfo *info = NULL;
   int ret = -1;
-  size_t i;
+  int errCode = 0;
+  char *errMsg = NULL;
 
 
-  glfs = glusterBlockVolumeInit(blk->volume);
+  if ((GB_ALLOC(reply) < 0) || (GB_ALLOC(info) < 0)) {
+    GB_FREE (reply);
+    GB_FREE (info);
+    return NULL;
+  }
+
+  glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR,
         "glusterBlockVolumeInit(%s) for block %s failed",
         blk->volume, blk->block_name);
-    goto out;
+    goto optfail;
   }
 
-  lkfd = glusterBlockCreateMetaLockFile(glfs, blk->volume);
+  lkfd = glusterBlockCreateMetaLockFile(glfs, blk->volume, &errCode, &errMsg);
   if (!lkfd) {
     LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s",
         FAILED_CREATING_META, blk->volume, blk->block_name);
-    goto out;
+    goto optfail;
   }
 
-  GB_METALOCK_OR_GOTO(lkfd, blk->volume, ret, out);
+  GB_METALOCK_OR_GOTO(lkfd, blk->volume, errCode, errMsg, optfail);
 
-  if (GB_ALLOC(info) < 0) {
-    goto out;
-  }
-
-  ret = blockGetMetaInfo(glfs, blk->block_name, info);
+  ret = blockGetMetaInfo(glfs, blk->block_name, info, &errCode);
   if (ret) {
-    goto out;
-  }
-
-  if (asprintf(&tmp, "NAME: %s\nVOLUME: %s\nGBID: %s\nSIZE: %zu\n"
-                     "HA: %zu\nBLOCK CONFIG NODE(S):",
-               blk->block_name, info->volume, info->gbid,
-               info->size, info->mpath) == -1) {
-    ret = -1;
-    goto out;
-  }
-  for (i = 0; i < info->nhosts; i++) {
-    if (blockMetaStatusEnumParse(info->list[i]->status) == GB_CONFIG_SUCCESS) {
-      if (asprintf(&out, "%s %s", (tmp==NULL?"":tmp),
-                   info->list[i]->addr) == -1) {
-        out = NULL;
-        GB_FREE(tmp);
-        ret = -1;
-        goto out;
-      }
-      GB_FREE(tmp);
-      tmp = out;
+    if (errCode == ENOENT) {
+      GB_ASPRINTF (&errMsg, "block %s/%s doesn't exist", blk->volume,
+                   blk->block_name);
+    } else {
+      GB_ASPRINTF (&errMsg, "Not able to get metadata information for %s/%s[%s]",
+                   blk->volume, blk->block_name, strerror(errCode));
     }
-  }
-  if (asprintf(&out, "%s\n", tmp) == -1) {
-    ret = -1;
     goto out;
   }
-  ret = 0;
 
  out:
-  if (GB_ALLOC(reply) < 0) {
-    return NULL;
-  }
+  GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
 
-  if (!out) {
-    if (asprintf(&out, "No Block with name %s", blk->block_name) == -1) {
-      ret = -1;
-    }
-  }
-
-  reply->out = out;
-
-  GB_METAUNLOCK(lkfd, blk->volume, ret);
-
-  reply->exit = ret;
-
+ optfail:
   if (lkfd && glfs_close(lkfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR,
         "glfs_close(%s): on volume %s for block %s failed[%s]",
         GB_TXLOCKFILE, blk->volume, blk->block_name, strerror(errno));
   }
 
-  glfs_fini(glfs);
 
+  block_info_cli_format_response(blk, errCode, errMsg, info, reply);
+  glfs_fini(glfs);
+  GB_FREE(errMsg);
   blockFreeMetaInfo(info);
 
   return reply;

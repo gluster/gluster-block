@@ -46,6 +46,10 @@
 
 # define  FAILED_DEPENDENCY         "failed dependency, check if you have targetcli and tcmu-runner installed"
 
+# define FMT_WARN(fmt...) do { if (0) printf (fmt); } while (0)
+
+# define GB_ASPRINTF(ptr, fmt...) ({FMT_WARN (fmt);                 \
+                int __ret=asprintf(ptr, ##fmt);__ret;})
 
 # define LOCK(x)                                                     \
          do {                                                        \
@@ -86,26 +90,32 @@
               fclose(fd);                                            \
           } while (0)
 
-# define  GB_METALOCK_OR_GOTO(lkfd, volume, ret, label)              \
+# define  GB_METALOCK_OR_GOTO(lkfd, volume, errCode, errMsg, label)  \
           do {                                                       \
             struct flock lock = {0, };                               \
             lock.l_type = F_WRLCK;                                   \
             if (glfs_posix_lock (lkfd, F_SETLKW, &lock)) {           \
               LOG("mgmt", GB_LOG_ERROR, "glfs_posix_lock() on "      \
                   "volume %s failed[%s]", volume, strerror(errno));  \
-              ret = -1;                                              \
+              errCode = errno;                                       \
+              if (!errMsg) {                                         \
+                    GB_ASPRINTF (&errMsg, "Not able to acquire "     \
+                        "lock on %s[%s]", volume, strerror(errCode));\
+              }                                                      \
               goto label;                                            \
             }                                                        \
           } while (0)
 
 # define  GB_METAUPDATE_OR_GOTO(lock, glfs, fname,                   \
-                                volume, ret, label,...)              \
+                                volume, ret, errMsg, label,...)      \
           do {                                                       \
             char *write;                                             \
             struct glfs_fd *tgmfd;                                   \
             LOCK(lock);                                              \
             ret = glfs_chdir (glfs, GB_METADIR);                     \
             if (ret) {                                               \
+              GB_ASPRINTF(&errMsg, "Failed to update transaction log "\
+                "for %s/%s[%s]", volume, fname, strerror(errno));  \
               LOG("gfapi", GB_LOG_ERROR, "glfs_chdir(%s) on "        \
                   "volume %s failed[%s]", GB_METADIR, volume,        \
                   strerror(errno));                                  \
@@ -116,6 +126,8 @@
             tgmfd = glfs_creat(glfs, fname, O_WRONLY | O_APPEND,     \
                                S_IRUSR | S_IWUSR);                   \
             if (!tgmfd) {                                            \
+              GB_ASPRINTF(&errMsg, "Failed to update transaction log "\
+                "for %s/%s[%s]", volume, fname, strerror(errno));  \
               LOG("mgmt", GB_LOG_ERROR, "glfs_creat(%s): on "        \
                   "volume %s failed[%s]", fname, volume,             \
                   strerror(errno));                                  \
@@ -123,12 +135,14 @@
               ret = -1;                                              \
               goto label;                                            \
             }                                                        \
-            if (asprintf(&write, __VA_ARGS__) < 0) {                 \
+            if (GB_ASPRINTF(&write, __VA_ARGS__) < 0) {                 \
               UNLOCK(lock);                                          \
               ret = -1;                                              \
               goto label;                                            \
             }                                                        \
             if(glfs_write (tgmfd, write, strlen(write), 0) < 0) {    \
+              GB_ASPRINTF(&errMsg, "Failed to update transaction log "\
+                "for %s/%s[%s]", volume, fname, strerror(errno));  \
               LOG("mgmt", GB_LOG_ERROR, "glfs_write(%s): on "        \
                   "volume %s failed[%s]", fname, volume,             \
                   strerror(errno));                                  \
@@ -138,6 +152,8 @@
             }                                                        \
             GB_FREE(write);                                          \
             if (tgmfd && glfs_close(tgmfd) != 0) {                   \
+              GB_ASPRINTF(&errMsg, "Failed to update transaction log "\
+                "for %s/%s[%s]", volume, fname, strerror(errno));  \
               LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on "        \
                   "volume %s failed[%s]", fname, volume,             \
                   strerror(errno));                                  \
@@ -148,11 +164,15 @@
             UNLOCK(lock);                                            \
           } while (0)
 
-# define  GB_METAUNLOCK(lkfd, volume, ret)                           \
+# define  GB_METAUNLOCK(lkfd, volume, ret, errMsg)                   \
           do {                                                       \
             struct flock lock = {0, };                               \
             lock.l_type = F_UNLCK;                                   \
             if (glfs_posix_lock(lkfd, F_SETLK, &lock)) {             \
+              if (!errMsg) {                                         \
+                    GB_ASPRINTF (&errMsg, "Not able to acquire "     \
+                        "lock on %s[%s]", volume, strerror(errno));  \
+              }                                                      \
               LOG("mgmt", GB_LOG_ERROR, "glfs_posix_lock() on "      \
                   "volume %s failed[%s]", volume, strerror(errno));  \
               ret = -1;                                              \
