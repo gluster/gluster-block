@@ -291,6 +291,9 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
   case GB_META_ENTRYCREATE:
     strcpy(info->entry, strchr(line, ' ')+1);
     break;
+  case GB_META_PASSWD:
+    strcpy(info->passwd, strchr(line, ' ')+1);
+    break;
 
   default:
     if(!info->list) {

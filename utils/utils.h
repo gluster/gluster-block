@@ -37,6 +37,11 @@
 /* Target Info */
 # define  FAILED_INFO               "failed in info"
 
+/* Target Modify */
+# define  FAILED_MODIFY             "failed in modify"
+# define  FAILED_REMOTE_MODIFY      "failed in remote modify"
+# define  FAILED_REMOTE_AYNC_MODIFY "failed in remote async modify"
+
 /* Target Delete */
 # define  FAILED_DELETE             "failed in delete"
 # define  FAILED_REMOTE_DELETE      "failed in remote delete"
@@ -281,6 +286,7 @@ typedef enum Metakey {
   GB_META_HA          = 3,
   GB_META_ENTRYCREATE = 4,
   GB_META_ENTRYDELETE = 5,
+  GB_META_PASSWD      = 6,
 
   GB_METAKEY_MAX
 } Metakey;
@@ -292,30 +298,43 @@ static const char *const MetakeyLookup[] = {
   [GB_META_HA]          = "HA",
   [GB_META_ENTRYCREATE] = "ENTRYCREATE",
   [GB_META_ENTRYDELETE] = "ENTRYDELETE",
+  [GB_META_PASSWD]      = "PASSWORD",
 
   [GB_METAKEY_MAX]      = NULL
 };
 
 typedef enum MetaStatus {
-  GB_CONFIG_SUCCESS     = 0,
-  GB_CONFIG_FAIL        = 1,
-  GB_CONFIG_INPROGRESS  = 2,
-  GB_CLEANUP_SUCCESS    = 3,
-  GB_CLEANUP_FAIL       = 4,
-  GB_CLEANUP_INPROGRESS = 5,
+  GB_CONFIG_SUCCESS           = 0,
+  GB_CONFIG_FAIL              = 1,
+  GB_CONFIG_INPROGRESS        = 2,
+  GB_AUTH_ENFORCEING          = 3,
+  GB_AUTH_ENFORCED            = 4,
+  GB_AUTH_ENFORCE_FAIL        = 5,
+  GB_AUTH_CLEAR_ENFORCEING    = 6,
+  GB_AUTH_CLEAR_ENFORCED      = 7,
+  GB_AUTH_CLEAR_ENFORCE_FAIL  = 8,
+  GB_CLEANUP_SUCCESS          = 9,
+  GB_CLEANUP_FAIL             = 10,
+  GB_CLEANUP_INPROGRESS       = 11,
 
   GB_METASTATUS_MAX
 } MetaStatus;
 
 static const char *const MetaStatusLookup[] = {
-  [GB_CONFIG_SUCCESS]     = "CONFIGSUCCESS",
-  [GB_CONFIG_FAIL]        = "CONFIGFAIL",
-  [GB_CONFIG_INPROGRESS]  = "CONFIGINPROGRESS",
-  [GB_CLEANUP_INPROGRESS] = "CLEANUPINPROGRESS",
-  [GB_CLEANUP_SUCCESS]    = "CLEANUPSUCCESS",
-  [GB_CLEANUP_FAIL]       = "CLEANUPFAIL",
+  [GB_CONFIG_SUCCESS]           = "CONFIGSUCCESS",
+  [GB_CONFIG_FAIL]              = "CONFIGFAIL",
+  [GB_CONFIG_INPROGRESS]        = "CONFIGINPROGRESS",
+  [GB_AUTH_ENFORCEING]          = "AUTHENFORCEING",
+  [GB_AUTH_ENFORCED]            = "AUTHENFORCED",
+  [GB_AUTH_ENFORCE_FAIL]        = "AUTHENFORCEFAIL",
+  [GB_AUTH_CLEAR_ENFORCEING]    = "AUTHCLEARENFORCEING",
+  [GB_AUTH_CLEAR_ENFORCED]      = "AUTHCLEARENFORCED",
+  [GB_AUTH_CLEAR_ENFORCE_FAIL]  = "AUTHCLEARENFORCEFAIL",
+  [GB_CLEANUP_INPROGRESS]       = "CLEANUPINPROGRESS",
+  [GB_CLEANUP_SUCCESS]          = "CLEANUPSUCCESS",
+  [GB_CLEANUP_FAIL]             = "CLEANUPFAIL",
 
-  [GB_METASTATUS_MAX]     = NULL,
+  [GB_METASTATUS_MAX]           = NULL,
 };
 
 typedef enum RemoteCreateResp {

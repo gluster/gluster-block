@@ -79,11 +79,17 @@ sleep 1;
 # Block create
 TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 ${HOST} 1GiB
 
+# Modify Block with auth enable
+TEST gluster-block modify ${VOLNAME}/${BLKNAME} auth enable
+
 # Block list
 TEST gluster-block list ${VOLNAME}
 
 # Block info
 TEST gluster-block info ${VOLNAME}/${BLKNAME}
+
+# Modify Block with auth disable
+TEST gluster-block modify ${VOLNAME}/${BLKNAME} auth disable
 
 # Block delete
 gluster-block delete ${VOLNAME}/${BLKNAME}
@@ -93,10 +99,16 @@ echo -e "\n*** JSON responses ***\n"
 # Block create and expect json response
 TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 ${HOST} 1GiB --json-pretty
 
+# Modify Block with auth enable and expect json response
+TEST gluster-block modify ${VOLNAME}/${BLKNAME} auth enable --json-pretty
+
 # Block list and expect json response
 TEST gluster-block list ${VOLNAME} --json-pretty
 
 # Block info and expect json response
 TEST gluster-block info ${VOLNAME}/${BLKNAME} --json-pretty
+
+# Modify Block with auth disable and expect json response
+TEST gluster-block modify ${VOLNAME}/${BLKNAME} auth disable --json-pretty
 
 cleanup;

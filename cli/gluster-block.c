@@ -12,6 +12,7 @@
 # include  "common.h"
 # include  "block.h"
 # include  "config.h"
+# include  <ctype.h>
 
 
 
@@ -19,7 +20,8 @@ typedef enum clioperations {
   CREATE_CLI = 1,
   LIST_CLI   = 2,
   INFO_CLI   = 3,
-  DELETE_CLI = 4
+  DELETE_CLI = 4,
+  MODIFY_CLI = 5
 } clioperations;
 
 const char *argp_program_version = ""                                 \
@@ -36,6 +38,8 @@ const char *argp_program_version = ""                                 \
                            "[ha <count>] <HOST1[,HOST2,...]> <size> [--json*]"
 
 #define GB_DELETE_HELP_STR "gluster-block delete <volname/blockname> [--json*]"
+#define GB_MODIFY_HELP_STR "gluster-block modify <volname/blockname> "\
+                           "<auth enable|disable> [--json*]"
 #define GB_INFO_HELP_STR  "gluster-block info <volname/blockname> [--json*]"
 #define GB_LIST_HELP_STR  "gluster-block list <volname> [--json*]"
 
@@ -50,6 +54,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
   blockDeleteCli *delete_obj;
   blockInfoCli *info_obj;
   blockListCli *list_obj;
+  blockModifyCli *modify_obj;
   blockResponse *reply = NULL;
 
 
@@ -133,6 +138,15 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
       goto out;
     }
     break;
+  case MODIFY_CLI:
+    modify_obj = cobj;
+    reply = block_modify_cli_1(modify_obj, clnt);
+    if (!reply) {
+      LOG("cli", GB_LOG_ERROR, "%sblock modify on volume %s failed",
+          clnt_sperror(clnt, "block_modify_cli_1"), modify_obj->volume);
+      goto out;
+    }
+    break;
   }
 
   if (reply) {
@@ -180,6 +194,9 @@ glusterBlockHelp(void)
       "  delete  <volname/blockname>\n"
       "        delete block device.\n"
       "\n"
+      "  modify  <volname/blockname> <auth enable|disable>\n"
+      "        modify block device.\n"
+      "\n"
       "  help\n"
       "        show this message and exit.\n"
       "\n"
@@ -191,6 +208,116 @@ glusterBlockHelp(void)
       );
 }
 
+static bool
+glusterBlockIsNameAcceptable (char *name)
+{
+  int i = 0;
+  if (!name || strlen(name) == 0)
+    return FALSE;
+  for (i = 0; i < strlen(name); i++) {
+    if (!isalnum (name[i]) && (name[i] != '_') && (name[i] != '-'))
+      return FALSE;
+  }
+  return TRUE;
+}
+
+static int
+glusterBlockParseVolumeBlock(char *volumeblock, char *volume, char *block,
+                             char *helpstr, char *op)
+{
+  int ret = -1;
+  size_t len = 0;
+  char *sep = NULL;
+
+  /* part before '/' is the volume name */
+  sep = strchr(volumeblock, '/');
+  if (!sep) {
+    MSG("argument '<volname/blockname>'(%s) doesn't seems to be right",
+        volumeblock);
+    MSG("%s\n", helpstr);
+    LOG("cli", GB_LOG_ERROR, "%s failed while parsing <volname/blockname>", op);
+    goto out;
+  }
+  len = sep - volumeblock;
+  if (len >= 255 || strlen(sep+1) >= 255) {
+    MSG("%s\n", "Both volname and blockname should be less than 255 "
+        "characters long");
+    MSG("%s\n", helpstr);
+    LOG("cli", GB_LOG_ERROR, "%s failed while parsing <volname/blockname>", op);
+    goto out;
+  }
+  strncpy(volume, volumeblock, len);
+  /* part after / is blockname */
+  strncpy(block, sep+1, strlen(sep+1));
+  if (!glusterBlockIsNameAcceptable (volume)) {
+    MSG("volume name(%s) should contain only aplhanumeric,'-' "
+        "and '_' characters", volume);
+    goto out;
+  }
+  if (!glusterBlockIsNameAcceptable (block)) {
+    MSG("block name(%s) should contain only aplhanumeric,'-' "
+        "and '_' characters", block);
+    goto out;
+  }
+  ret = 0;
+ out:
+  return ret;
+}
+
+static int
+glusterBlockModify(int argcount, char **options, int json)
+{
+  size_t optind = 2;
+  blockModifyCli mobj = {0, };
+  int ret = -1;
+  char *out = NULL;
+
+  mobj.json_resp = json;
+  if (argcount != 5) {
+    MSG("%s\n", "Insufficient arguments for modify:");
+    MSG("%s\n", GB_MODIFY_HELP_STR);
+    return -1;
+  }
+
+  if (glusterBlockParseVolumeBlock (options[optind++], mobj.volume,
+                                    mobj.block_name, GB_MODIFY_HELP_STR,
+                                    "modify")) {
+    goto out;
+  }
+
+  /* if auth given then collect status which is next by 'auth' arg */
+  if (!strcmp(options[optind], "auth")) {
+    optind++;
+    if(strcmp (options[optind], "enable") == 0) {
+       mobj.auth_mode = 1;
+    } else if (strcmp (options[optind], "disable") == 0) {
+       mobj.auth_mode = 0;
+    } else {
+      MSG("%s\n", "argument to 'auth' doesn't seems to be right");
+      MSG("%s\n", GB_MODIFY_HELP_STR);
+      LOG("cli", GB_LOG_ERROR, "Modify failed while parsing argument "
+                               "to auth  for <%s/%s>",
+                               mobj.volume, mobj.block_name);
+      goto out;
+    }
+  }
+
+  ret = glusterBlockCliRPC_1(&mobj, MODIFY_CLI, &out);
+  if (ret) {
+    LOG("cli", GB_LOG_ERROR,
+        "failed getting info of block %s on volume %s",
+        mobj.block_name, mobj.volume);
+  }
+
+  if (out) {
+    MSG("%s", out);
+  }
+
+ out:
+  GB_FREE(out);
+
+  return ret;
+}
 
 static int
 glusterBlockCreate(int argcount, char **options, int json)
@@ -200,8 +327,6 @@ glusterBlockCreate(int argcount, char **options, int json)
   ssize_t sparse_ret;
   char *out = NULL;
   blockCreateCli cobj = {0, };
-  char *argcopy;
-  char *sep;
 
 
   cobj.json_resp = json;
@@ -214,24 +339,11 @@ glusterBlockCreate(int argcount, char **options, int json)
   /* default mpath */
   cobj.mpath = 1;
 
-  if (GB_STRDUP (argcopy, options[optind++]) < 0) {
+  if (glusterBlockParseVolumeBlock (options[optind++], cobj.volume,
+                                    cobj.block_name, GB_CREATE_HELP_STR,
+                                    "create")) {
     goto out;
   }
-  /* part before '/' is the volume name */
-  sep = strchr(argcopy, '/');
-  if (!sep) {
-    MSG("%s\n",
-        "first argument '<volname/blockname>' doesn't seems to be right");
-    MSG("%s\n", GB_CREATE_HELP_STR);
-    LOG("cli", GB_LOG_ERROR, "%s",
-        "create failed while parsing <volname/blockname>");
-    goto out;
-  }
-  *sep = '\0';
-  strcpy(cobj.volume, argcopy);
-
-  /* part after / is blockname */
-  strcpy(cobj.block_name, sep + 1);
 
   if (argcount - optind >= 2) {  /* atleast 2 needed */
     /* if ha given then collect count which is next by 'ha' arg */
@@ -280,7 +392,6 @@ glusterBlockCreate(int argcount, char **options, int json)
   }
 
  out:
-  GB_FREE(argcopy);
   GB_FREE(cobj.block_hosts);
   GB_FREE(out);
 
@@ -291,7 +402,7 @@ glusterBlockCreate(int argcount, char **options, int json)
 static int
 glusterBlockList(int argcount, char **options, int json)
 {
-  blockListCli cobj;
+  blockListCli cobj = {0};
   char *out = NULL;
   int ret = -1;
 
@@ -324,10 +435,8 @@ glusterBlockList(int argcount, char **options, int json)
 static int
 glusterBlockDelete(int argcount, char **options, int json)
 {
-  blockDeleteCli cobj;
+  blockDeleteCli cobj = {0};
   char *out = NULL;
-  char *argcopy;
-  char *sep;
   int ret = -1;
 
 
@@ -339,23 +448,11 @@ glusterBlockDelete(int argcount, char **options, int json)
   }
 
 
-  if (GB_STRDUP (argcopy, options[2]) < 0) {
+  if (glusterBlockParseVolumeBlock (options[2], cobj.volume,
+                                    cobj.block_name, GB_DELETE_HELP_STR,
+                                    "delete")) {
     goto out;
   }
-  /* part before '/' is the volume name */
-  sep = strchr(argcopy, '/');
-  if (!sep) {
-    MSG("%s\n", "argument '<volname/blockname>' doesn't seems to be right");
-    MSG("%s\n", GB_DELETE_HELP_STR);
-    LOG("cli", GB_LOG_ERROR, "%s",
-        "delete failed while parsing <volname/blockname>");
-    goto out;
-  }
-  *sep = '\0';
-  strcpy(cobj.volume, argcopy);
-
-  /* part after / is blockname */
-  strcpy(cobj.block_name, sep + 1);
 
   ret = glusterBlockCliRPC_1(&cobj, DELETE_CLI, &out);
   if (ret) {
@@ -368,7 +465,6 @@ glusterBlockDelete(int argcount, char **options, int json)
   }
 
  out:
-  GB_FREE(argcopy);
   GB_FREE(out);
 
   return ret;
@@ -378,10 +474,8 @@ glusterBlockDelete(int argcount, char **options, int json)
 static int
 glusterBlockInfo(int argcount, char **options, int json)
 {
-  blockInfoCli cobj;
+  blockInfoCli cobj = {0};
   char *out = NULL;
-  char *argcopy;
-  char *sep;
   int ret = -1;
 
 
@@ -393,23 +487,11 @@ glusterBlockInfo(int argcount, char **options, int json)
   }
 
 
-  if (GB_STRDUP (argcopy, options[2]) < 0) {
+  if (glusterBlockParseVolumeBlock (options[2], cobj.volume,
+                                    cobj.block_name, GB_INFO_HELP_STR,
+                                    "info")) {
     goto out;
   }
-  /* part before '/' is the volume name */
-  sep = strchr(argcopy, '/');
-  if (!sep) {
-    MSG("%s\n", "argument '<volname/blockname>' doesn't seems to be right");
-    MSG("%s\n", GB_INFO_HELP_STR);
-    LOG("cli", GB_LOG_ERROR, "%s",
-        "info failed while parsing <volname/blockname>");
-    goto out;
-  }
-  *sep = '\0';
-  strcpy(cobj.volume, argcopy);
-
-  /* part after / is blockname */
-  strcpy(cobj.block_name, sep + 1);
 
   ret = glusterBlockCliRPC_1(&cobj, INFO_CLI, &out);
   if (ret) {
@@ -423,7 +505,6 @@ glusterBlockInfo(int argcount, char **options, int json)
   }
 
  out:
-  GB_FREE(argcopy);
   GB_FREE(out);
 
   return ret;
@@ -479,7 +560,10 @@ glusterBlockParseArgs(int count, char **options)
       goto out;
 
     case GB_CLI_MODIFY:
-      MSG("option '%s' is not supported yet.\n", options[1]);
+      ret = glusterBlockModify(count, options, json);
+      if (ret) {
+        LOG("cli", GB_LOG_ERROR, "%s", FAILED_MODIFY);
+      }
       goto out;
 
     case GB_CLI_DELETE:

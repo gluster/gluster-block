@@ -34,6 +34,7 @@ typedef struct MetaInfo {
   size_t size;
   size_t mpath;
   char   entry[16];
+  char   passwd[38];
 
   size_t nhosts;
   NodeInfo **list;

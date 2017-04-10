@@ -22,6 +22,14 @@ struct blockCreate {
   char      block_name[255];
 };
 
+struct blockModify {
+  char      volume[255];
+  char      block_name[255];
+  char      gbid[127];
+  char      passwd[127];
+  bool      auth_mode;
+};
+
 struct blockCreateCli {
   char      volume[255];
   u_quad_t  size;
@@ -54,6 +62,13 @@ struct blockListCli {
   enum JsonResponseFormat     json_resp;
 };
 
+struct blockModifyCli {
+  char      block_name[255];
+  char      volume[255];
+  bool      auth_mode;
+  enum JsonResponseFormat     json_resp;
+};
+
 struct blockResponse {
   int       exit;       /* exit code of the command */
   string    out<>;      /* output; TODO: return respective objects */
@@ -65,6 +80,7 @@ program GLUSTER_BLOCK {
   version GLUSTER_BLOCK_VERS {
     blockResponse BLOCK_CREATE(blockCreate) = 1;
     blockResponse BLOCK_DELETE(blockDelete) = 2;
+    blockResponse BLOCK_MODIFY(blockModify) = 3;
   } = 1;
 } = 21215311; /* B2 L12 O15 C3 K11 */
 
@@ -74,5 +90,6 @@ program GLUSTER_BLOCK_CLI {
     blockResponse BLOCK_LIST_CLI(blockListCli) = 2;
     blockResponse BLOCK_INFO_CLI(blockInfoCli) = 3;
     blockResponse BLOCK_DELETE_CLI(blockDeleteCli) = 4;
+    blockResponse BLOCK_MODIFY_CLI(blockModifyCli) = 5;
   } = 1;
 } = 212153113; /* B2 L12 O15 C3 K11 C3 */
