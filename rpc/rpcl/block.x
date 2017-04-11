@@ -18,8 +18,10 @@ struct blockCreate {
   char      ipaddr[255];
   char      volume[255];
   char      gbid[127];                   /* uuid */
+  char      passwd[127];                 /* uuid */
   u_quad_t  size;
   char      block_name[255];
+  bool      auth_mode;
 };
 
 struct blockModify {
@@ -34,6 +36,7 @@ struct blockCreateCli {
   char      volume[255];
   u_quad_t  size;
   u_int     mpath;                /* HA request count */
+  bool      auth_mode;
   char      block_name[255];
   string    block_hosts<>;
   enum JsonResponseFormat     json_resp;

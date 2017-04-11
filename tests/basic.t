@@ -94,6 +94,12 @@ TEST gluster-block modify ${VOLNAME}/${BLKNAME} auth disable
 # Block delete
 gluster-block delete ${VOLNAME}/${BLKNAME}
 
+# Block create with auth set
+TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 auth enable ${HOST} 1GiB
+
+# Block delete
+TEST gluster-block delete ${VOLNAME}/${BLKNAME}
+
 echo -e "\n*** JSON responses ***\n"
 
 # Block create and expect json response
@@ -110,5 +116,11 @@ TEST gluster-block info ${VOLNAME}/${BLKNAME} --json-pretty
 
 # Modify Block with auth disable and expect json response
 TEST gluster-block modify ${VOLNAME}/${BLKNAME} auth disable --json-pretty
+
+# Block delete and expect json response
+TEST gluster-block delete ${VOLNAME}/${BLKNAME} --json-pretty
+
+# Block create with auth set and expect json response
+TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 auth enable ${HOST} 1GiB --json-pretty
 
 cleanup;

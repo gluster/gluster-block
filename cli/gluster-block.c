@@ -35,7 +35,8 @@ const char *argp_program_version = ""                                 \
   "in all cases as published by the Free Software Foundation.";
 
 #define GB_CREATE_HELP_STR "gluster-block create <volname/blockname> "\
-                           "[ha <count>] <HOST1[,HOST2,...]> <size> [--json*]"
+                           "[ha <count>] [auth enable|disable] "\
+                           "<HOST1[,HOST2,...]> <size> [--json*]"
 
 #define GB_DELETE_HELP_STR "gluster-block delete <volname/blockname> [--json*]"
 #define GB_MODIFY_HELP_STR "gluster-block modify <volname/blockname> "\
@@ -182,7 +183,7 @@ glusterBlockHelp(void)
       "  gluster-block <command> <volname[/blockname]> [<args>] [--json*]\n"
       "\n"
       "commands:\n"
-      "  create  <volname/blockname> [ha <count>] <host1[,host2,...]> <size>\n"
+      "  create  <volname/blockname> [ha <count>] [auth enable|disable] <host1[,host2,...]> <size>\n"
       "        create block device.\n"
       "\n"
       "  list    <volname>\n"
@@ -350,6 +351,26 @@ glusterBlockCreate(int argcount, char **options, int json)
     if (!strcmp(options[optind], "ha")) {
       optind++;
       sscanf(options[optind++], "%u", &cobj.mpath);
+    }
+  }
+
+  if (argcount - optind >= 2) {  /* atleast 2 needed */
+    /* if auth given then collect boolean which is next by 'auth' arg */
+    if (!strcmp(options[optind], "auth")) {
+      optind++;
+      if(strcmp (options[optind], "enable") == 0) {
+         cobj.auth_mode = 1;
+      } else if (strcmp (options[optind], "disable") == 0) {
+         cobj.auth_mode = 0;
+      } else {
+        MSG("%s\n", "argument to 'auth' doesn't seems to be right");
+        MSG("%s\n", GB_CREATE_HELP_STR);
+        LOG("cli", GB_LOG_ERROR, "Create failed while parsing argument "
+                                 "to auth  for <%s/%s>",
+                                 cobj.volume, cobj.block_name);
+        goto out;
+      }
+      optind++;
     }
   }
 
