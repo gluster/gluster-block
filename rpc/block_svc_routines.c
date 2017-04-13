@@ -28,7 +28,9 @@
 # define   GB_TGCLI_GLFS_CHECK  GB_TGCLI_GLFS " ls > " DEVNULLPATH
 # define   GB_TGCLI_CHECK       GB_TGCLI_GLFS " ls | grep ' %s ' > " DEVNULLPATH
 # define   GB_TGCLI_ISCSI       "targetcli /iscsi"
-# define   GB_TGCLI_GLOBALS     "targetcli set global auto_add_default_portal=false > " DEVNULLPATH
+# define   GB_TGCLI_GLOBALS     "targetcli set "                        \
+                                "global auto_add_default_portal=false " \
+                                "logfile=" CONFIGSHELL_LOG_FILE " > " DEVNULLPATH
 # define   GB_TGCLI_SAVE        "targetcli / saveconfig > " DEVNULLPATH
 # define   GB_TGCLI_ATTRIBUTES  "generate_node_acls=1 demo_mode_write_protect=0 > " DEVNULLPATH
 # define   GB_TGCLI_IQN_PREFIX  "iqn.2016-12.org.gluster-block:"
