@@ -21,6 +21,7 @@ struct blockCreate {
   char      passwd[127];                 /* uuid */
   u_quad_t  size;
   char      block_name[255];
+  string    block_hosts<>;               /* for multiple tpg's creation */
   bool      auth_mode;
 };
 

@@ -32,19 +32,22 @@
 # define   GB_TGCLI_ISCSI       "targetcli /iscsi"
 # define   GB_TGCLI_GLOBALS     "targetcli set "                        \
                                 "global auto_add_default_portal=false " \
+                                "auto_enable_tpgt=false "               \
                                 "logfile=" CONFIGSHELL_LOG_FILE " > " DEVNULLPATH
 # define   GB_TGCLI_SAVE        "targetcli / saveconfig > " DEVNULLPATH
 # define   GB_TGCLI_ATTRIBUTES  "generate_node_acls=1 demo_mode_write_protect=0 > " DEVNULLPATH
 # define   GB_TGCLI_IQN_PREFIX  "iqn.2016-12.org.gluster-block:"
 
-
+# define   GB_JSON_OBJ_TO_STR(x) json_object_new_string(x?x:"")
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 typedef enum operations {
   CREATE_SRV = 1,
-  DELETE_SRV = 2,
-  MODIFY_SRV = 3
+  DELETE_SRV,
+  MODIFY_SRV,
+  LIST_SRV,
+  INFO_SRV
 } operations;
 
 
@@ -75,9 +78,6 @@ typedef struct blockRemoteDeleteResp {
 typedef struct blockRemoteCreateResp {
   char *backend_size;
   char *iqn;
-  char *tpg_no;
-  char *lun_no;
-  char *port;
   size_t nportal;
   char **portal;
   blockRemoteDeleteResp *obj;
@@ -119,6 +119,38 @@ getLastWordNoDot(char *line)
 }
 
 
+void
+removeDuplicateSubstr(char **line)
+{
+  char *temp = *line;
+  char *out;
+  char *element;
+
+
+  if (!temp) {
+    return;
+  }
+
+  /* Allocate size for out. */
+  if (GB_ALLOC_N(out, strlen(temp)) < 0) {
+    return;
+  }
+
+  /* Split string into tokens */
+  element = strtok(temp, " ");
+  while (element) {
+    if (!strstr(out, element)) {
+      strcat(out, element);
+      strcat(out, " ");
+    }
+    element = strtok(NULL, " ");
+  }
+
+  GB_FREE(*line);
+  *line = out;
+}
+
+
 static int
 mapJsonFlagToJsonCstring(int jsonflag)
 {
@@ -151,9 +183,6 @@ blockCreateParsedRespFree(blockRemoteCreateResp *savereply)
 
   GB_FREE(savereply->backend_size);
   GB_FREE(savereply->iqn);
-  GB_FREE(savereply->tpg_no);
-  GB_FREE(savereply->lun_no);
-  GB_FREE(savereply->port);
 
   for (i = 0; i < savereply->nportal; i++) {
     GB_FREE(savereply->portal[i]);
@@ -208,25 +237,9 @@ blockRemoteCreateRespParse(char *output /* create output on one node */,
       }
       break;
     case GB_TPG_NO_RESP:
-      if (!local->tpg_no) {
-        if (GB_STRDUP(local->tpg_no, getLastWordNoDot(line)) < 0) {
-          goto out;
-        }
-      }
-      break;
     case GB_LUN_NO_RESP:
-      if (!local->lun_no) {
-        if (GB_STRDUP(local->lun_no, getLastWordNoDot(line)) < 0) {
-          goto out;
-        }
-      }
-      break;
     case GB_IP_PORT_RESP:
-      if (!local->port) {
-        if (GB_STRDUP(local->port, getLastWordNoDot(line)) < 0) {
-          goto out;
-        }
-      }
+      /* Not needed as reponse doesn't need them now. */
       break;
     case GB_PORTAL_RESP:
       if (!local->nportal) {
@@ -344,6 +357,9 @@ glusterBlockCallRPC_1(char *host, void *cobj,
       goto out;
     }
     break;
+  case LIST_SRV:
+  case INFO_SRV:
+      goto out;
   }
 
   if (reply) {
@@ -448,6 +464,7 @@ void *
 glusterBlockCreateRemote(void *data)
 {
   int ret;
+  int saveret;
   blockRemoteObj *args = (blockRemoteObj *)data;
   blockCreate cobj = *(blockCreate *)args->obj;
   char *errMsg = NULL;
@@ -458,7 +475,9 @@ glusterBlockCreateRemote(void *data)
 
   ret = glusterBlockCallRPC_1(args->addr, &cobj, CREATE_SRV, &args->reply);
   if (ret) {
+    saveret = ret;
     if (errno == ENETUNREACH || errno == ECONNREFUSED  || errno == ETIMEDOUT) {
+      GB_ASPRINTF(&errMsg, ": %s", strerror(errno));
       LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on"
           "host %s volume %s", strerror(errno), FAILED_REMOTE_CREATE,
           cobj.block_name, args->addr, args->volume);
@@ -476,6 +495,8 @@ glusterBlockCreateRemote(void *data)
                           ret, errMsg, out, "%s: CONFIGFAIL\n", args->addr);
     LOG("mgmt", GB_LOG_ERROR, "%s for block %s on host %s volume %s",
         FAILED_REMOTE_CREATE, cobj.block_name, args->addr, args->volume);
+
+    ret = saveret;
     goto out;
   }
 
@@ -490,7 +511,7 @@ glusterBlockCreateRemote(void *data)
   if (!args->reply) {
     if (GB_ASPRINTF(&args->reply, "failed to configure on %s %s\n", args->addr,
                     errMsg?errMsg:"") == -1) {
-      ret = -1;
+      ret = ret?ret:-1;
     }
   }
   args->exit = ret;
@@ -537,6 +558,7 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
   }
 
   for (i = 0; i < mpath; i++) {
+    /* TODO: use glusterBlockCollectAttemptSuccess */
     ret = blockRemoteCreateRespParse(args[i].reply, savereply);
     if (ret) {
       goto out;
@@ -545,6 +567,7 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
 
   ret = 0;
   for (i = 0; i < mpath; i++) {
+    /* this means in oneof the nodes dependency package not installed*/
     if (args[i].exit == EKEYEXPIRED) {
       ret = EKEYEXPIRED;
       goto out; /* important to catch */
@@ -565,6 +588,7 @@ void *
 glusterBlockDeleteRemote(void *data)
 {
   int ret;
+  int saveret;
   blockRemoteObj *args = (blockRemoteObj *)data;
   blockDelete dobj = *(blockDelete *)args->obj;
   char *errMsg = NULL;
@@ -572,8 +596,10 @@ glusterBlockDeleteRemote(void *data)
 
   GB_METAUPDATE_OR_GOTO(lock, args->glfs, dobj.block_name, args->volume,
                         ret, errMsg, out, "%s: CLEANUPINPROGRESS\n", args->addr);
+
   ret = glusterBlockCallRPC_1(args->addr, &dobj, DELETE_SRV, &args->reply);
   if (ret) {
+    saveret = ret;
     if (errno == ENETUNREACH || errno == ECONNREFUSED  || errno == ETIMEDOUT) {
       LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on"
           "host %s volume %s", strerror(errno), FAILED_REMOTE_DELETE,
@@ -592,6 +618,8 @@ glusterBlockDeleteRemote(void *data)
                           ret, errMsg, out, "%s: CLEANUPFAIL\n", args->addr);
     LOG("mgmt", GB_LOG_ERROR, "%s for block %s on host %s volume %s",
         FAILED_REMOTE_DELETE, dobj.block_name, args->addr, args->volume);
+
+    ret = saveret;;
     goto out;
   }
   GB_METAUPDATE_OR_GOTO(lock, args->glfs, dobj.block_name, args->volume,
@@ -601,7 +629,7 @@ glusterBlockDeleteRemote(void *data)
   if (!args->reply) {
     if (GB_ASPRINTF(&args->reply, "failed to delete config on %s %s",
                     args->addr, errMsg?errMsg:"") == -1) {
-      ret = -1;
+      ret = ret?ret:-1;
     }
   }
   GB_FREE(errMsg);
@@ -629,9 +657,10 @@ glusterBlockDeleteFillArgs(MetaInfo *info, bool deleteall, blockRemoteObj *args,
     case GB_AUTH_CLEAR_ENFORCE_FAIL:
       if (!deleteall)
         break;
+    case GB_CONFIG_INPROGRESS:
+    case GB_CONFIG_FAIL:
     case GB_CLEANUP_INPROGRESS:
     case GB_CLEANUP_FAIL:
-    case GB_CONFIG_FAIL:
       if (args) {
         args[count].glfs = glfs;
         args[count].obj = (void *)dobj;
@@ -647,8 +676,8 @@ glusterBlockDeleteFillArgs(MetaInfo *info, bool deleteall, blockRemoteObj *args,
 
 
 static int
-glusterBlockCollectAttemptSuccess (blockRemoteObj *args, size_t count,
-                                   char **attempt, char **success)
+glusterBlockCollectAttemptSuccess(blockRemoteObj *args, size_t count,
+                                  char **attempt, char **success)
 {
   char *a_tmp = NULL;
   char *s_tmp = NULL;
@@ -769,9 +798,11 @@ void *
 glusterBlockModifyRemote(void *data)
 {
   int ret;
+  int saveret;
   blockRemoteObj *args = (blockRemoteObj *)data;
   blockModify cobj = *(blockModify *)args->obj;
   char *errMsg = NULL;
+
 
   GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
                         ret, errMsg, out, "%s: AUTH%sENFORCEING\n", args->addr,
@@ -779,6 +810,7 @@ glusterBlockModifyRemote(void *data)
 
   ret = glusterBlockCallRPC_1(args->addr, &cobj, MODIFY_SRV, &args->reply);
   if (ret) {
+    saveret = ret;
     if (errno == ENETUNREACH || errno == ECONNREFUSED  || errno == ETIMEDOUT) {
       LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on"
           "host %s volume %s", strerror(errno), FAILED_REMOTE_MODIFY,
@@ -798,6 +830,8 @@ glusterBlockModifyRemote(void *data)
                           args->addr, cobj.auth_mode?"":"CLEAR");
     LOG("mgmt", GB_LOG_ERROR, "%s for block %s on host %s volume %s",
         FAILED_REMOTE_MODIFY, cobj.block_name, args->addr, args->volume);
+
+    ret = saveret;
     goto out;
   }
 
@@ -809,7 +843,7 @@ glusterBlockModifyRemote(void *data)
   if (!args->reply) {
     if (GB_ASPRINTF(&args->reply, "failed to configure auth on %s %s",
                  args->addr, errMsg?errMsg:"") == -1) {
-      ret = -1;
+      ret = ret?ret:-1;
     }
   }
   GB_FREE(errMsg);
@@ -852,7 +886,7 @@ glusterBlockModifyArgsFill(blockModify *mobj, MetaInfo *info,
         args[count].glfs = glfs;
         args[count].obj = (void *)mobj;
         args[count].addr = info->list[i]->addr;
-    }
+      }
       count++;
     }
     fill = FALSE;
@@ -1139,22 +1173,26 @@ glusterBlockAuditRequest(struct glfs *glfs,
 }
 
 void
-blockFormatErrorResponse (int json_resp, int errCode, char *errMsg,
-                          struct blockResponse *reply)
+blockFormatErrorResponse (operations op, int json_resp, int errCode,
+                          char *errMsg, struct blockResponse *reply)
 {
   json_object *json_obj = NULL;
   reply->exit = errCode;
   if (json_resp) {
     json_obj = json_object_new_object();
-    json_object_object_add(json_obj, "RESULT", json_object_new_string("FAIL"));
+    json_object_object_add(json_obj, "RESULT", GB_JSON_OBJ_TO_STR("FAIL"));
     json_object_object_add(json_obj, "errCode", json_object_new_int(errCode));
-    json_object_object_add(json_obj, "errMsg", json_object_new_string(errMsg));
+    json_object_object_add(json_obj, "errMsg", GB_JSON_OBJ_TO_STR(errMsg));
     GB_ASPRINTF(&reply->out, "%s\n",
                 json_object_to_json_string_ext(json_obj,
                                      mapJsonFlagToJsonCstring(json_resp)));
     json_object_put(json_obj);
   } else {
-    GB_ASPRINTF (&reply->out, "%s\nRESULT:FAIL\n", errMsg);
+    if (op != INFO_SRV) {
+      GB_ASPRINTF (&reply->out, "%s\nRESULT:FAIL\n", errMsg);
+    } else {
+      GB_ASPRINTF (&reply->out, "%s\n", errMsg);
+    }
   }
 }
 
@@ -1172,7 +1210,7 @@ blockStr2arrayAddToJsonObj (json_object *json_obj, char *string, char *label,
   tmp = strtok (string, " ");
   while (tmp != NULL)
   {
-    json_object_array_add(json_array1, json_object_new_string(tmp));
+    json_object_array_add(json_array1, GB_JSON_OBJ_TO_STR(tmp));
     tmp = strtok (NULL, " ");
   }
   json_object_object_add(json_obj, label, json_array1);
@@ -1202,45 +1240,51 @@ blockModifyCliFormatResponse (blockModifyCli *blk, struct blockModify *mobj,
   }
 
   if (errMsg) {
-    blockFormatErrorResponse(blk->json_resp, errCode, errMsg, reply);
+    blockFormatErrorResponse(MODIFY_SRV, blk->json_resp, errCode,
+                             errMsg, reply);
     return;
   }
 
   if (blk->json_resp) {
     json_obj = json_object_new_object();
 
-    blockStr2arrayAddToJsonObj (json_obj, savereply->attempt, "FAILED ON",
-                                &json_array[0]);
+    GB_ASPRINTF(&tmp, "%s%s", GB_TGCLI_IQN_PREFIX, info->gbid);
+    json_object_object_add(json_obj, "IQN",
+                           GB_JSON_OBJ_TO_STR(tmp?tmp:""));
+    if (!errCode && mobj->auth_mode) {
+      json_object_object_add(json_obj, "USERNAME",
+                             GB_JSON_OBJ_TO_STR(info->gbid));
+      json_object_object_add(json_obj, "PASSWORD",
+                             GB_JSON_OBJ_TO_STR(mobj->passwd));
+    }
+
+    if (savereply->attempt) {
+      blockStr2arrayAddToJsonObj(json_obj, savereply->attempt, "FAILED ON",
+                                 &json_array[0]);
+    }
 
     if (savereply->success) {
-      blockStr2arrayAddToJsonObj (json_obj, savereply->success,
-                                  "SUCCESSFUL ON", &json_array[1]);
-      tmp = NULL;
+      blockStr2arrayAddToJsonObj(json_obj, savereply->success,
+                                 "SUCCESSFUL ON", &json_array[1]);
+    }
 
-      GB_ASPRINTF(&tmp, "%s%s", GB_TGCLI_IQN_PREFIX, info->gbid);
-      json_object_object_add(json_obj, "IQN",
-                             json_object_new_string(tmp?tmp:""));
-      if (mobj->auth_mode) {
-        json_object_object_add(json_obj, "USERNAME",
-                               json_object_new_string(info->gbid));
-        json_object_object_add(json_obj, "PASSWORD",
-                               json_object_new_string(mobj->passwd));
+    if (rollback) {
+      if (savereply->rb_attempt) {
+        blockStr2arrayAddToJsonObj(json_obj, savereply->rb_attempt,
+                                   "ROLLBACK FAILED ON", &json_array[2]);
+      }
+
+      if (savereply->rb_success) {
+        blockStr2arrayAddToJsonObj(json_obj, savereply->rb_success,
+                                   "ROLLBACK SUCCESS ON", &json_array[3]);
       }
     }
 
     json_object_object_add(json_obj, "RESULT",
-      errCode?json_object_new_string("FAIL"):json_object_new_string("SUCCESS"));
-
-    if (rollback) {
-      blockStr2arrayAddToJsonObj (json_obj, savereply->rb_attempt,
-                                  "ROLLBACK FAILED ON", &json_array[2]);
-
-      blockStr2arrayAddToJsonObj (json_obj, savereply->rb_success,
-                                  "ROLLBACK SUCCESS ON", &json_array[3]);
-    }
+      errCode?GB_JSON_OBJ_TO_STR("FAIL"):GB_JSON_OBJ_TO_STR("SUCCESS"));
 
     GB_ASPRINTF(&reply->out, "%s\n", json_object_to_json_string_ext(json_obj,
-                                mapJsonFlagToJsonCstring(blk->json_resp)));
+                                     mapJsonFlagToJsonCstring(blk->json_resp)));
 
     for (i = 0; i < 4; i++) {
       if (json_array[i]) {
@@ -1250,22 +1294,23 @@ blockModifyCliFormatResponse (blockModifyCli *blk, struct blockModify *mobj,
     json_object_put(json_obj);
   } else {
     /* save 'failed on'*/
-    if (savereply->attempt)
+    if (savereply->attempt) {
       GB_ASPRINTF(&tmp, "FAILED ON: %s\n", savereply->attempt);
-
-    if (savereply->success) {
-      if (mobj->auth_mode) {
-        GB_ASPRINTF(&tmp2, "%s\nIQN: %s%s\nUSERNAME: %s\nPASSWORD: %s",
-            savereply->success, GB_TGCLI_IQN_PREFIX, info->gbid,
-            info->gbid, mobj->passwd);
-      } else {
-        GB_ASPRINTF(&tmp2, "%s\nIQN: %s%s",
-            savereply->success, GB_TGCLI_IQN_PREFIX, info->gbid);
-      }
     }
 
-    GB_ASPRINTF(&tmp3, "%sSUCCESSFUL ON: %s\n" "RESULT: %s\n", tmp?tmp:"",
-          savereply->success?tmp2:"None", errCode?"FAIL":"SUCCESS");
+    if (savereply->success) {
+      GB_ASPRINTF(&tmp2, "SUCCESSFUL ON: %s\n", savereply->success);
+    }
+
+    if (!errCode && mobj->auth_mode) {
+      GB_ASPRINTF(&tmp3, "IQN: %s%s\nUSERNAME: %s\nPASSWORD: %s\n%s%s",
+                  GB_TGCLI_IQN_PREFIX, info->gbid,
+                  info->gbid, mobj->passwd, tmp?tmp:"", tmp2?tmp2:"");
+    } else {
+      GB_ASPRINTF(&tmp3, "IQN: %s%s\n%s%s",
+                  GB_TGCLI_IQN_PREFIX, info->gbid,
+                  tmp?tmp:"", tmp2?tmp2:"");
+    }
 
     GB_FREE(tmp);
     GB_FREE(tmp2);
@@ -1275,12 +1320,12 @@ blockModifyCliFormatResponse (blockModifyCli *blk, struct blockModify *mobj,
         GB_ASPRINTF(&tmp, "ROLLBACK FAILED ON: %s\n", savereply->rb_attempt);
       }
       if (savereply->rb_success) {
-        GB_ASPRINTF(&tmp2, "ROLLBACK SUCCESS ON: %s\n", savereply->rb_attempt);
+        GB_ASPRINTF(&tmp2, "ROLLBACK SUCCESS ON: %s\n", savereply->rb_success);
       }
     }
 
-    GB_ASPRINTF(&reply->out, "%s%s%s", tmp3, savereply->rb_attempt?tmp:"",
-                 savereply->rb_success?tmp2:"");
+    GB_ASPRINTF(&reply->out, "%s%s%sRESULT: %s\n", tmp3, savereply->rb_attempt?tmp:"",
+                savereply->rb_success?tmp2:"", errCode?"FAIL":"SUCCESS");
     GB_FREE(tmp2);
     GB_FREE(tmp3);
   }
@@ -1299,7 +1344,7 @@ block_modify_cli_1_svc(blockModifyCli *blk, struct svc_req *rqstp)
   MetaInfo *info = NULL;
   uuid_t uuid;
   char passwd[UUID_BUF_SIZE];
-  int asyncret;
+  int asyncret = 0;
   bool rollback = false;
   int errCode = 0;
   char *errMsg = NULL;
@@ -1368,31 +1413,45 @@ block_modify_cli_1_svc(blockModifyCli *blk, struct svc_req *rqstp)
 
   asyncret = glusterBlockModifyRemoteAsync(info, glfs, &mobj,
                                            &savereply, rollback);
-  if (asyncret) {
+  if (asyncret) {   /* asyncret decides result is success/fail */
     LOG("mgmt", GB_LOG_WARNING,
         "glusterBlockModifyRemoteAsync(auth=%d): return %d %s for block %s on volume %s",
         blk->auth_mode, asyncret, FAILED_REMOTE_AYNC_MODIFY, blk->block_name, info->volume);
+
     /* Unwind by removing authentication */
     if (blk->auth_mode) {
       GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
                           ret, errMsg, out, "PASSWORD: \n");
     }
 
+    /* Collect new Meta status */
+    blockFreeMetaInfo(info);
+    if (GB_ALLOC(info) < 0) {
+      goto out;
+    }
+    ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
+    if (ret) {
+      goto out;
+    }
+
     /* toggle */
     mobj.auth_mode = !mobj.auth_mode;
 
     rollback = true;
+
     /* undo */
-    asyncret = glusterBlockModifyRemoteAsync(info, glfs, &mobj,
+    ret = glusterBlockModifyRemoteAsync(info, glfs, &mobj,
                                              &savereply, rollback);
-    if (asyncret) {
+    if (ret) {
       LOG("mgmt", GB_LOG_WARNING,
           "glusterBlockModifyRemoteAsync(auth=%d): on rollback return %d %s "
-          "for block %s on volume %s",  blk->auth_mode, asyncret, FAILED_REMOTE_AYNC_MODIFY,
+          "for block %s on volume %s",  blk->auth_mode, ret, FAILED_REMOTE_AYNC_MODIFY,
           blk->block_name, info->volume);
       /* do nothing ? */
     }
   }
+
+  ret = 0;
 
  out:
   if (ret == EKEYEXPIRED) {
@@ -1410,8 +1469,9 @@ block_modify_cli_1_svc(blockModifyCli *blk, struct svc_req *rqstp)
   }
 
  initfail:
-  blockModifyCliFormatResponse (blk, &mobj, errCode, errMsg, savereply, info,
-                                reply, rollback);
+  blockModifyCliFormatResponse (blk, &mobj, asyncret?asyncret:errCode,
+                                errMsg, savereply, info, reply, rollback);
+  blockFreeMetaInfo(info);
   glfs_fini(glfs);
 
   if (savereply) {
@@ -1432,7 +1492,8 @@ blockCreateCliFormatResponse(blockCreateCli *blk, struct blockCreate *cobj,
                              struct blockResponse *reply)
 {
   json_object *json_obj = NULL;
-  json_object *json_array = NULL;
+  json_object *json_array1 = NULL;
+  json_object *json_array2 = NULL;
   char         *tmp      = NULL;
   char         *tmp2     = NULL;
   char         *portals  = NULL;
@@ -1447,62 +1508,67 @@ blockCreateCliFormatResponse(blockCreateCli *blk, struct blockCreate *cobj,
   }
 
   if (errMsg) {
-    blockFormatErrorResponse(blk->json_resp, errCode, errMsg, reply);
+    blockFormatErrorResponse(CREATE_SRV, blk->json_resp, errCode,
+                             errMsg, reply);
     return;
+  }
+
+  if (savereply->obj->d_success || savereply->obj->d_attempt) {
+    removeDuplicateSubstr(&savereply->obj->d_success);
+    removeDuplicateSubstr(&savereply->obj->d_attempt);
   }
 
   if (blk->json_resp) {
     json_obj = json_object_new_object();
     json_object_object_add(json_obj, "IQN",
-                           json_object_new_string(savereply->iqn));
-    if (blk->auth_mode) {
+                           GB_JSON_OBJ_TO_STR(savereply->iqn));
+    if (blk->auth_mode && savereply->iqn) {
       json_object_object_add(json_obj, "USERNAME",
-                             json_object_new_string(cobj->gbid));
+                             GB_JSON_OBJ_TO_STR(cobj->gbid));
       json_object_object_add(json_obj, "PASSWORD",
-                             json_object_new_string(cobj->passwd));
+                             GB_JSON_OBJ_TO_STR(cobj->passwd));
     }
 
-    json_array = json_object_new_array();
+    json_array1 = json_object_new_array();
 
     for (i = 0; i < savereply->nportal; i++) {
-      json_object_array_add(json_array,
-                            json_object_new_string(savereply->portal[i]));
+      json_object_array_add(json_array1,
+                            GB_JSON_OBJ_TO_STR(savereply->portal[i]));
     }
 
-    json_object_object_add(json_obj, "PORTAL(S)", json_array);
+    json_object_object_add(json_obj, "PORTAL(S)", json_array1);
 
     if (savereply->obj->d_attempt || savereply->obj->d_success) {
-      json_object_put(json_array);
-      json_array = json_object_new_array();
+      json_array2 = json_object_new_array();
 
       if (savereply->obj->d_attempt) {
         tmp = strtok (savereply->obj->d_attempt, " ");
         while (tmp!= NULL)
         {
-          json_object_array_add(json_array, json_object_new_string(tmp));
+          json_object_array_add(json_array2, GB_JSON_OBJ_TO_STR(tmp));
           tmp = strtok (NULL, " ");
         }
       }
 
       if (savereply->obj->d_success) {
         tmp = strtok (savereply->obj->d_success, " ");
-        while (tmp!= NULL)
-        {
-          json_object_array_add(json_array, json_object_new_string(tmp));
+        while (tmp!= NULL) {
+          json_object_array_add(json_array2, GB_JSON_OBJ_TO_STR(tmp));
           tmp = strtok (NULL, " ");
         }
       }
       tmp = NULL;
-      json_object_object_add(json_obj, "ROLLBACK ON", json_array);
+      json_object_object_add(json_obj, "ROLLBACK ON", json_array2);
     }
 
     json_object_object_add(json_obj, "RESULT",
-      errCode?json_object_new_string("FAIL"):json_object_new_string("SUCCESS"));
+      errCode?GB_JSON_OBJ_TO_STR("FAIL"):GB_JSON_OBJ_TO_STR("SUCCESS"));
 
     GB_ASPRINTF(&reply->out, "%s\n",
                 json_object_to_json_string_ext(json_obj,
                                      mapJsonFlagToJsonCstring(blk->json_resp)));
-    json_object_put(json_array);
+    json_object_put(json_array1);
+    json_object_put(json_array2);
     json_object_put(json_obj);
   } else {
     for (i = 0; i < savereply->nportal; i++) {
@@ -1524,7 +1590,8 @@ blockCreateCliFormatResponse(blockCreateCli *blk, struct blockCreate *cobj,
       }
     }
 
-    if (blk->auth_mode) {
+    /* if savereply->iqn==NULL no point in printing auth */
+    if (blk->auth_mode && savereply->iqn) {
       if (GB_ASPRINTF(&tmp2, "USERNAME: %s\nPASSWORD: %s\n",
                       cobj->gbid, cobj->passwd) == 1) {
         goto out;
@@ -1532,7 +1599,8 @@ blockCreateCliFormatResponse(blockCreateCli *blk, struct blockCreate *cobj,
     }
 
     GB_ASPRINTF(&reply->out, "IQN: %s\n%sPORTAL(S): %s\n%sRESULT: %s\n",
-                savereply->iqn, blk->auth_mode?tmp2:"", portals, tmp?tmp:"",
+                savereply->iqn?savereply->iqn:"-",
+                blk->auth_mode?tmp2:"", portals?portals:"-", tmp?tmp:"",
                 errCode?"FAIL":"SUCCESS");
   }
 
@@ -1632,6 +1700,10 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   strcpy(cobj.block_name, blk->block_name);
   cobj.size = blk->size;
   strcpy(cobj.gbid, gbid);
+  if (GB_STRDUP(cobj.block_hosts,  blk->block_hosts) < 0) {
+    errCode = ENOMEM;
+    goto exist;
+  }
 
   if (blk->auth_mode) {
     uuid_generate(uuid);
@@ -1668,13 +1740,14 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
     LOG("mgmt", GB_LOG_ERROR, "glusterBlockAuditRequest: return %d"
         "volume: %s hosts: %s blockname %s", errCode,
         blk->volume, blk->block_hosts, blk->block_name);
+    reply->exit = GB_DEFAULT_ERRCODE;
   }
 
  exist:
   if (errCode == EKEYEXPIRED) {
     GB_ASPRINTF(&errMsg, "Looks like targetcli and tcmu-runner are not "
                 "installed on few nodes.\n");
-    }
+  }
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
  out:
@@ -1691,6 +1764,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   blockServerDefFree(list);
   glfs_fini(glfs);
   blockCreateParsedRespFree(savereply);
+  GB_FREE (cobj.block_hosts);
 
   return reply;
 }
@@ -1701,14 +1775,18 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
 {
   FILE *fp;
   int  ret;
+  char *tmp = NULL;
   char *backstore = NULL;
   char *iqn = NULL;
+  char *tpg = NULL;
   char *lun = NULL;
   char *portal = NULL;
   char *attr = NULL;
   char *authcred = NULL;
   char *exec = NULL;
   blockResponse *reply = NULL;
+  blockServerDefPtr list = NULL;
+  size_t i;
 
 
   if (GB_ALLOC(reply) < 0) {
@@ -1738,37 +1816,86 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
     goto out;
   }
 
+  list = blockServerParse(blk->block_hosts);
 
-  if (GB_ASPRINTF(&lun, "%s/%s%s/tpg1/luns %s %s/%s",  GB_TGCLI_ISCSI,
-                  GB_TGCLI_IQN_PREFIX, blk->gbid, GB_CREATE,
-                  GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
-    goto out;
+  /* i = 2; because tpg1 is created by default while iqn create */
+  for (i = 2; i <= list->nhosts; i++) {
+    if (!tmp) {
+      if (GB_ASPRINTF(&tpg, "%s/%s%s create tpg%zu > %s && ",
+                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i, DEVNULLPATH) == -1) {
+        goto out;
+      }
+      tmp = tpg;
+    } else {
+      if (GB_ASPRINTF(&tpg, "%s %s/%s%s create tpg%zu > %s && ", tmp,
+                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i, DEVNULLPATH) == -1) {
+        goto out;
+      }
+      GB_FREE(tmp);
+      tmp = tpg;
+    }
   }
+  tmp = NULL;
 
-  if (GB_ASPRINTF(&portal, "%s/%s%s/tpg1/portals create %s",
-                  GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid,
-                  blk->ipaddr) == -1) {
-    goto out;
-  }
+  for (i = 1; i <= list->nhosts; i++) {
+    if (GB_ASPRINTF(&lun, "%s/%s%s/tpg%zu/luns %s %s/%s > %s",  GB_TGCLI_ISCSI,
+                 GB_TGCLI_IQN_PREFIX, blk->gbid, i, GB_CREATE,
+                 GB_TGCLI_GLFS_PATH, blk->block_name, DEVNULLPATH) == -1) {
+      goto out;
+    }
 
-  if (GB_ASPRINTF(&attr, "%s/%s%s/tpg1 set attribute %s %s",
-                  GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid,
-             blk->auth_mode?"authentication=1":"", GB_TGCLI_ATTRIBUTES) == -1) {
-    goto out;
-  }
+    if (!strcmp(blk->ipaddr, list->hosts[i-1])) {
+      if (GB_ASPRINTF(&attr, "%s/%s%s/tpg%zu enable > %s && %s/%s%s/tpg%zu set attribute %s %s",
+                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i, DEVNULLPATH,
+                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+                   blk->auth_mode?"authentication=1":"", GB_TGCLI_ATTRIBUTES) == -1) {
+        goto out;
+      }
+      if (GB_ASPRINTF(&portal, "%s/%s%s/tpg%zu/portals create %s ",
+                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+                   blk->ipaddr) == -1) {
+        goto out;
+      }
+    } else {
+      if (GB_ASPRINTF(&attr, "%s/%s%s/tpg%zu set attribute tpg_enabled_sendtargets=0 %s %s > %s",
+                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+                   blk->auth_mode?"authentication=1":"",
+                   GB_TGCLI_ATTRIBUTES, DEVNULLPATH) == -1) {
+        goto out;
+      }
+      if (GB_ASPRINTF(&portal, "%s/%s%s/tpg%zu/portals create %s > %s",
+                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+                   list->hosts[i-1], DEVNULLPATH) == -1) {
+        goto out;
+      }
+    }
 
-
-  if (blk->auth_mode &&
-      GB_ASPRINTF(&authcred, "&& %s/%s%s/tpg1 set auth userid=%s "
-                  "password=%s > %s", GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX,
-                  blk->gbid, blk->gbid, blk->passwd, DEVNULLPATH) == -1) {
-    goto out;
-  }
-
-  if (GB_ASPRINTF(&exec, "%s && %s && %s && %s && %s && %s %s && %s",
-                  GB_TGCLI_GLOBALS, backstore, iqn, lun, portal, attr,
-                  blk->auth_mode?authcred:"", GB_TGCLI_SAVE) == -1) {
-    goto out;
+    if (blk->auth_mode &&
+        GB_ASPRINTF(&authcred, "&& %s/%s%s/tpg%zu set auth userid=%s password=%s > %s",
+          GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+          blk->gbid, blk->passwd, DEVNULLPATH) == -1) {
+      goto out;
+    }
+    if (!tmp) {
+      if (GB_ASPRINTF(&exec, "%s && %s && %s && %s %s && %s && %s %s && %s",
+          GB_TGCLI_GLOBALS, backstore, iqn, tpg?tpg:"", lun, portal, attr,
+          blk->auth_mode?authcred:"", GB_TGCLI_SAVE) == -1) {
+        goto out;
+      }
+      tmp = exec;
+    } else {
+      if (GB_ASPRINTF(&exec, "%s && %s && %s && %s %s && %s",
+          tmp, lun, portal, attr,
+          blk->auth_mode?authcred:"", GB_TGCLI_SAVE) == -1) {
+        goto out;
+      }
+      GB_FREE(tmp);
+      tmp = exec;
+    }
+    GB_FREE(authcred);
+    GB_FREE(attr);
+    GB_FREE(portal);
+    GB_FREE(lun);
   }
 
   if (GB_ALLOC_N(reply->out, 4096) < 0) {
@@ -1799,8 +1926,10 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   GB_FREE(attr);
   GB_FREE(portal);
   GB_FREE(lun);
+  GB_FREE(tpg);
   GB_FREE(iqn);
   GB_FREE(backstore);
+  blockServerDefFree(list);
 
   return reply;
 }
@@ -1826,7 +1955,8 @@ blockDeleteCliFormatResponse(blockDeleteCli *blk, int errCode, char *errMsg,
   reply->exit = errCode;
 
   if (errMsg) {
-    blockFormatErrorResponse(blk->json_resp, errCode, errMsg, reply);
+    blockFormatErrorResponse(DELETE_SRV, blk->json_resp, errCode,
+                             errMsg, reply);
     return;
   }
 
@@ -1839,7 +1969,7 @@ blockDeleteCliFormatResponse(blockDeleteCli *blk, int errCode, char *errMsg,
                                 "SUCCESSFUL ON", &json_array2);
 
     json_object_object_add(json_obj, "RESULT",
-        errCode?json_object_new_string("FAIL"):json_object_new_string("SUCCESS"));
+        errCode?GB_JSON_OBJ_TO_STR("FAIL"):GB_JSON_OBJ_TO_STR("SUCCESS"));
 
     GB_ASPRINTF(&reply->out, "%s\n",
                 json_object_to_json_string_ext(json_obj,
@@ -2041,11 +2171,16 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
 blockResponse *
 block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
 {
+  FILE *fp;
   int ret;
   char *authattr = NULL;
   char *authcred = NULL;
   char *exec = NULL;
   blockResponse *reply = NULL;
+  char out[1024] = {0, };
+  size_t tpgs = 0;
+  size_t i;
+  char *tmp = NULL;
 
 
   if (GB_ALLOC(reply) < 0) {
@@ -2078,27 +2213,90 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
   }
   GB_FREE(exec);
 
-  if (blk->auth_mode) {
-    if (GB_ASPRINTF(&authattr, "%s/%s%s/tpg1 set attribute authentication=1",
-                 GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
-      goto out;
-    }
+  if (GB_ASPRINTF(&exec, "%s/%s%s status", GB_TGCLI_ISCSI,
+                      GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
+    goto out;
+  }
 
-    if (GB_ASPRINTF(&authcred, "%s/%s%s/tpg1 set auth userid=%s password=%s",
-                 GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid,
-                 blk->gbid, blk->passwd) == -1) {
-      goto out;
+  /* get number of tpg's for this target */
+  fp = popen(exec, "r");
+  if (fp) {
+    size_t newLen = fread(out, sizeof(char), 1024, fp);
+    if (ferror( fp ) != 0) {
+      LOG("mgmt", GB_LOG_ERROR,
+          "reading command %s output for block %s on volume %s failed",
+          exec, blk->block_name, blk->volume);
+    } else {
+      out[newLen++] = '\0';
     }
+    ret = WEXITSTATUS(pclose(fp));
+    if (ret) {
+      LOG("mgmt", GB_LOG_ERROR,
+          "reading command %s output for block %s on volume %s failed",
+          exec, blk->block_name, blk->volume);
+      reply->exit = ret;
+       goto out;
+     }
+   } else {
+      LOG("mgmt", GB_LOG_ERROR,
+          "popen(): for block %s on volume %s executing command %s failed(%s)",
+          blk->block_name, blk->volume, exec, strerror(errno));
+  }
 
-    if (GB_ASPRINTF(&exec, "%s && %s && %s", authattr, authcred, GB_TGCLI_SAVE) == -1) {
-      goto out;
-    }
-  } else {
-    if (GB_ASPRINTF(&exec, "%s/%s%s/tpg1 set attribute authentication=0 && %s",
-                 GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, GB_TGCLI_SAVE) == -1) {
-      goto out;
+  /* out looks like, "Status for /iscsi/iqn.abc:xyz: TPGs: 2" */
+  tmp = strrchr(out, ':');
+  if (tmp) {
+    sscanf(tmp+1, "%zu", &tpgs);
+    tmp = NULL;
+  }
+
+  for (i = 1; i <= tpgs; i++) {
+    if (blk->auth_mode) {  /* set auth */
+      if (GB_ASPRINTF(&authattr, "%s/%s%s/tpg%zu set attribute authentication=1",
+                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i) == -1) {
+        goto out;
+      }
+
+      if (GB_ASPRINTF(&authcred, "%s/%s%s/tpg%zu set auth userid=%s password=%s",
+                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+                   blk->gbid, blk->passwd) == -1) {
+        goto out;
+      }
+
+      if (!tmp) {
+        if (GB_ASPRINTF(&exec, "%s && %s", authattr, authcred) == -1) {
+          goto out;
+        }
+        tmp = exec;
+      } else {   /* append next series of commands */
+        if (GB_ASPRINTF(&exec, "%s && %s && %s", tmp, authattr, authcred) == -1) {
+          goto out;
+        }
+        GB_FREE(tmp);
+        tmp = exec;
+      }
+    } else {      /* unset auth */
+      if (!tmp) {
+        if (GB_ASPRINTF(&exec, "%s/%s%s/tpg%zu set attribute authentication=0",
+                     GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i) == -1) {
+          goto out;
+        }
+        tmp = exec;
+      } else {   /* append next series of commands */
+        if (GB_ASPRINTF(&exec, "%s && %s/%s%s/tpg%zu set attribute authentication=0",
+                     tmp, GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i) == -1) {
+          goto out;
+        }
+        GB_FREE(tmp);
+        tmp = exec;
+      }
     }
   }
+
+  if (GB_ASPRINTF(&exec, "%s && %s", tmp, GB_TGCLI_SAVE) == -1) {
+    goto out;
+  }
+  /* free(tmp) happens at out: */
 
   if (GB_ALLOC_N(reply->out, 4096) < 0) {
     GB_FREE(reply);
@@ -2122,6 +2320,7 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
   reply->exit = 0;
 
  out:
+  GB_FREE(tmp);
   GB_FREE(exec);
   GB_FREE(authattr);
   GB_FREE(authcred);
@@ -2186,7 +2385,7 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
        strcmp(entry->d_name, "meta.lock")) {
       if (blk->json_resp) {
         json_object_array_add(json_array,
-                                    json_object_new_string(entry->d_name));
+                              GB_JSON_OBJ_TO_STR(entry->d_name));
       } else {
         if (GB_ASPRINTF(&filelist, "%s%s\n", (tmp==NULL?"":tmp),
                         entry->d_name)  == -1) {
@@ -2203,8 +2402,9 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
 
   errCode = 0;
 
-  if (blk->json_resp)
+  if (blk->json_resp) {
     json_object_object_add(json_obj, "blocks", json_array);
+  }
 
  out:
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
@@ -2224,14 +2424,14 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
   if (blk->json_resp) {
     if (errCode) {
       json_object_object_add(json_obj, "RESULT",
-                             json_object_new_string("FAIL"));
+                             GB_JSON_OBJ_TO_STR("FAIL"));
       json_object_object_add(json_obj, "errCode",
                              json_object_new_int(errCode));
       json_object_object_add(json_obj, "errMsg",
-                             json_object_new_string(errMsg));
+                             GB_JSON_OBJ_TO_STR(errMsg));
     } else {
             json_object_object_add(json_obj, "RESULT",
-                                   json_object_new_string("SUCCESS"));
+                                   GB_JSON_OBJ_TO_STR("SUCCESS"));
     }
     GB_ASPRINTF(&reply->out, "%s\n",
                 json_object_to_json_string_ext(json_obj,
@@ -2297,24 +2497,25 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     errCode = GB_DEFAULT_ERRCODE;
   }
   if (errMsg) {
-    blockFormatErrorResponse(blk->json_resp, errCode, errMsg, reply);
+    blockFormatErrorResponse(INFO_SRV, blk->json_resp, errCode,
+                             errMsg, reply);
     return;
   }
 
   if (blk->json_resp) {
     json_obj = json_object_new_object();
-    json_object_object_add(json_obj, "NAME", json_object_new_string(blk->block_name));
-    json_object_object_add(json_obj, "VOLUME", json_object_new_string(info->volume));
-    json_object_object_add(json_obj, "GBID", json_object_new_string(info->gbid));
+    json_object_object_add(json_obj, "NAME", GB_JSON_OBJ_TO_STR(blk->block_name));
+    json_object_object_add(json_obj, "VOLUME", GB_JSON_OBJ_TO_STR(info->volume));
+    json_object_object_add(json_obj, "GBID", GB_JSON_OBJ_TO_STR(info->gbid));
     json_object_object_add(json_obj, "SIZE", json_object_new_int64(info->size));
     json_object_object_add(json_obj, "HA", json_object_new_int(info->mpath));
-    json_object_object_add(json_obj, "PASSWORD", json_object_new_string(info->passwd));
+    json_object_object_add(json_obj, "PASSWORD", GB_JSON_OBJ_TO_STR(info->passwd));
 
     json_array = json_object_new_array();
 
     for (i = 0; i < info->nhosts; i++) {
       if (blockhostIsValid (info->list[i]->status)) {
-        json_object_array_add(json_array, json_object_new_string(info->list[i]->addr));
+        json_object_array_add(json_array, GB_JSON_OBJ_TO_STR(info->list[i]->addr));
       }
     }
 

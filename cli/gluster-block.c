@@ -34,15 +34,26 @@ const char *argp_program_version = ""                                 \
   "or later), or the GNU General Public License, version 2 (GPLv2),\n"\
   "in all cases as published by the Free Software Foundation.";
 
-#define GB_CREATE_HELP_STR "gluster-block create <volname/blockname> "\
-                           "[ha <count>] [auth enable|disable] "\
-                           "<HOST1[,HOST2,...]> <size> [--json*]"
 
-#define GB_DELETE_HELP_STR "gluster-block delete <volname/blockname> [--json*]"
-#define GB_MODIFY_HELP_STR "gluster-block modify <volname/blockname> "\
-                           "<auth enable|disable> [--json*]"
-#define GB_INFO_HELP_STR  "gluster-block info <volname/blockname> [--json*]"
-#define GB_LIST_HELP_STR  "gluster-block list <volname> [--json*]"
+# define  GB_CREATE_HELP_STR  "gluster-block create <volname/blockname> "\
+                                "[ha <count>] [auth enable|disable] "\
+                                "<HOST1[,HOST2,...]> <size> [--json*]"
+
+# define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> [--json*]"
+# define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "\
+                               "<auth enable|disable> [--json*]"
+# define  GB_INFO_HELP_STR    "gluster-block info <volname/blockname> [--json*]"
+# define  GB_LIST_HELP_STR    "gluster-block list <volname> [--json*]"
+
+
+# define  GB_ARGCHECK_OR_RETURN(argcount, count, cmd, helpstr)        \
+          do {                                                        \
+            if (argcount != count) {                                  \
+              MSG("Inadequate arguments for %s:\n%s\n", cmd, helpstr);\
+              return -1;                                              \
+            }                                                         \
+          } while(0)
+
 
 static int
 glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
@@ -273,12 +284,10 @@ glusterBlockModify(int argcount, char **options, int json)
   int ret = -1;
   char *out = NULL;
 
+
+  GB_ARGCHECK_OR_RETURN(argcount, 5, "modify", GB_MODIFY_HELP_STR);
+
   mobj.json_resp = json;
-  if (argcount != 5) {
-    MSG("%s\n", "Insufficient arguments for modify:");
-    MSG("%s\n", GB_MODIFY_HELP_STR);
-    return -1;
-  }
 
   if (glusterBlockParseVolumeBlock (options[optind++], mobj.volume,
                                     mobj.block_name, GB_MODIFY_HELP_STR,
@@ -330,12 +339,11 @@ glusterBlockCreate(int argcount, char **options, int json)
   blockCreateCli cobj = {0, };
 
 
-  cobj.json_resp = json;
   if (argcount <= optind) {
-    MSG("%s\n", "Insufficient arguments for create:");
-    MSG("%s\n", GB_CREATE_HELP_STR);
+    MSG("Inadequate arguments for create:\n%s\n", GB_CREATE_HELP_STR);
     return -1;
   }
+  cobj.json_resp = json;
 
   /* default mpath */
   cobj.mpath = 1;
@@ -375,8 +383,7 @@ glusterBlockCreate(int argcount, char **options, int json)
   }
 
   if (argcount - optind < 2) {  /* left with servers and size so 2 */
-    MSG("%s\n", "Insufficient arguments for create");
-    MSG("%s\n", GB_CREATE_HELP_STR);
+    MSG("Inadequate arguments for create:\n%s\n", GB_CREATE_HELP_STR);
     LOG("cli", GB_LOG_ERROR,
         "failed creating block %s on volume %s with hosts %s",
         cobj.block_name, cobj.volume, cobj.block_hosts);
@@ -428,12 +435,8 @@ glusterBlockList(int argcount, char **options, int json)
   int ret = -1;
 
 
+  GB_ARGCHECK_OR_RETURN(argcount, 3, "list", GB_LIST_HELP_STR);
   cobj.json_resp = json;
-  if (argcount != 3) {
-    MSG("%s\n", "Insufficient arguments for list:");
-    MSG("%s\n", GB_LIST_HELP_STR);
-    return -1;
-  }
 
   strcpy(cobj.volume, options[2]);
 
@@ -461,13 +464,8 @@ glusterBlockDelete(int argcount, char **options, int json)
   int ret = -1;
 
 
+  GB_ARGCHECK_OR_RETURN(argcount, 3, "delete", GB_DELETE_HELP_STR);
   cobj.json_resp = json;
-  if (argcount != 3) {
-    MSG("%s\n", "Insufficient arguments for delete:");
-    MSG("%s\n", GB_DELETE_HELP_STR);
-    return -1;
-  }
-
 
   if (glusterBlockParseVolumeBlock (options[2], cobj.volume,
                                     cobj.block_name, GB_DELETE_HELP_STR,
@@ -500,13 +498,8 @@ glusterBlockInfo(int argcount, char **options, int json)
   int ret = -1;
 
 
+  GB_ARGCHECK_OR_RETURN(argcount, 3, "info", GB_INFO_HELP_STR);
   cobj.json_resp = json;
-  if (argcount != 3) {
-    MSG("%s\n", "Insufficient arguments for info:");
-    MSG("%s\n", GB_INFO_HELP_STR);
-    return -1;
-  }
-
 
   if (glusterBlockParseVolumeBlock (options[2], cobj.volume,
                                     cobj.block_name, GB_INFO_HELP_STR,

@@ -351,8 +351,8 @@ blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info,
     if (errCode) {
       *errCode = errno;
     }
-    LOG("gfapi", GB_LOG_ERROR, "glfs_open(%s) on volume %s failed[%s]",
-        metafile, info->volume, strerror(errno));
+    LOG("gfapi", GB_LOG_ERROR, "glfs_open(%s) failed[%s]", metafile,
+                               strerror(errno));
     ret = -1;
     goto out;
   }
