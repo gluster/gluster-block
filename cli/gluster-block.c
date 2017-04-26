@@ -65,6 +65,13 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
 
   if (connect(sockfd, (struct sockaddr *) &saun,
               sizeof(struct sockaddr_un)) < 0) {
+    if (errno == ENOENT || errno == ECONNREFUSED) {
+      MSG("%s\n", "Connection failed. Please check if gluster-block daemon is operational.");
+      if (sockfd != -1) {
+        close (sockfd);
+      }
+      return -1;
+    }
     LOG("cli", GB_LOG_ERROR, "%s: connect failed (%s)", GB_UNIX_ADDRESS,
         strerror (errno));
     goto out;
