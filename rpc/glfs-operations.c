@@ -53,6 +53,17 @@ glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg)
 
   ret = glfs_init(glfs);
   if (ret) {
+    *errCode = errno;
+    if (*errCode == ENOENT) {
+      GB_ASPRINTF (errMsg, "Volume %s does not exist", volume);
+    } else if (*errCode == EIO) {
+      GB_ASPRINTF (errMsg, "Check if volume %s is operational", volume);
+    } else {
+      GB_ASPRINTF (errMsg, "Not able to initialize volume %s[%s]", volume,
+                   strerror(*errCode));
+    }
+    LOG("gfapi", GB_LOG_ERROR, "glfs_init() on %s failed[%s]", volume,
+        strerror(*errCode));
     goto out;
   }
 
