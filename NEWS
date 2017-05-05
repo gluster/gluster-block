@@ -1,10 +1,18 @@
-gluster-block release 0.1.1 is tagged.
+gluster-block release 0.2 is tagged.
 
-Fixes:
------
-* Login failues at initiator side.
-  https://review.gluster.org/#/c/16894/
+Highlights:
+----------
+One command for logging-in to all gateways of a target (#9)
+Add support for one way authentication (#5)
+Support json response (#3)
 
+Other Fixes:
+-----------
+Increase the clnt_call() total time out (#15)
+Clue if gluster-block daemon is not operational (#14)
+Show reason for cmd failue on non-existent/not started volume (#10)
+Redirect configshell logs to GB_LOGDIR (#13)
+Use rpcgen to generate all XDR code (#2)
 
 Read more at [1] and [2]
 
