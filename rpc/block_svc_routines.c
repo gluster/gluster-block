@@ -478,14 +478,14 @@ glusterBlockCreateRemote(void *data)
     saveret = ret;
     if (errno == ENETUNREACH || errno == ECONNREFUSED  || errno == ETIMEDOUT) {
       GB_ASPRINTF(&errMsg, ": %s", strerror(errno));
-      LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on"
+      LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on "
           "host %s volume %s", strerror(errno), FAILED_REMOTE_CREATE,
           cobj.block_name, args->addr, args->volume);
       goto out;
     }
 
     if (ret == EKEYEXPIRED) {
-      LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence create block %s on"
+      LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence create block %s on "
           "host %s volume %s failed", FAILED_DEPENDENCY, strerror(errno),
           cobj.block_name, args->addr, args->volume);
       goto out;
@@ -601,14 +601,14 @@ glusterBlockDeleteRemote(void *data)
   if (ret) {
     saveret = ret;
     if (errno == ENETUNREACH || errno == ECONNREFUSED  || errno == ETIMEDOUT) {
-      LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on"
+      LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on "
           "host %s volume %s", strerror(errno), FAILED_REMOTE_DELETE,
           dobj.block_name, args->addr, args->volume);
       goto out;
     }
 
     if (ret == EKEYEXPIRED) {
-      LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence delete block %s on"
+      LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence delete block %s on "
           "host %s volume %s failed", FAILED_DEPENDENCY, strerror(errno),
           dobj.block_name, args->addr, args->volume);
       goto out;
@@ -657,7 +657,7 @@ glusterBlockDeleteFillArgs(MetaInfo *info, bool deleteall, blockRemoteObj *args,
     case GB_AUTH_CLEAR_ENFORCE_FAIL:
       if (!deleteall)
         break;
-    case GB_CONFIG_INPROGRESS:
+ /* case GB_CONFIG_INPROGRESS: untouched may be due to connect failed */
     case GB_CONFIG_FAIL:
     case GB_CLEANUP_INPROGRESS:
     case GB_CLEANUP_FAIL:
@@ -676,7 +676,8 @@ glusterBlockDeleteFillArgs(MetaInfo *info, bool deleteall, blockRemoteObj *args,
 
 
 static int
-glusterBlockCollectAttemptSuccess(blockRemoteObj *args, size_t count,
+glusterBlockCollectAttemptSuccess(struct glfs *glfs, char *blockname,
+                                  blockRemoteObj *args, size_t count,
                                   char **attempt, char **success)
 {
   char *a_tmp = NULL;
@@ -686,21 +687,23 @@ glusterBlockCollectAttemptSuccess(blockRemoteObj *args, size_t count,
   for (i = 0; i < count; i++) {
     if (args[i].exit) {
       if (GB_ASPRINTF(attempt, "%s %s",
-            (a_tmp==NULL?"":a_tmp), args[i].addr) == -1) {
+                      (a_tmp==NULL?"":a_tmp), args[i].addr) == -1) {
         goto fail;
       }
       GB_FREE(a_tmp);
       a_tmp = *attempt;
     } else {
       if (GB_ASPRINTF(success, "%s %s",
-            (s_tmp==NULL?"":s_tmp), args[i].addr) == -1) {
+                      (s_tmp==NULL?"":s_tmp), args[i].addr) == -1) {
         goto fail;
       }
       GB_FREE(s_tmp);
       s_tmp = *success;
     }
   }
+
   return 0;
+
  fail:
   GB_FREE(a_tmp);
   GB_FREE(s_tmp);
@@ -747,9 +750,10 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
     pthread_join(tid[i], NULL);
   }
 
-  ret = glusterBlockCollectAttemptSuccess (args, count, &d_attempt, &d_success);
+  ret = glusterBlockCollectAttemptSuccess (glfs, dobj->block_name, args,
+                                           count, &d_attempt, &d_success);
   if (ret) {
-          goto out;
+    goto out;
   }
 
   if (d_attempt) {
@@ -812,14 +816,14 @@ glusterBlockModifyRemote(void *data)
   if (ret) {
     saveret = ret;
     if (errno == ENETUNREACH || errno == ECONNREFUSED  || errno == ETIMEDOUT) {
-      LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on"
+      LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on "
           "host %s volume %s", strerror(errno), FAILED_REMOTE_MODIFY,
           cobj.block_name, args->addr, args->volume);
       goto out;
     }
 
     if (ret == EKEYEXPIRED) {
-      LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence modify block %s on"
+      LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence modify block %s on "
           "host %s volume %s failed", FAILED_DEPENDENCY, strerror(errno),
           cobj.block_name, args->addr, args->volume);
       goto out;
@@ -934,15 +938,16 @@ glusterBlockModifyRemoteAsync(MetaInfo *info,
 
   if (!rollback) {
     /* collect return */
-    ret = glusterBlockCollectAttemptSuccess (args, count, &local->attempt,
-                                             &local->success);
+    ret = glusterBlockCollectAttemptSuccess(glfs, mobj->block_name,
+                                            args, count, &local->attempt,
+                                            &local->success);
     if (ret)
             goto out;
   } else {
     /* collect return */
-    ret = glusterBlockCollectAttemptSuccess (args, count,
-                                             &local->rb_attempt,
-                                             &local->rb_success);
+    ret = glusterBlockCollectAttemptSuccess(glfs, mobj->block_name, args,
+                                            count, &local->rb_attempt,
+                                            &local->rb_success);
     if (ret)
             goto out;
   }
@@ -1007,7 +1012,7 @@ glusterBlockCleanUp(operations opt, struct glfs *glfs, char *blockname,
 
   count = glusterBlockDeleteFillArgs(info, deleteall, NULL, NULL, NULL);
   asyncret = glusterBlockDeleteRemoteAsync(info, glfs, &dobj, count,
-                                      deleteall, &drobj);
+                                           deleteall, &drobj);
   if (asyncret) {
     LOG("mgmt", GB_LOG_WARNING,
         "glusterBlockDeleteRemoteAsync: return %d %s for block %s on volume %s",
@@ -1177,6 +1182,12 @@ blockFormatErrorResponse (operations op, int json_resp, int errCode,
                           char *errMsg, struct blockResponse *reply)
 {
   json_object *json_obj = NULL;
+
+
+  if (!reply) {
+    return;
+  }
+
   reply->exit = errCode;
   if (json_resp) {
     json_obj = json_object_new_object();
@@ -1486,11 +1497,12 @@ block_modify_cli_1_svc(blockModifyCli *blk, struct svc_req *rqstp)
 }
 
 void
-blockCreateCliFormatResponse(blockCreateCli *blk, struct blockCreate *cobj,
-                             int errCode, char *errMsg,
-                             blockRemoteCreateResp *savereply,
+blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
+                             struct blockCreate *cobj, int errCode,
+                             char *errMsg, blockRemoteCreateResp *savereply,
                              struct blockResponse *reply)
 {
+  MetaInfo *info = NULL;
   json_object *json_obj = NULL;
   json_object *json_array1 = NULL;
   json_object *json_array2 = NULL;
@@ -1498,6 +1510,7 @@ blockCreateCliFormatResponse(blockCreateCli *blk, struct blockCreate *cobj,
   char         *tmp2     = NULL;
   char         *portals  = NULL;
   int          i         = 0;
+
 
   if (!reply) {
     return;
@@ -1512,6 +1525,26 @@ blockCreateCliFormatResponse(blockCreateCli *blk, struct blockCreate *cobj,
                              errMsg, reply);
     return;
   }
+
+  if (GB_ALLOC(info) < 0) {
+    return;
+  }
+
+  if (blockGetMetaInfo(glfs, blk->block_name, info, NULL)) {
+    goto out;
+  }
+
+  for (i = 0; i < info->nhosts; i++) {
+    tmp = savereply->obj->d_attempt;
+    if (blockMetaStatusEnumParse(info->list[i]->status) == GB_CONFIG_INPROGRESS) {
+      if (GB_ASPRINTF(&savereply->obj->d_attempt, "%s %s",
+                      (tmp==NULL?"":tmp), info->list[i]->addr) == -1) {
+        goto out;
+      }
+      GB_FREE(tmp);
+    }
+  }
+  tmp = NULL;
 
   if (savereply->obj->d_success || savereply->obj->d_attempt) {
     removeDuplicateSubstr(&savereply->obj->d_success);
@@ -1605,6 +1638,7 @@ blockCreateCliFormatResponse(blockCreateCli *blk, struct blockCreate *cobj,
   }
 
  out:
+  blockFreeMetaInfo(info);
   GB_FREE(tmp);
   GB_FREE(tmp2);
   return;
@@ -1759,7 +1793,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   }
 
  optfail:
-  blockCreateCliFormatResponse(blk, &cobj, errCode, errMsg, savereply, reply);
+  blockCreateCliFormatResponse(glfs, blk, &cobj, errCode, errMsg, savereply, reply);
   GB_FREE(errMsg);
   blockServerDefFree(list);
   glfs_fini(glfs);
@@ -2499,6 +2533,10 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
   if (errMsg) {
     blockFormatErrorResponse(INFO_SRV, blk->json_resp, errCode,
                              errMsg, reply);
+    return;
+  }
+
+  if (!info) {
     return;
   }
 

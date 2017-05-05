@@ -17,6 +17,7 @@ block_xdr.c: block.x
 
 block_clnt.c: block.x
 	rpcgen -l -o $(top_builddir)/rpc/rpcl/$@ $^
+	$(SED) -i 's|TIMEOUT = { 25, 0 }|TIMEOUT = { 300, 0 }|' $(top_builddir)/rpc/rpcl/$@
 
 block_svc.c: block.x
 	rpcgen -m -o $(top_builddir)/rpc/rpcl/$@ $^
