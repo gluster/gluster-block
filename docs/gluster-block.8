@@ -25,11 +25,14 @@ Note that the gluster-blockd daemon is responsible for block management, hence t
 
 .SH COMMANDS
 .SS
-\fBcreate\fR <VOLNAME/NEW-BLOCKNAME> [ha <COUNT>] <HOST1[,HOST2,..]> <BYTES>
+\fBcreate\fR <VOLNAME/NEW-BLOCKNAME> [ha <COUNT>] [auth enable|disable] <HOST1[,HOST2,..]> <BYTES>
 create block device.
 .TP
 [ha <COUNT>]
 multipath requirement for high availability (default: 1)
+.TP
+[auth enable|disable]
+authentication setting (default: disable)
 .TP
 <HOST1,[HOST2....]>
 servers in the pool where targets will be exported.
@@ -76,6 +79,9 @@ show version info and exit.
 To create a block device of size 1GiB
 .B # gluster-block create blockVol/sampleBlock ${HOST} 1GiB
 
+To create a block device of size 1GiB with auth enable
+.B # gluster-block create blockVol/sampleBlock auth enable ${HOST} 1GiB
+
 To create a block device of size 1GiB with multi-path(replica) 3
 .B # gluster-block create blockVol/sampleBlock ha 3 ${HOST1},${HOST2},${HOST3} 1GiB
 
@@ -85,6 +91,12 @@ To create a block device of size 1GiB and expect response in json format
 You can pass more no. of nodes than ha count, this will actually help create in recovering from
 failures, incase creation of block fails on any of scheduled(always first in list) ha count nodes.
 .B # gluster-block create blockVol/sampleBlock ha 3 ${HOST1},${HOST2},${HOST3},${HOST4},${HOST5} 1GiB
+
+To disable auth on a block device
+.B # gluster-block modify blockVol/sampleBlock auth disable
+
+To enable auth on a block device
+.B # gluster-block modify blockVol/sampleBlock auth enable
 
 To list available block devices
 .B # gluster-block list blockVol

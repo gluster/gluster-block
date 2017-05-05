@@ -55,7 +55,7 @@ managing the command ring buffers
 <pre>
 # git clone https://github.com/gluster/gluster-block.git
 # cd gluster-block/
-# dnf install libuuid-devel glusterfs-api-devel tcmu-runner targetcli (on fedora)
+# dnf install autoconf automake libtool libuuid-devel json-c-devel glusterfs-api-devel tcmu-runner targetcli (on fedora)
 # make -j install
 </pre>
 
@@ -64,14 +64,15 @@ managing the command ring buffers
 **Prerequisites:** *this guide assume we already have*
 - [x] *A gluster volume with name 'block-test'*
 - [x] *In all nodes gluster-blockd.service is running*
+- [x] *Open 24007(for glusterd) 24006(gluster-blockd) 3260(iscsi targets) 111(rpcbind) ports and glusterfs service in your firewall*
 
 ```script
-# gluster-block (3ba7ec5)
+# gluster-block (0.2)
 usage:
-  gluster-block <command> <volname[/blockname]> [<args>]
+  gluster-block <command> <volname[/blockname]> [<args>] [--json*]
 
 commands:
-  create  <volname/blockname> [ha <count>] <host1[,host2,...]> <size>
+  create  <volname/blockname> [ha <count>] [auth enable|disable] <host1[,host2,...]> <size>
         create block device.
 
   list    <volname>
@@ -83,11 +84,17 @@ commands:
   delete  <volname/blockname>
         delete block device.
 
+  modify  <volname/blockname> <auth enable|disable>
+        modify block device.
+
   help
         show this message and exit.
 
   version
         show version info and exit.
+
+supported JSON formats:
+  --json|--json-plain|--json-spaced|--json-pretty
 ```
 
 #### Example:
@@ -105,10 +112,18 @@ IQN: iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea
 PORTAL(S): 192.168.1.11:3260 192.168.1.12:3260 192.168.1.13:3260
 RESULT: SUCCESS
 
+Enable Authentication (you can do this as part of create as well)
+<b># gluster-block modify block-test/sample-block auth enable</b>
+IQN: iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea
+USERNAME: aafea465-9167-4880-b37c-2c36db8562ea
+PASSWORD: 4a5c9b84-3a6d-44b4-9668-c9a6d699a5e9
+SUCCESSFUL ON:  192.168.1.11 192.168.1.12 192.168.1.13
+RESULT: SUCCESS
+
 <b># gluster-block list block-test</b>
 sample-block
 
-<b>#  gluster-block info block-test/sample-block</b>
+<b># gluster-block info block-test/sample-block</b>
 NAME: sample-block
 VOLUME: block-test
 GBID: 6b60c53c-8ce0-4d8d-a42c-5b546bca3d09
@@ -123,10 +138,18 @@ BLOCK CONFIG NODE(S): 192.168.1.11 192.168.1.12 192.168.1.13
 # dnf install iscsi-initiator-utils
 # lsblk (note the available devices)
 
-Make sure you have multipathd running and configured
-# iscsiadm -m discovery -t st -p 192.168.1.11 -l
-# iscsiadm -m discovery -t st -p 192.168.1.12 -l
-# iscsiadm -m discovery -t st -p 192.168.1.13 -l
+Make sure you have multipathd running and configured in Active/Passive mode
+
+Discovery ...
+# iscsiadm -m discovery -t st -p 192.168.1.11
+
+Update Credentials (Skip this step incase if you have not enabled auth)
+# iscsiadm -m node -T "iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea" -o update
+ -n node.session.auth.authmethod -v CHAP -n node.session.auth.username -v aafea465-9167-4880-b37c-2c36db8562ea -n node
+.session.auth.password -v 4a5c9b84-3a6d-44b4-9668-c9a6d699a5e9
+
+Login ...
+# iscsiadm -m node -T "iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea" -l
 
 # lsblk (note the new devices, let's say sdb, sdc and sdd multipath to mpatha)
 # mkfs.xfs /dev/mapper/mpatha
