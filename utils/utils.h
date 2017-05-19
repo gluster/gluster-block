@@ -111,62 +111,64 @@
             }                                                        \
           } while (0)
 
-# define  GB_METAUPDATE_OR_GOTO(lock, glfs, fname,                   \
-                                volume, ret, errMsg, label,...)      \
-          do {                                                       \
-            char *write;                                             \
-            struct glfs_fd *tgmfd;                                   \
-            LOCK(lock);                                              \
-            ret = glfs_chdir (glfs, GB_METADIR);                     \
-            if (ret) {                                               \
-              GB_ASPRINTF(&errMsg, "Failed to update transaction log "\
-                "for %s/%s[%s]", volume, fname, strerror(errno));  \
-              LOG("gfapi", GB_LOG_ERROR, "glfs_chdir(%s) on "        \
-                  "volume %s failed[%s]", GB_METADIR, volume,        \
-                  strerror(errno));                                  \
-              UNLOCK(lock);                                          \
-              ret = -1;                                              \
-              goto label;                                            \
-            }                                                        \
-            tgmfd = glfs_creat(glfs, fname, O_WRONLY | O_APPEND,     \
-                               S_IRUSR | S_IWUSR);                   \
-            if (!tgmfd) {                                            \
-              GB_ASPRINTF(&errMsg, "Failed to update transaction log "\
-                "for %s/%s[%s]", volume, fname, strerror(errno));  \
-              LOG("mgmt", GB_LOG_ERROR, "glfs_creat(%s): on "        \
-                  "volume %s failed[%s]", fname, volume,             \
-                  strerror(errno));                                  \
-              UNLOCK(lock);                                          \
-              ret = -1;                                              \
-              goto label;                                            \
-            }                                                        \
+# define  GB_METAUPDATE_OR_GOTO(lock, glfs, fname,                      \
+                                volume, ret, errMsg, label,...)         \
+          do {                                                          \
+            char *write;                                                \
+            struct glfs_fd *tgmfd;                                      \
+            LOCK(lock);                                                 \
+            ret = glfs_chdir (glfs, GB_METADIR);                        \
+            if (ret) {                                                  \
+              GB_ASPRINTF(&errMsg, "Failed to update transaction log "  \
+                "for %s/%s[%s]", volume, fname, strerror(errno));       \
+              LOG("gfapi", GB_LOG_ERROR, "glfs_chdir(%s) on "           \
+                  "volume %s failed[%s]", GB_METADIR, volume,           \
+                  strerror(errno));                                     \
+              UNLOCK(lock);                                             \
+              ret = -1;                                                 \
+              goto label;                                               \
+            }                                                           \
+            tgmfd = glfs_creat(glfs, fname,                             \
+                               O_WRONLY | O_APPEND | O_SYNC,            \
+                               S_IRUSR | S_IWUSR);                      \
+            if (!tgmfd) {                                               \
+              GB_ASPRINTF(&errMsg, "Failed to update transaction log "  \
+                "for %s/%s[%s]", volume, fname, strerror(errno));       \
+              LOG("mgmt", GB_LOG_ERROR, "glfs_creat(%s): on "           \
+                  "volume %s failed[%s]", fname, volume,                \
+                  strerror(errno));                                     \
+              UNLOCK(lock);                                             \
+              ret = -1;                                                 \
+              goto label;                                               \
+            }                                                           \
             if (GB_ASPRINTF(&write, __VA_ARGS__) < 0) {                 \
-              UNLOCK(lock);                                          \
-              ret = -1;                                              \
-              goto label;                                            \
-            }                                                        \
-            if(glfs_write (tgmfd, write, strlen(write), 0) < 0) {    \
-              GB_ASPRINTF(&errMsg, "Failed to update transaction log "\
-                "for %s/%s[%s]", volume, fname, strerror(errno));  \
-              LOG("mgmt", GB_LOG_ERROR, "glfs_write(%s): on "        \
-                  "volume %s failed[%s]", fname, volume,             \
-                  strerror(errno));                                  \
-              UNLOCK(lock);                                          \
-              ret = -1;                                              \
-              goto label;                                            \
-            }                                                        \
-            GB_FREE(write);                                          \
-            if (tgmfd && glfs_close(tgmfd) != 0) {                   \
-              GB_ASPRINTF(&errMsg, "Failed to update transaction log "\
-                "for %s/%s[%s]", volume, fname, strerror(errno));  \
-              LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on "        \
-                  "volume %s failed[%s]", fname, volume,             \
-                  strerror(errno));                                  \
-              UNLOCK(lock);                                          \
-              ret = -1;                                              \
-              goto label;                                            \
-            }                                                        \
-            UNLOCK(lock);                                            \
+              ret = -1;                                                 \
+            }                                                           \
+            if (!ret) {                                                 \
+              if(glfs_write (tgmfd, write, strlen(write), 0) < 0) {     \
+                GB_ASPRINTF(&errMsg, "Failed to update transaction log "\
+                  "for %s/%s[%s]", volume, fname, strerror(errno));     \
+                LOG("mgmt", GB_LOG_ERROR, "glfs_write(%s): on "         \
+                    "volume %s failed[%s]", fname, volume,              \
+                    strerror(errno));                                   \
+                ret = -1;                                               \
+              }                                                         \
+              GB_FREE(write);                                           \
+            }                                                           \
+            if (tgmfd && glfs_close(tgmfd) != 0) {                      \
+              GB_ASPRINTF(&errMsg, "Failed to update transaction log "  \
+                "for %s/%s[%s]", volume, fname, strerror(errno));       \
+              LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on "           \
+                  "volume %s failed[%s]", fname, volume,                \
+                  strerror(errno));                                     \
+              UNLOCK(lock);                                             \
+              ret = -1;                                                 \
+              goto label;                                               \
+            }                                                           \
+            UNLOCK(lock);                                               \
+            if (ret) {                                                  \
+              goto label;                                               \
+            }                                                           \
           } while (0)
 
 # define  GB_METAUNLOCK(lkfd, volume, ret, errMsg)                   \

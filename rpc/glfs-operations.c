@@ -102,7 +102,7 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
   }
 
   tgfd = glfs_creat(glfs, gbid,
-                    O_WRONLY | O_CREAT | O_EXCL,
+                    O_WRONLY | O_CREAT | O_EXCL | O_SYNC,
                     S_IRUSR | S_IWUSR);
   if (!tgfd) {
     *errCode = errno;
