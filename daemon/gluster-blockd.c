@@ -119,11 +119,18 @@ glusterBlockServerThreadProc(void *vargp)
   register SVCXPRT *transp = NULL;
   struct sockaddr_in sain = {0, };
   int sockfd;
+  int opt = 1;
 
 
   if ((sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
     LOG("mgmt", GB_LOG_ERROR, "TCP socket creation failed (%s)",
         strerror (errno));
+    goto out;
+  }
+
+  if (setsockopt (sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof (opt)) < 0) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "setsockopt() for SO_REUSEADDR failed (%s)", strerror (errno));
     goto out;
   }
 
