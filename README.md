@@ -56,7 +56,7 @@ managing the command ring buffers
 # git clone https://github.com/gluster/gluster-block.git
 # cd gluster-block/
 # dnf install autoconf automake libtool libuuid-devel json-c-devel glusterfs-api-devel tcmu-runner targetcli (on fedora)
-# make -j install
+# ./autogen.sh && ./configure && make -j install
 </pre>
 
 ### Usage
@@ -138,7 +138,27 @@ BLOCK CONFIG NODE(S): 192.168.1.11 192.168.1.12 192.168.1.13
 # dnf install iscsi-initiator-utils
 # lsblk (note the available devices)
 
-Make sure you have multipathd running and configured in Active/Passive mode
+You can skip configuring multipath, if you choose not to enable mpath.
+Below we set mapth in Active/Passive mode; Note currently Active/Active is not supported.
+# modprobe dm_multipath
+# mpathconf --enable
+# cat >> /etc/multipath.conf
+# LIO iSCSI
+devices {
+        device {
+                vendor "LIO-ORG"
+                user_friendly_names "yes" # names like mpatha
+                path_grouping_policy "failover" # one path per group
+                path_selector "round-robin 0"
+                failback immediate
+                path_checker "tur"
+                prio "const"
+                no_path_retry 120
+                rr_weight "uniform"
+        }
+}
+Ctrl^C
+# systemctl restart multipathd
 
 Discovery ...
 # iscsiadm -m discovery -t st -p 192.168.1.11
