@@ -244,7 +244,7 @@ glusterBlockParseVolumeBlock(char *volumeblock, char *volume, char *block,
   /* part before '/' is the volume name */
   sep = strchr(volumeblock, '/');
   if (!sep) {
-    MSG("argument '<volname/blockname>'(%s) doesn't seems to be right",
+    MSG("argument '<volname/blockname>'(%s) is incorrect",
         volumeblock);
     MSG("%s\n", helpstr);
     LOG("cli", GB_LOG_ERROR, "%s failed while parsing <volname/blockname>", op);
@@ -303,7 +303,7 @@ glusterBlockModify(int argcount, char **options, int json)
     } else if (strcmp (options[optind], "disable") == 0) {
        mobj.auth_mode = 0;
     } else {
-      MSG("%s\n", "argument to 'auth' doesn't seems to be right");
+      MSG("%s\n", "'auth' option is incorrect");
       MSG("%s\n", GB_MODIFY_HELP_STR);
       LOG("cli", GB_LOG_ERROR, "Modify failed while parsing argument "
                                "to auth  for <%s/%s>",
@@ -371,7 +371,7 @@ glusterBlockCreate(int argcount, char **options, int json)
       } else if (strcmp (options[optind], "disable") == 0) {
          cobj.auth_mode = 0;
       } else {
-        MSG("%s\n", "argument to 'auth' doesn't seems to be right");
+        MSG("%s\n", "'auth' option is incorrect");
         MSG("%s\n", GB_CREATE_HELP_STR);
         LOG("cli", GB_LOG_ERROR, "Create failed while parsing argument "
                                  "to auth  for <%s/%s>",
@@ -400,7 +400,7 @@ glusterBlockCreate(int argcount, char **options, int json)
   /* last arg will be size */
   sparse_ret = glusterBlockCreateParseSize("cli", options[optind]);
   if (sparse_ret < 0) {
-    MSG("%s\n", "last argument '<size>' doesn't seems to be right");
+    MSG("%s\n", "'<size>' is incorrect");
     MSG("%s\n", GB_CREATE_HELP_STR);
     LOG("cli", GB_LOG_ERROR, "failed while parsing size for block <%s/%s>",
         cobj.volume, cobj.block_name);
@@ -535,14 +535,14 @@ glusterBlockParseArgs(int count, char **options)
 
   opt = glusterBlockCLIOptEnumParse(options[1]);
   if (!opt || opt >= GB_CLI_OPT_MAX) {
-    MSG("unknow option: %s\n", options[1]);
+    MSG("unknown option: %s\n", options[1]);
     return -1;
   }
 
   if (opt > 0 && opt < GB_CLI_HELP) {
           json = jsonResponseFormatParse (options[count-1]);
           if (json == GB_JSON_MAX) {
-            MSG("expecting '--json*', but argument %s doesn't seem to be matching",
+            MSG("expecting '--json*', got '%s'\n",
                 options[count-1]);
             return -1;
           } else if (json != GB_JSON_NONE) {
