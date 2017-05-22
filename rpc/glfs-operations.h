@@ -25,7 +25,7 @@
 
 typedef struct NodeInfo {
   char addr[255];
-  char status[16];
+  char status[32];
 } NodeInfo;
 
 typedef struct MetaInfo {
@@ -33,7 +33,7 @@ typedef struct MetaInfo {
   char   gbid[38];
   size_t size;
   size_t mpath;
-  char   entry[16];
+  char   entry[16];  /* possible strings for ENTRYCREATE: INPROGRESS|SUCCESS|FAIL */
   char   passwd[38];
 
   size_t nhosts;
