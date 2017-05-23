@@ -98,11 +98,20 @@ supported JSON formats:
 
 #### Example:
 
-*192.168.1.11, 192.168.1.12, 192.168.1.13: All nodes run gluster-blockd.service and glusterd.service (three nodes to achieve mutipath for HA)<br>
-192.168.1.14: Initiator, iSCSI client<br><br>
-Execute gluster-block CLI from any of the 3 nodes where glusterd and gluster-blockd are running <br>
-Create a gluster volume by pooling 3 nodes (192.168.1.11, 192.168.1.12 and 192.168.1.13) <br>
-Read More on how to [create a gluster volume](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/2.1/html/Administration_Guide/sect-User_Guide-Setting_Volumes-Replicated.html)*
+The hosts involved:
+
+* 192.168.1.11, 192.168.1.12, 192.168.1.13: All nodes run gluster-blockd.service and glusterd.service (three nodes to achieve mutipath for HA)
+* 192.168.1.14: Initiator, iSCSI client
+
+Preparation:
+
+* Create a gluster trusted storage pool of the 3 nodes
+  (192.168.1.11, 192.168.1.12 and 192.168.1.13).
+* Create a gluster volume called `block-test` on the gluster cluster.
+* Read More on how to [create a gluster volume](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/2.1/html/Administration_Guide/sect-User_Guide-Setting_Volumes-Replicated.html)
+
+In the following, you can execute gluster-block CLI from any of the 3
+nodes where glusterd and gluster-blockd are running.
 
 <pre>
 Create 1G gluster block storage with name 'sample-block'
