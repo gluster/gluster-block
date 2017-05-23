@@ -106,9 +106,10 @@ The hosts involved:
 Preparation:
 
 * Create a gluster trusted storage pool of the 3 nodes
-  (192.168.1.11, 192.168.1.12 and 192.168.1.13).
+  192.168.1.11, 192.168.1.12, and 192.168.1.13.
+    * Read more about [trusted storage pools](https://gluster.readthedocs.io/en/latest/Administrator%20Guide/Storage%20Pools/).
 * Create a gluster volume called `block-test` on the gluster cluster.
-* Read More on how to [create a gluster volume](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/2.1/html/Administration_Guide/sect-User_Guide-Setting_Volumes-Replicated.html)
+    * Read More on how to [create a gluster volume](https://gluster.readthedocs.io/en/latest/Administrator%20Guide/Setting%20Up%20Volumes/#creating-replicated-volumes).
 
 In the following, you can execute gluster-block CLI from any of the 3
 nodes where glusterd and gluster-blockd are running.
