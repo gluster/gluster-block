@@ -13,7 +13,6 @@ We can access glusterfs via [FUSE](https://en.wikipedia.org/wiki/Filesystem_in_U
 > A unique distributed storage solution build on traditional filesystems
 
 ### How we achieve block storage in gluster ?
-======
 
 ![untitled diagram](https://cloud.githubusercontent.com/assets/12432241/21478518/235e533c-cb72-11e6-9c5a-e351513a34b7.png)
 
@@ -98,7 +97,7 @@ supported JSON formats:
 ```
 
 #### Example:
-======
+
 *192.168.1.11, 192.168.1.12, 192.168.1.13: All nodes run gluster-blockd.service and glusterd.service (three nodes to achieve mutipath for HA)<br>
 192.168.1.14: Initiator, iSCSI client<br><br>
 Execute gluster-block CLI from any of the 3 nodes where glusterd and gluster-blockd are running <br>
