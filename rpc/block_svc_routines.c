@@ -2500,6 +2500,7 @@ blockhostIsValid (char *status)
 {
   switch (blockMetaStatusEnumParse(status)) {
   case GB_CONFIG_SUCCESS:
+  case GB_CLEANUP_INPROGRESS:
   case GB_AUTH_ENFORCEING:
   case GB_AUTH_ENFORCED:
   case GB_AUTH_ENFORCE_FAIL:
