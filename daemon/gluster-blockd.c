@@ -206,6 +206,9 @@ main (int argc, char **argv)
     exit(errnosv);
   }
 
+  /* set signal */
+  signal(SIGPIPE, SIG_IGN);
+
   pmap_unset(GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS);
   pmap_unset(GLUSTER_BLOCK, GLUSTER_BLOCK_VERS);
 
