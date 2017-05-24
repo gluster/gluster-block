@@ -267,7 +267,6 @@ blockRemoteCreateRespParse(char *output, blockRemoteCreateResp **savereply)
       }
       break;
     case GB_FAILED_RESP:
-    case GB_FAILED_DEPEND:
       errMsg = local->errMsg;
       if (errMsg == NULL) {
         GB_ASPRINTF(&local->errMsg, "%s", line);
@@ -474,6 +473,17 @@ blockServerParse(char *blkServers)
 }
 
 
+static bool
+isRetValueDependencyError(int ret)
+{
+    if (ret == EKEYEXPIRED || ret == ESRCH || ret == ENODEV) {
+      return TRUE;
+    }
+
+    return FALSE;
+}
+
+
 void *
 glusterBlockCreateRemote(void *data)
 {
@@ -500,9 +510,9 @@ glusterBlockCreateRemote(void *data)
       goto out;
     }
 
-    if (ret == EKEYEXPIRED) {
+    if (isRetValueDependencyError(ret)) {
       LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence create block %s on "
-          "host %s volume %s failed", FAILED_DEPENDENCY, strerror(errno),
+          "host %s volume %s failed", FAILED_DEPENDENCY, strerror(ret),
           cobj.block_name, args->addr, args->volume);
       goto out;
     }
@@ -584,8 +594,8 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
   ret = 0;
   for (i = 0; i < mpath; i++) {
     /* this means in oneof the nodes dependency package not installed*/
-    if (args[i].exit == EKEYEXPIRED) {
-      ret = EKEYEXPIRED;
+    if (isRetValueDependencyError(args[i].exit)) {
+      ret = args[i].exit;
       goto out; /* important to catch */
     } else if (args[i].exit) {
       ret = -1;
@@ -626,9 +636,9 @@ glusterBlockDeleteRemote(void *data)
       goto out;
     }
 
-    if (ret == EKEYEXPIRED) {
+    if (isRetValueDependencyError(ret)) {
       LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence delete block %s on "
-          "host %s volume %s failed", FAILED_DEPENDENCY, strerror(errno),
+          "host %s volume %s failed", FAILED_DEPENDENCY, strerror(ret),
           dobj.block_name, args->addr, args->volume);
       goto out;
     }
@@ -797,8 +807,8 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
 
   ret = 0;
   for (i = 0; i < count; i++) {
-    if (args[i].exit == EKEYEXPIRED) {
-      ret = EKEYEXPIRED;
+    if (isRetValueDependencyError(args[i].exit)) {
+      ret = args[i].exit;
       break; /* important to catch */
     } else if (args[i].exit) {
       ret = -1;
@@ -844,9 +854,9 @@ glusterBlockModifyRemote(void *data)
       goto out;
     }
 
-    if (ret == EKEYEXPIRED) {
+    if (isRetValueDependencyError(ret)) {
       LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence modify block %s on "
-          "host %s volume %s failed", FAILED_DEPENDENCY, strerror(errno),
+          "host %s volume %s failed", FAILED_DEPENDENCY, strerror(ret),
           cobj.block_name, args->addr, args->volume);
       goto out;
     }
@@ -974,8 +984,8 @@ glusterBlockModifyRemoteAsync(MetaInfo *info,
             goto out;
   }
   for (i = 0; i < count; i++) {
-    if (args[i].exit == EKEYEXPIRED) {
-      ret = EKEYEXPIRED;
+    if (isRetValueDependencyError(args[i].exit)) {
+      ret = args[i].exit;
       break; /* important to catch */
     } else if (args[i].exit) {
       ret = -1;
@@ -1025,7 +1035,10 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
     LOG("mgmt", GB_LOG_WARNING,
         "glusterBlockDeleteRemoteAsync: return %d %s for block %s on volume %s",
         asyncret, FAILED_REMOTE_AYNC_DELETE, blockname, info->volume);
-    /* No action ? */
+
+    if (isRetValueDependencyError(asyncret)) {
+      goto out;
+    }
   }
 
   /* delete metafile and block file */
@@ -1232,6 +1245,21 @@ blockStr2arrayAddToJsonObj (json_object *json_obj, char *string, char *label,
   json_object_object_add(json_obj, label, json_array1);
   *json_array = json_array1;
 }
+
+
+static void
+blockFormatDependencyErrors(int errCode, char **errMsg)
+{
+  if (errCode == ESRCH) {
+    GB_ASPRINTF(errMsg, "tcmu-runner is not running in few nodes");
+  } else if (errCode == ENODEV) {
+    GB_ASPRINTF(errMsg, "tcmu-runner running, but targetcli doesn't list "
+                        "user:glfs handler in few nodes");
+  } else if (errCode == EKEYEXPIRED) {
+    GB_ASPRINTF(errMsg, "targetcli is not installed on few nodes");
+  }
+}
+
 
 static void
 blockModifyCliFormatResponse (blockModifyCli *blk, struct blockModify *mobj,
@@ -1441,6 +1469,7 @@ block_modify_cli_1_svc(blockModifyCli *blk, struct svc_req *rqstp)
   asyncret = glusterBlockModifyRemoteAsync(info, glfs, &mobj,
                                            &savereply, rollback);
   if (asyncret) {   /* asyncret decides result is success/fail */
+    errCode = asyncret;
     LOG("mgmt", GB_LOG_WARNING,
         "glusterBlockModifyRemoteAsync(auth=%d): return %d %s for block %s on volume %s",
         blk->auth_mode, asyncret, FAILED_REMOTE_AYNC_MODIFY, blk->block_name, info->volume);
@@ -1481,10 +1510,7 @@ block_modify_cli_1_svc(blockModifyCli *blk, struct svc_req *rqstp)
   ret = 0;
 
  out:
-  if (ret == EKEYEXPIRED) {
-    GB_ASPRINTF(&errMsg, "Looks like targetcli and tcmu-runner are not "
-                "installed on " "few nodes.\n");
-  }
+  blockFormatDependencyErrors(errCode, &errMsg);
 
   GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
 
@@ -1787,7 +1813,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   errCode = glusterBlockCreateRemoteAsync(list, 0, blk->mpath,
                                           glfs, &cobj, &savereply);
   if (errCode) {
-    if (errCode == EKEYEXPIRED) {
+    if (isRetValueDependencyError(errCode)) {
       LOG("mgmt", GB_LOG_ERROR, "glusterBlockCreateRemoteAsync: return %d"
           " rollingback the create request for block %s on volume %s with hosts %s",
           errCode, blk->block_name, blk->volume, blk->block_hosts);
@@ -1812,10 +1838,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   }
 
  exist:
-  if (errCode == EKEYEXPIRED) {
-    GB_ASPRINTF(&errMsg, "Looks like targetcli and tcmu-runner are not "
-                "installed on few nodes.\n");
-  }
+  blockFormatDependencyErrors(errCode, &errMsg);
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
  out:
@@ -1837,11 +1860,54 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 }
 
 
+static int
+blockNodeSanityCheck(blockResponse *reply)
+{
+  int ret;
+
+
+  /* Check if tcmu-runner is running */
+  ret = WEXITSTATUS(system("ps aux ww | grep -w '[t]cmu-runner' > /dev/null"));
+  if (ret == 1) {
+    LOG("mgmt", GB_LOG_ERROR, "%s", "tcmu-runner not running");
+    reply->exit = ESRCH;
+    if (GB_ASPRINTF(&reply->out, "tcmu-runner not running") == -1) {
+      return -1;
+    }
+    return -1;
+  }
+
+  /* Check targetcli has user:glfs handler listed */
+  ret = WEXITSTATUS(system(GB_TGCLI_GLFS_CHECK));
+  if (ret == 1) {
+    LOG("mgmt", GB_LOG_ERROR, "%s",
+        "tcmu-runner running, but targetcli doesn't list user:glfs handler");
+    reply->exit = ENODEV;
+    if (GB_ASPRINTF(&reply->out,
+                    "tcmu-runner running, but targetcli doesn't list "
+                    "user:glfs handler") == -1) {
+      return -1;
+    }
+    return -1;
+  }
+
+  if (ret == EKEYEXPIRED) {
+    LOG("mgmt", GB_LOG_ERROR, "%s", "targetcli not found");
+    reply->exit = EKEYEXPIRED;
+    if (GB_ASPRINTF(&reply->out, "targetcli not found") == -1) {
+      return -1;
+    }
+    return -1;
+  }
+
+  return 0;
+}
+
+
 blockResponse *
 block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
 {
   FILE *fp;
-  int  ret;
   char *tmp = NULL;
   char *backstore = NULL;
   char *iqn = NULL;
@@ -1866,14 +1932,7 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  /* Check if targetcli and tcmu-runner installed ? */
-  ret = WEXITSTATUS(system(GB_TGCLI_GLFS_CHECK));
-  if (ret == EKEYEXPIRED || ret == 1) {
-    reply->exit = EKEYEXPIRED;
-    if (GB_ASPRINTF(&reply->out,
-                 "check if targetcli and tcmu-runner are installed.") == -1) {
-      goto out;
-    }
+  if (blockNodeSanityCheck(reply)) {
     goto out;
   }
 
@@ -2139,10 +2198,7 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
   }
 
  out:
-  if (errCode == EKEYEXPIRED) {
-    GB_ASPRINTF(&errMsg, "Looks like targetcli and tcmu-runner are not "
-                "installed on few nodes.\n");
-  }
+  blockFormatDependencyErrors(errCode, &errMsg);
 
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
@@ -2173,7 +2229,6 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
   char *iqn = NULL;
   char *backstore = NULL;
   char *exec = NULL;
-  int ret;
   blockResponse *reply = NULL;
 
 
@@ -2185,14 +2240,7 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  /* Check if targetcli and tcmu-runner installed ? */
-  ret = WEXITSTATUS(system(GB_TGCLI_GLFS_CHECK));
-  if (ret == EKEYEXPIRED || ret == 1) {
-    reply->exit = EKEYEXPIRED;
-    if (GB_ASPRINTF(&reply->out,
-                    "check if targetcli and tcmu-runner are installed.") == -1) {
-      goto out;
-    }
+  if (blockNodeSanityCheck(reply)) {
     goto out;
   }
 
@@ -2286,14 +2334,7 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  /* Check if targetcli and tcmu-runner installed ? */
-  ret = WEXITSTATUS(system(GB_TGCLI_GLFS_CHECK));
-  if (ret == EKEYEXPIRED || ret == 1) {
-    reply->exit = EKEYEXPIRED;
-    if (GB_ASPRINTF(&reply->out,
-                 "check if targetcli and tcmu-runner are installed.") == -1) {
-      goto out;
-    }
+  if (blockNodeSanityCheck(reply)) {
     goto out;
   }
 

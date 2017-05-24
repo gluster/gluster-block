@@ -369,7 +369,6 @@ typedef enum RemoteCreateResp {
   GB_IP_PORT_RESP   = 4,
   GB_PORTAL_RESP    = 5,
   GB_FAILED_RESP    = 6,
-  GB_FAILED_DEPEND  = 7,
 
   GB_REMOTE_CREATE_RESP_MAX
 } RemoteCreateResp;
@@ -382,7 +381,6 @@ static const char *const RemoteCreateRespLookup[] = {
   [GB_IP_PORT_RESP]  = "Using default IP port ",
   [GB_PORTAL_RESP]   = "Created network portal ",
   [GB_FAILED_RESP]   = "failed to configure on ",
-  [GB_FAILED_DEPEND] = "check if targetcli and tcmu-runner are installed.",
 
   [GB_REMOTE_CREATE_RESP_MAX] = NULL,
 };
