@@ -20,6 +20,10 @@ glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg)
   struct glfs *glfs;
   int ret;
 
+  glfs = queryCache(volume);
+  if (glfs) {
+    return glfs;
+  }
 
   glfs = glfs_new(volume);
   if (!glfs) {
@@ -64,6 +68,12 @@ glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg)
     }
     LOG("gfapi", GB_LOG_ERROR, "glfs_init() on %s failed[%s]", volume,
         strerror(*errCode));
+    goto out;
+  }
+
+  if (appendNewEntry(volume, glfs)) {
+    *errCode = ENOMEM;
+    LOG("gfapi", GB_LOG_ERROR, "allocation failed in appendNewEntry(%s)", volume);
     goto out;
   }
 

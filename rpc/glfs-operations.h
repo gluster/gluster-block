@@ -17,8 +17,7 @@
 # include  <stdbool.h>
 # include  <errno.h>
 
-# include  <glusterfs/api/glfs.h>
-
+# include  "lru.h"
 # include  "block.h"
 
 

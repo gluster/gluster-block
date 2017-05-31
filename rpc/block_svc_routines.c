@@ -1495,7 +1495,6 @@ block_modify_cli_1_svc(blockModifyCli *blk, struct svc_req *rqstp)
   blockModifyCliFormatResponse (blk, &mobj, asyncret?asyncret:errCode,
                                 errMsg, savereply, info, reply, rollback);
   blockFreeMetaInfo(info);
-  glfs_fini(glfs);
 
   if (savereply) {
     GB_FREE(savereply->attempt);
@@ -1808,7 +1807,6 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   blockCreateCliFormatResponse(glfs, blk, &cobj, errCode, errMsg, savereply, reply);
   GB_FREE(errMsg);
   blockServerDefFree(list);
-  glfs_fini(glfs);
   blockCreateParsedRespFree(savereply);
   GB_FREE (cobj.block_hosts);
 
@@ -2115,7 +2113,6 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 
 
   blockDeleteCliFormatResponse(blk, errCode, errMsg, savereply, reply);
-  glfs_fini(glfs);
 
   if (savereply) {
     GB_FREE(savereply->d_attempt);
@@ -2502,8 +2499,6 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
         GB_TXLOCKFILE, blk->volume, strerror(errno));
   }
 
-  glfs_fini(glfs);
-
   return reply;
 }
 
@@ -2662,7 +2657,6 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
 
 
   blockInfoCliFormatResponse(blk, errCode, errMsg, info, reply);
-  glfs_fini(glfs);
   GB_FREE(errMsg);
   blockFreeMetaInfo(info);
 

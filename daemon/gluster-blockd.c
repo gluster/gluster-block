@@ -16,6 +16,7 @@
 # include  <rpc/pmap_clnt.h>
 
 # include  "common.h"
+# include  "lru.h"
 # include  "block.h"
 # include  "block_svc.h"
 
@@ -205,6 +206,8 @@ main (int argc, char **argv)
     close(fd);
     exit(errnosv);
   }
+
+  initCache();
 
   /* set signal */
   signal(SIGPIPE, SIG_IGN);
