@@ -39,6 +39,8 @@
 # define   GB_TGCLI_IQN_PREFIX  "iqn.2016-12.org.gluster-block:"
 
 # define   GB_JSON_OBJ_TO_STR(x) json_object_new_string(x?x:"")
+# define   GB_DEFAULT_ERRMSG    "Operation failed, please check the log "\
+                                "file to find the reason."
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -76,6 +78,7 @@ typedef struct blockRemoteDeleteResp {
 
 
 typedef struct blockRemoteCreateResp {
+  char *errMsg;
   char *backend_size;
   char *iqn;
   size_t nportal;
@@ -183,6 +186,7 @@ blockCreateParsedRespFree(blockRemoteCreateResp *savereply)
 
   GB_FREE(savereply->backend_size);
   GB_FREE(savereply->iqn);
+  GB_FREE(savereply->errMsg);
 
   for (i = 0; i < savereply->nportal; i++) {
     GB_FREE(savereply->portal[i]);
@@ -200,11 +204,11 @@ blockCreateParsedRespFree(blockRemoteCreateResp *savereply)
 
 
 static int
-blockRemoteCreateRespParse(char *output /* create output on one node */,
-                           blockRemoteCreateResp **savereply)
+blockRemoteCreateRespParse(char *output, blockRemoteCreateResp **savereply)
 {
   char *line;
   blockRemoteCreateResp *local = *savereply;
+  char *errMsg = NULL;
 
 
   if (!local) {
@@ -264,7 +268,13 @@ blockRemoteCreateRespParse(char *output /* create output on one node */,
       break;
     case GB_FAILED_RESP:
     case GB_FAILED_DEPEND:
-      /* do nothing, this node will be mentioned in FAILED ON: while delete */
+      errMsg = local->errMsg;
+      if (errMsg == NULL) {
+        GB_ASPRINTF(&local->errMsg, "%s", line);
+      } else {
+        GB_ASPRINTF(&local->errMsg, "%s\n%s", errMsg, line);
+      }
+      GB_FREE (errMsg);
       break;
     case GB_REMOTE_CREATE_RESP_MAX:
       goto out;
@@ -983,8 +993,8 @@ glusterBlockModifyRemoteAsync(MetaInfo *info,
 
 
 static int
-glusterBlockCleanUp(operations opt, struct glfs *glfs, char *blockname,
-                    bool deleteall, void *reply)
+glusterBlockCleanUp(struct glfs *glfs, char *blockname,
+                    bool deleteall, blockRemoteDeleteResp *drobj)
 {
   int ret = -1;
   size_t i;
@@ -992,22 +1002,8 @@ glusterBlockCleanUp(operations opt, struct glfs *glfs, char *blockname,
   size_t cleanupsuccess = 0;
   size_t count = 0;
   MetaInfo *info = NULL;
-  blockRemoteDeleteResp *drobj;
-  blockRemoteCreateResp *crobj;
   int asyncret = 0;
   char *errMsg = NULL;
-
-  switch(opt) {
-  case CREATE_SRV:
-    crobj = *(blockRemoteCreateResp **)reply;
-    drobj = crobj->obj;
-  break;
-  case DELETE_SRV:
-    drobj = *(blockRemoteDeleteResp **)reply;
-  break;
-  default:
-    goto out;
-  }
 
 
   if (GB_ALLOC(info) < 0) {
@@ -1139,8 +1135,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
           "No Spare nodes to create (%s): rollingback creation of target"
           " on volume %s with given hosts %s",
           blk->block_name, blk->volume, blk->block_hosts);
-      glusterBlockCleanUp(CREATE_SRV, glfs,
-                          blk->block_name, TRUE, reply);
+      glusterBlockCleanUp(glfs, blk->block_name, TRUE, (*reply)->obj);
       needcleanup = FALSE;   /* already clean attempted */
       ret = -1;
       goto out;
@@ -1149,8 +1144,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
           "Not enough Spare nodes for (%s): rollingback creation of target"
           " on volume %s with given hosts %s",
           blk->block_name, blk->volume, blk->block_hosts);
-      glusterBlockCleanUp(CREATE_SRV, glfs,
-                          blk->block_name, TRUE, reply);
+      glusterBlockCleanUp(glfs, blk->block_name, TRUE, (*reply)->obj);
       needcleanup = FALSE;   /* already clean attempted */
       ret = -1;
       goto out;
@@ -1181,8 +1175,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
 
  out:
   if (needcleanup) {
-      glusterBlockCleanUp(CREATE_SRV, glfs,
-                          blk->block_name, FALSE, reply);
+      glusterBlockCleanUp(glfs, blk->block_name, FALSE, (*reply)->obj);
   }
 
   blockFreeMetaInfo(info);
@@ -1353,6 +1346,13 @@ blockModifyCliFormatResponse (blockModifyCli *blk, struct blockModify *mobj,
     GB_FREE(tmp3);
   }
   GB_FREE(tmp);
+
+  /*catch all*/
+  if (!reply->out) {
+    blockFormatErrorResponse(MODIFY_SRV, blk->json_resp, errCode,
+                             GB_DEFAULT_ERRMSG, reply);
+  }
+
 }
 
 blockResponse *
@@ -1525,6 +1525,7 @@ blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
   char         *tmp2     = NULL;
   char         *portals  = NULL;
   int          i         = 0;
+  int          infoErrCode = 0;
 
 
   if (!reply) {
@@ -1542,10 +1543,17 @@ blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
   }
 
   if (GB_ALLOC(info) < 0) {
+    blockFormatErrorResponse(CREATE_SRV, blk->json_resp, ENOMEM,
+                             "Allocatoin Failed\n", reply);
     return;
   }
 
-  if (blockGetMetaInfo(glfs, blk->block_name, info, NULL)) {
+  if (blockGetMetaInfo(glfs, blk->block_name, info, &infoErrCode)) {
+    if (infoErrCode == ENOENT) {
+      blockFormatErrorResponse(CREATE_SRV, blk->json_resp,
+                               (errCode?errCode:GB_DEFAULT_ERRCODE),
+                               savereply->errMsg, reply);
+    }
     goto out;
   }
 
@@ -1653,6 +1661,12 @@ blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
   }
 
  out:
+  /*catch all*/
+  if (!reply->out) {
+    blockFormatErrorResponse(CREATE_SRV, blk->json_resp, errCode,
+                             GB_DEFAULT_ERRMSG, reply);
+  }
+
   blockFreeMetaInfo(info);
   GB_FREE(tmp);
   GB_FREE(tmp2);
@@ -1778,7 +1792,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
           " rollingback the create request for block %s on volume %s with hosts %s",
           errCode, blk->block_name, blk->volume, blk->block_hosts);
 
-      glusterBlockCleanUp(CREATE_SRV, glfs, blk->block_name, TRUE, &savereply);
+      glusterBlockCleanUp(glfs, blk->block_name, TRUE, savereply->obj);
 
       goto exist;
     }
@@ -2058,6 +2072,12 @@ blockDeleteCliFormatResponse(blockDeleteCli *blk, int errCode, char *errMsg,
     }
   }
  out:
+  /*catch all*/
+  if (!reply->out) {
+    blockFormatErrorResponse(DELETE_SRV, blk->json_resp, errCode,
+                             GB_DEFAULT_ERRMSG, reply);
+  }
+
   GB_FREE (tmp);
   return;
 }
@@ -2112,8 +2132,7 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  errCode = glusterBlockCleanUp(DELETE_SRV, glfs, blk->block_name, TRUE,
-                                &savereply);
+  errCode = glusterBlockCleanUp(glfs, blk->block_name, TRUE, savereply);
   if (errCode) {
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockCleanUp: return %d "
         "on block %s for volume %s", errCode, blk->block_name, blk->volume);
@@ -2640,6 +2659,11 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     GB_FREE (tmp);
   }
  out:
+  /*catch all*/
+  if (!reply->out) {
+    blockFormatErrorResponse(DELETE_SRV, blk->json_resp, errCode,
+                             GB_DEFAULT_ERRMSG, reply);
+  }
   return;
 }
 
