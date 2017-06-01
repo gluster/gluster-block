@@ -17,6 +17,7 @@
 # include  "common.h"
 # include  "list.h"
 
+# define   LRU_COUNT_MAX   512
 
 void
 initCache(void);

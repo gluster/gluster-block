@@ -15,26 +15,6 @@
 # include  <ctype.h>
 
 
-
-typedef enum clioperations {
-  CREATE_CLI = 1,
-  LIST_CLI   = 2,
-  INFO_CLI   = 3,
-  DELETE_CLI = 4,
-  MODIFY_CLI = 5
-} clioperations;
-
-const char *argp_program_version = ""                                 \
-  PACKAGE_NAME" ("PACKAGE_VERSION")"                                  \
-  "\nRepository rev: https://github.com/gluster/gluster-block.git\n"  \
-  "Copyright (c) 2016 Red Hat, Inc. <https://redhat.com/>\n"          \
-  "gluster-block comes with ABSOLUTELY NO WARRANTY.\n"                \
-  "It is licensed to you under your choice of the GNU Lesser\n"       \
-  "General Public License, version 3 or any later version (LGPLv3\n"  \
-  "or later), or the GNU General Public License, version 2 (GPLv2),\n"\
-  "in all cases as published by the Free Software Foundation.";
-
-
 # define  GB_CREATE_HELP_STR  "gluster-block create <volname/blockname> "\
                                 "[ha <count>] [auth enable|disable] "\
                                 "<HOST1[,HOST2,...]> <size> [--json*]"
@@ -53,6 +33,17 @@ const char *argp_program_version = ""                                 \
               return -1;                                              \
             }                                                         \
           } while(0)
+
+
+extern const char *argp_program_version;
+
+typedef enum clioperations {
+  CREATE_CLI = 1,
+  LIST_CLI   = 2,
+  INFO_CLI   = 3,
+  DELETE_CLI = 4,
+  MODIFY_CLI = 5
+} clioperations;
 
 
 static int

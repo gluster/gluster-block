@@ -15,11 +15,36 @@
 # include  <pthread.h>
 # include  <rpc/pmap_clnt.h>
 
+# include  "config.h"
 # include  "common.h"
 # include  "lru.h"
 # include  "block.h"
 # include  "block_svc.h"
 
+
+
+extern size_t glfsLruCount;
+extern const char *argp_program_version;
+
+
+static void
+glusterBlockDHelp(void)
+{
+  MSG("%s",
+      "gluster-blockd ("PACKAGE_VERSION")\n"
+      "usage:\n"
+      "  gluster-blockd [--glfs-lru-count <count>]\n"
+      "\n"
+      "commands:\n"
+      "  --glfs-lru-count <count>\n"
+      "        glfs objects cache capacity [max: 512] (default: 5)\n"
+      "  --help\n"
+      "        show this message and exit.\n"
+      "  --version\n"
+      "        show version info and exit.\n"
+      "\n"
+     );
+}
 
 
 static bool
@@ -184,7 +209,47 @@ main (int argc, char **argv)
   pthread_t server_thread;
   struct flock lock = {0, };
   int errnosv = 0;
+  size_t opt = 0;
 
+
+  if (argc > 1) {
+    opt = glusterBlockDaemonOptEnumParse(argv[1]);
+    if (!opt || opt >= GB_DAEMON_OPT_MAX) {
+      MSG("unknown option: %s\n", argv[1]);
+      return -1;
+    }
+
+    switch (opt) {
+    case GB_DAEMON_HELP:
+    case GB_DAEMON_USAGE:
+      if (argc != 2) {
+        MSG("undesired options for: %s\n", argv[1]);
+      }
+      glusterBlockDHelp();
+      return 0;
+
+    case GB_DAEMON_VERSION:
+      MSG("%s\n", argp_program_version);
+      return 0;
+
+    case GB_DAEMON_GLFS_LRU_COUNT:
+      if (argc != 3) {
+        MSG("undesired options for: %s\n", argv[1]);
+        return -1;
+      }
+      if (sscanf(argv[2], "%zu", &glfsLruCount) != 1) {
+        MSG("option '%s' expect argument type integer <count>\n", argv[1]);
+        return -1;
+      }
+      if (!glfsLruCount || (glfsLruCount > LRU_COUNT_MAX)) {
+        MSG("glfs-lru-count argument should be [0 < count < %d]\n", LRU_COUNT_MAX);
+        LOG("mgmt", GB_LOG_ERROR,
+            "glfs-lru-count argument should be [0 < count < %d]\n", LRU_COUNT_MAX);
+        return -1;
+      }
+      break;
+    }
+  }
 
   if (!glusterBlockLogdirCreate()) {
     return -1;

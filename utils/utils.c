@@ -10,7 +10,18 @@
 
 
 # include "utils.h"
+# include "config.h"
 
+
+const char *argp_program_version = ""                                 \
+  PACKAGE_NAME" ("PACKAGE_VERSION")"                                  \
+  "\nRepository rev: https://github.com/gluster/gluster-block.git\n"  \
+  "Copyright (c) 2016 Red Hat, Inc. <https://redhat.com/>\n"          \
+  "gluster-block comes with ABSOLUTELY NO WARRANTY.\n"                \
+  "It is licensed to you under your choice of the GNU Lesser\n"       \
+  "General Public License, version 3 or any later version (LGPLv3\n"  \
+  "or later), or the GNU General Public License, version 2 (GPLv2),\n"\
+  "in all cases as published by the Free Software Foundation.";
 
 
 int
@@ -24,7 +35,31 @@ glusterBlockCLIOptEnumParse(const char *opt)
   }
 
   for (i = 0; i < GB_CLI_OPT_MAX; i++) {
-    if (!strcmp(opt, gbCmdlineOptLookup[i])) {
+    if (!strcmp(opt, gbCliCmdlineOptLookup[i])) {
+      return i;
+    }
+  }
+
+  return i;
+}
+
+
+int
+glusterBlockDaemonOptEnumParse(const char *opt)
+{
+  int i;
+
+
+  if (!opt) {
+    return GB_DAEMON_OPT_MAX;
+  }
+
+  for (i = 0; i < GB_DAEMON_OPT_MAX; i++) {
+    /* clip '--' from option */
+    while (*opt == '-') {
+      opt++;
+    }
+    if (!strcmp(opt, gbDaemonCmdlineOptLookup[i])) {
       return i;
     }
   }

@@ -10,11 +10,10 @@
 
 # include "lru.h"
 
-# define  LRU_CAPACITY  5
-
 
 static struct list_head Cache;
 static int lruCount;
+size_t glfsLruCount = 5;  /* default lru cache size */
 
 typedef struct Entry {
   char volume[256];
@@ -50,7 +49,7 @@ appendNewEntry(const char *volname, glfs_t *fs)
   Entry *tmp;
 
 
-  if (lruCount == LRU_CAPACITY) {
+  if (lruCount == glfsLruCount) {
     releaseColdEntry();
   }
 

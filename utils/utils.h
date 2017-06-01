@@ -213,9 +213,8 @@
             gbFree(1 ? (void *) &(ptr) : (ptr))
 
 
-typedef enum gbCmdlineOption {
+typedef enum gbCliCmdlineOption {
   GB_CLI_UNKNOWN        = 0,
-
   GB_CLI_CREATE         = 1,
   GB_CLI_LIST           = 2,
   GB_CLI_INFO           = 3,
@@ -229,12 +228,10 @@ typedef enum gbCmdlineOption {
   GB_CLI_HYPHEN_USAGE   = 11,
 
   GB_CLI_OPT_MAX
-} gbCmdlineOption;
+} gbCliCmdlineOption;
 
-
-static const char *const gbCmdlineOptLookup[] = {
+static const char *const gbCliCmdlineOptLookup[] = {
   [GB_CLI_UNKNOWN]        = "NONE",
-
   [GB_CLI_CREATE]         = "create",
   [GB_CLI_LIST]           = "list",
   [GB_CLI_INFO]           = "info",
@@ -250,6 +247,25 @@ static const char *const gbCmdlineOptLookup[] = {
   [GB_CLI_OPT_MAX]        = NULL,
 };
 
+typedef enum gbDaemonCmdlineOption {
+  GB_DAEMON_UNKNOWN        = 0,
+  GB_DAEMON_HELP           = 1,
+  GB_DAEMON_VERSION        = 2,
+  GB_DAEMON_USAGE          = 3,
+  GB_DAEMON_GLFS_LRU_COUNT = 4,
+
+  GB_DAEMON_OPT_MAX
+} gbDaemonCmdlineOption;
+
+static const char *const gbDaemonCmdlineOptLookup[] = {
+  [GB_DAEMON_UNKNOWN]        = "NONE",
+  [GB_DAEMON_HELP]           = "help",
+  [GB_DAEMON_VERSION]        = "version",
+  [GB_DAEMON_USAGE]          = "usage",
+  [GB_DAEMON_GLFS_LRU_COUNT] = "glfs-lru-count",
+
+  [GB_DAEMON_OPT_MAX]        = NULL,
+};
 
 typedef enum LogLevel {
   GB_LOG_NONE       = 0,
@@ -367,6 +383,8 @@ static const char *const RemoteCreateRespLookup[] = {
 
 
 int glusterBlockCLIOptEnumParse(const char *opt);
+
+int glusterBlockDaemonOptEnumParse(const char *opt);
 
 int blockMetaKeyEnumParse(const char *opt);
 
