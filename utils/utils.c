@@ -148,6 +148,30 @@ int blockRemoteCreateRespEnumParse(const char *opt)
 }
 
 
+/* On any failure return, epoch atleast */
+void
+logTimeNow(char *buf, size_t bufSize)
+{
+  struct tm tm;
+  struct timeval tv;
+
+
+  if (gettimeofday (&tv, NULL) < 0) {
+    goto out;
+  }
+
+  if (tv.tv_sec && gmtime_r(&tv.tv_sec, &tm) != NULL) {
+    strftime (buf, bufSize, "%Y-%m-%d %H:%M:%S", &tm);
+    snprintf (buf + strlen(buf), bufSize - strlen(buf), ".%06d", tv.tv_usec);
+    return;
+  }
+
+out:
+  snprintf(buf, bufSize, "%lu", (unsigned long)time(NULL));
+  return;
+}
+
+
 int
 gbAlloc(void *ptrptr, size_t size,
         const char *filename, const char *funcname, size_t linenr)

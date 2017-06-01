@@ -22,7 +22,13 @@
 # include  <unistd.h>
 # include  <errno.h>
 # include  <time.h>
+# include  <sys/time.h>
 
+# define GB_TIME_STRING_BUFLEN  \
+         (4 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 6 + 1 +   5)
+     /*   Yr      Mon     Day     Hour    Min     Sec     Ms  NULL  Round-off(32)
+         2017 -   06  -   01  ' ' 18  :   58  :   29  . 695147 '\0' Power^2
+         2017-06-01 18:58:29.695147                                             */
 
 /* Target Create */
 # define  FAILED_CREATE             "failed in create"
@@ -82,6 +88,7 @@ extern size_t logLevel;
 # define  LOG(str, level, fmt, ...)                                    \
           do {                                                         \
             FILE *fd;                                                  \
+            char timestamp[GB_TIME_STRING_BUFLEN] = {0};               \
             if (level <= logLevel) {                                   \
               if (!strcmp(str, "mgmt"))                                \
                 fd = fopen (DAEMON_LOG_FILE, "a");                     \
@@ -91,8 +98,9 @@ extern size_t logLevel;
                 fd = fopen (GFAPI_LOG_FILE, "a");                      \
               else                                                     \
                 fd = stderr;                                           \
-              fprintf(fd, "[%lu] %s: " fmt " [at %s+%d :<%s>]\n",      \
-                      (unsigned long)time(NULL), LogLevelLookup[level],\
+              logTimeNow(timestamp, GB_TIME_STRING_BUFLEN);            \
+              fprintf(fd, "[%s] %s: " fmt " [at %s+%d :<%s>]\n",       \
+                      timestamp, LogLevelLookup[level],                \
                       __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__);  \
               if (fd != stderr)                                        \
                 fclose(fd);                                            \
@@ -391,6 +399,8 @@ int blockMetaKeyEnumParse(const char *opt);
 int blockMetaStatusEnumParse(const char *opt);
 
 int blockRemoteCreateRespEnumParse(const char *opt);
+
+void logTimeNow(char* buf, size_t bufSize);
 
 int gbAlloc(void *ptrptr, size_t size,
             const char *filename, const char *funcname, size_t linenr);
