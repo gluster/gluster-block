@@ -1373,6 +1373,10 @@ block_modify_cli_1_svc(blockModifyCli *blk, struct svc_req *rqstp)
   char *errMsg = NULL;
 
 
+  LOG("mgmt", GB_LOG_DEBUG,
+      "modify cli request, volume=%s blockname=%s authmode=%d",
+      blk->volume, blk->block_name, blk->auth_mode);
+
   if ((GB_ALLOC(reply) < 0) || (GB_ALLOC(savereply) < 0) ||
       (GB_ALLOC (info) < 0)) {
     GB_FREE (reply);
@@ -1671,6 +1675,11 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   char *errMsg = NULL;
 
 
+  LOG("mgmt", GB_LOG_INFO,
+      "create cli request, volume=%s blockname=%s mpath=%d blockhosts=%s "
+      "authmode=%d size=%lu", blk->volume, blk->block_name, blk->mpath,
+      blk->block_hosts, blk->auth_mode, blk->size);
+
   if (GB_ALLOC(reply) < 0) {
     return NULL;
   }
@@ -1833,6 +1842,11 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   size_t i;
 
 
+  LOG("mgmt", GB_LOG_INFO,
+      "create request, volume=%s blockname=%s blockhosts=%s filename=%s authmode=%d "
+      "passwd=%s size=%lu", blk->volume, blk->block_name, blk->block_hosts,
+      blk->gbid, blk->auth_mode, blk->auth_mode?blk->passwd:"", blk->size);
+
   if (GB_ALLOC(reply) < 0) {
     goto out;
   }
@@ -1942,6 +1956,8 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
     GB_FREE(lun);
   }
 
+  LOG("mgmt", GB_LOG_DEBUG, "command, %s", exec);
+
   if (GB_ALLOC_N(reply->out, 4096) < 0) {
     GB_FREE(reply);
     goto out;
@@ -1963,6 +1979,9 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
           "popen(): for block %s on volume %s executing command %s failed(%s)",
           blk->block_name, blk->volume, exec, strerror(errno));
   }
+
+  LOG("mgmt", GB_LOG_DEBUG, "raw output, %s", reply->out);
+  LOG("mgmt", GB_LOG_INFO, "command exit code, %d", reply->exit);
 
  out:
   GB_FREE(exec);
@@ -2053,6 +2072,10 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
   char *errMsg = NULL;
   int errCode = 0;
 
+
+  LOG("mgmt", GB_LOG_INFO, "delete cli request, volume=%s blockname=%s",
+                           blk->volume, blk->block_name);
+
   if (GB_ALLOC(reply) < 0) {
     return NULL;
   }
@@ -2135,6 +2158,9 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
   blockResponse *reply = NULL;
 
 
+  LOG("mgmt", GB_LOG_INFO,
+      "delete request, blockname=%s filename=%s", blk->block_name, blk->gbid);
+
   if (GB_ALLOC(reply) < 0) {
     goto out;
   }
@@ -2180,6 +2206,8 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
     goto out;
   }
 
+  LOG("mgmt", GB_LOG_DEBUG, "command, %s", exec);
+
   if (GB_ALLOC_N(reply->out, 4096) < 0) {
     GB_FREE(reply);
     goto out;
@@ -2201,6 +2229,9 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
           "popen(): for block %s executing command %s failed(%s)",
           blk->block_name, exec, strerror(errno));
   }
+
+  LOG("mgmt", GB_LOG_DEBUG, "raw output, %s", reply->out);
+  LOG("mgmt", GB_LOG_INFO, "command exit code, %d", reply->exit);
 
  out:
   GB_FREE(exec);
@@ -2225,6 +2256,11 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
   size_t i;
   char *tmp = NULL;
 
+
+  LOG("mgmt", GB_LOG_INFO,
+      "modify request, volume=%s blockname=%s filename=%s authmode=%d passwd=%s",
+      blk->volume, blk->block_name, blk->gbid, blk->auth_mode,
+      blk->auth_mode?blk->passwd:"");
 
   if (GB_ALLOC(reply) < 0) {
     return NULL;
@@ -2339,7 +2375,9 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
   if (GB_ASPRINTF(&exec, "%s && %s", tmp, GB_TGCLI_SAVE) == -1) {
     goto out;
   }
-  /* free(tmp) happens at out: */
+
+  LOG("mgmt", GB_LOG_DEBUG, "command, %s", exec);
+
 
   if (GB_ALLOC_N(reply->out, 4096) < 0) {
     GB_FREE(reply);
@@ -2361,6 +2399,9 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
 
   /* command execution success */
   reply->exit = 0;
+
+  LOG("mgmt", GB_LOG_DEBUG, "raw output, %s", reply->out);
+  LOG("mgmt", GB_LOG_INFO, "command exit code, %d", reply->exit);
 
  out:
   GB_FREE(tmp);
@@ -2387,6 +2428,8 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
   int errCode = 0;
   char *errMsg = NULL;
 
+
+  LOG("mgmt", GB_LOG_DEBUG, "list cli request, volume=%s", blk->volume);
 
   if (GB_ALLOC(reply) < 0) {
     return NULL;
@@ -2444,6 +2487,8 @@ block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
   }
 
   errCode = 0;
+
+  LOG("mgmt", GB_LOG_DEBUG, "list cli success, volume=%s", blk->volume);
 
   if (blk->json_resp) {
     json_object_object_add(json_obj, "blocks", json_array);
@@ -2610,6 +2655,9 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
   char *errMsg = NULL;
 
 
+  LOG("mgmt", GB_LOG_DEBUG,
+      "info cli request, volume=%s blockname=%s", blk->volume, blk->block_name);
+
   if ((GB_ALLOC(reply) < 0) || (GB_ALLOC(info) < 0)) {
     GB_FREE (reply);
     GB_FREE (info);
@@ -2644,6 +2692,9 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
     }
     goto out;
   }
+
+  LOG("mgmt", GB_LOG_DEBUG,
+      "info cli success, volume=%s blockname=%s", blk->volume, blk->block_name);
 
  out:
   GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);

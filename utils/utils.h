@@ -269,27 +269,19 @@ static const char *const gbDaemonCmdlineOptLookup[] = {
 
 typedef enum LogLevel {
   GB_LOG_NONE       = 0,
-  GB_LOG_EMERGENCY  = 1,
-  GB_LOG_ALERT      = 2,
-  GB_LOG_CRITICAL   = 3,
-  GB_LOG_ERROR      = 4,
-  GB_LOG_WARNING    = 5,
-  GB_LOG_NOTICE     = 6,
-  GB_LOG_INFO       = 7,
-  GB_LOG_DEBUG      = 8,
-  GB_LOG_TRACE      = 9,
+  GB_LOG_ERROR      = 1,
+  GB_LOG_WARNING    = 2,
+  GB_LOG_INFO       = 3,
+  GB_LOG_DEBUG      = 4,
+  GB_LOG_TRACE      = 5,
 
   GB_LOG_MAX
 } LogLevel;
 
 static const char *const LogLevelLookup[] = {
   [GB_LOG_NONE]       = "NONE",
-  [GB_LOG_EMERGENCY]  = "EMERGENCY",
-  [GB_LOG_ALERT]      = "ALERT",
-  [GB_LOG_CRITICAL]   = "CRITICAL",
   [GB_LOG_ERROR]      = "ERROR",
   [GB_LOG_WARNING]    = "WARNING",
-  [GB_LOG_NOTICE]     = "NOTICE",
   [GB_LOG_INFO]       = "INFO",
   [GB_LOG_DEBUG]      = "DEBUG",
   [GB_LOG_TRACE]      = "TRACE",
