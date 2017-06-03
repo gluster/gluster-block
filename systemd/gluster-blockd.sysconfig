@@ -1,0 +1,14 @@
+# These options are used by the systemd gluster-blockd.service
+# Any changes done here will reflect in the way systemd exec gluster-blockd
+# with command arguments. See "gluster-blockd --help" output for defaults
+# and possible values.
+
+
+# The default cache capacity is 5 i.e there can be a max of five glfs
+# entries in the lru cache, anything more will lead to release/free of
+# least recently used object.
+#GB_GLFS_LRU_COUNT=5
+
+
+# Expert use only, just incase if we have any extra args to pass for daemon
+#GB_EXTRA_ARGS=""

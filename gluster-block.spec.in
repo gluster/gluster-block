@@ -53,9 +53,13 @@ rm -rf ${RPM_BUILD_ROOT}
 %{_mandir}/man8/gluster-block*.8*
 %if ( 0%{?_with_systemd:1} )
 %{_unitdir}/gluster-blockd.service
+%config(noreplace) %{_sysconfdir}/sysconfig/gluster-blockd
 %endif
 
 %changelog
+* Tue Jun 06 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
+- add gluster-blockd sysconfig template
+
 * Mon Mar 27 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - add json-c-devel to build dependency list
 
