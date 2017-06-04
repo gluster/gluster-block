@@ -33,11 +33,14 @@ glusterBlockDHelp(void)
   MSG("%s",
       "gluster-blockd ("PACKAGE_VERSION")\n"
       "usage:\n"
-      "  gluster-blockd [--glfs-lru-count <count>]\n"
+      "  gluster-blockd [--glfs-lru-count <COUNT>] [--log-level <LOGLEVEL>]\n"
       "\n"
       "commands:\n"
-      "  --glfs-lru-count <count>\n"
-      "        glfs objects cache capacity [max: 512] (default: 5)\n"
+      "  --glfs-lru-count <COUNT>\n"
+      "        glfs objects cache capacity [max: 512] [default: 5]\n"
+      "  --log-level <LOGLEVEL>\n"
+      "        Logging severity. Valid options are,\n"
+      "        TRACE, DEBUG, INFO, WARNING, ERROR and NONE [default: INFO]\n"
       "  --help\n"
       "        show this message and exit.\n"
       "  --version\n"
@@ -201,6 +204,79 @@ glusterBlockServerThreadProc(void *vargp)
 }
 
 
+static int
+glusterBlockDParseArgs(int count, char **options)
+{
+  size_t optind = 1;
+  size_t opt = 0;
+  int ret = 0;
+
+
+  while (optind < count) {
+    opt = glusterBlockDaemonOptEnumParse(options[optind++]);
+    if (!opt || opt >= GB_DAEMON_OPT_MAX) {
+      MSG("unknown option: %s\n", options[optind-1]);
+      return -1;
+    }
+
+    switch (opt) {
+    case GB_DAEMON_HELP:
+    case GB_DAEMON_USAGE:
+      if (count != 2) {
+        MSG("undesired options for: '%s'\n", options[optind-1]);
+        ret = -1;
+      }
+      glusterBlockDHelp();
+      exit(ret);
+
+    case GB_DAEMON_VERSION:
+      if (count != 2) {
+        MSG("undesired options for: '%s'\n", options[optind-1]);
+        ret = -1;
+      }
+      MSG("%s\n", argp_program_version);
+      exit(ret);
+
+    case GB_DAEMON_GLFS_LRU_COUNT:
+      if (count - optind  < 1) {
+        MSG("option '%s' needs argument <COUNT>\n", options[optind-1]);
+        return -1;
+      }
+      if (sscanf(options[optind], "%zu", &glfsLruCount) != 1) {
+        MSG("option '%s' expect argument type integer <COUNT>\n",
+            options[optind-1]);
+        return -1;
+      }
+      if (!glfsLruCount || (glfsLruCount > LRU_COUNT_MAX)) {
+        MSG("glfs-lru-count argument should be [0 < COUNT < %d]\n",
+            LRU_COUNT_MAX);
+        LOG("mgmt", GB_LOG_ERROR,
+            "glfs-lru-count argument should be [0 < COUNT < %d]\n",
+            LRU_COUNT_MAX);
+        return -1;
+      }
+      break;
+
+    case GB_DAEMON_LOG_LEVEL:
+      if (count - optind  < 1) {
+        MSG("option '%s' needs argument <LOG-LEVEL>\n", options[optind-1]);
+        return -1;
+      }
+      logLevel = blockLogLevelEnumParse(options[optind]);
+      if (logLevel >= GB_LOG_MAX) {
+        MSG("unknown LOG-LEVEL: '%s'\n", options[optind]);
+        return -1;
+      }
+      break;
+    }
+
+    optind++;
+  }
+
+  return 0;
+}
+
+
 int
 main (int argc, char **argv)
 {
@@ -212,43 +288,9 @@ main (int argc, char **argv)
   size_t opt = 0;
 
 
-  if (argc > 1) {
-    opt = glusterBlockDaemonOptEnumParse(argv[1]);
-    if (!opt || opt >= GB_DAEMON_OPT_MAX) {
-      MSG("unknown option: %s\n", argv[1]);
-      return -1;
-    }
-
-    switch (opt) {
-    case GB_DAEMON_HELP:
-    case GB_DAEMON_USAGE:
-      if (argc != 2) {
-        MSG("undesired options for: %s\n", argv[1]);
-      }
-      glusterBlockDHelp();
-      return 0;
-
-    case GB_DAEMON_VERSION:
-      MSG("%s\n", argp_program_version);
-      return 0;
-
-    case GB_DAEMON_GLFS_LRU_COUNT:
-      if (argc != 3) {
-        MSG("undesired options for: %s\n", argv[1]);
-        return -1;
-      }
-      if (sscanf(argv[2], "%zu", &glfsLruCount) != 1) {
-        MSG("option '%s' expect argument type integer <count>\n", argv[1]);
-        return -1;
-      }
-      if (!glfsLruCount || (glfsLruCount > LRU_COUNT_MAX)) {
-        MSG("glfs-lru-count argument should be [0 < count < %d]\n", LRU_COUNT_MAX);
-        LOG("mgmt", GB_LOG_ERROR,
-            "glfs-lru-count argument should be [0 < count < %d]\n", LRU_COUNT_MAX);
-        return -1;
-      }
-      break;
-    }
+  if (glusterBlockDParseArgs(argc, argv)) {
+    LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockDParseArgs() failed");
+    return -1;
   }
 
   if (!glusterBlockLogdirCreate()) {

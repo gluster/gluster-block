@@ -13,6 +13,8 @@
 # include "config.h"
 
 
+size_t logLevel = GB_LOG_INFO;
+
 const char *argp_program_version = ""                                 \
   PACKAGE_NAME" ("PACKAGE_VERSION")"                                  \
   "\nRepository rev: https://github.com/gluster/gluster-block.git\n"  \
@@ -60,6 +62,26 @@ glusterBlockDaemonOptEnumParse(const char *opt)
       opt++;
     }
     if (!strcmp(opt, gbDaemonCmdlineOptLookup[i])) {
+      return i;
+    }
+  }
+
+  return i;
+}
+
+
+int
+blockLogLevelEnumParse(const char *opt)
+{
+  int i;
+
+
+  if (!opt) {
+    return GB_LOG_MAX;
+  }
+
+  for (i = 0; i < GB_LOG_MAX; i++) {
+    if (!strcmp(opt, LogLevelLookup[i])) {
       return i;
     }
   }

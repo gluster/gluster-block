@@ -77,22 +77,26 @@
             fprintf(stdout, fmt, __VA_ARGS__);                       \
           } while (0)
 
-# define  LOG(str, level, fmt, ...)                                  \
-          do {                                                       \
-            FILE *fd;                                                \
-            if (!strcmp(str, "mgmt"))                                \
-              fd = fopen (DAEMON_LOG_FILE, "a");                     \
-            else if (strcmp(str, "cli"))                             \
-              fd = fopen (CLI_LOG_FILE, "a");                        \
-            else if (strcmp(str, "gfapi"))                           \
-              fd = fopen (GFAPI_LOG_FILE, "a");                      \
-            else                                                     \
-              fd = stderr;                                           \
-            fprintf(fd, "[%lu] %s: " fmt " [at %s+%d :<%s>]\n",      \
-                    (unsigned long)time(NULL), LogLevelLookup[level],\
-                    __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__);  \
-            if (fd != stderr)                                        \
-              fclose(fd);                                            \
+extern size_t logLevel;
+
+# define  LOG(str, level, fmt, ...)                                    \
+          do {                                                         \
+            FILE *fd;                                                  \
+            if (level <= logLevel) {                                   \
+              if (!strcmp(str, "mgmt"))                                \
+                fd = fopen (DAEMON_LOG_FILE, "a");                     \
+              else if (strcmp(str, "cli"))                             \
+                fd = fopen (CLI_LOG_FILE, "a");                        \
+              else if (strcmp(str, "gfapi"))                           \
+                fd = fopen (GFAPI_LOG_FILE, "a");                      \
+              else                                                     \
+                fd = stderr;                                           \
+              fprintf(fd, "[%lu] %s: " fmt " [at %s+%d :<%s>]\n",      \
+                      (unsigned long)time(NULL), LogLevelLookup[level],\
+                      __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__);  \
+              if (fd != stderr)                                        \
+                fclose(fd);                                            \
+            }                                                          \
           } while (0)
 
 # define  GB_METALOCK_OR_GOTO(lkfd, volume, errCode, errMsg, label)  \
@@ -253,6 +257,7 @@ typedef enum gbDaemonCmdlineOption {
   GB_DAEMON_VERSION        = 2,
   GB_DAEMON_USAGE          = 3,
   GB_DAEMON_GLFS_LRU_COUNT = 4,
+  GB_DAEMON_LOG_LEVEL      = 5,
 
   GB_DAEMON_OPT_MAX
 } gbDaemonCmdlineOption;
@@ -263,6 +268,7 @@ static const char *const gbDaemonCmdlineOptLookup[] = {
   [GB_DAEMON_VERSION]        = "version",
   [GB_DAEMON_USAGE]          = "usage",
   [GB_DAEMON_GLFS_LRU_COUNT] = "glfs-lru-count",
+  [GB_DAEMON_LOG_LEVEL]      = "log-level",
 
   [GB_DAEMON_OPT_MAX]        = NULL,
 };
@@ -377,6 +383,8 @@ static const char *const RemoteCreateRespLookup[] = {
 int glusterBlockCLIOptEnumParse(const char *opt);
 
 int glusterBlockDaemonOptEnumParse(const char *opt);
+
+int blockLogLevelEnumParse(const char *opt);
 
 int blockMetaKeyEnumParse(const char *opt);
 
