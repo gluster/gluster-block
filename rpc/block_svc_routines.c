@@ -286,7 +286,7 @@ blockRemoteCreateRespParse(char *output /* create output on one node */,
 
 int
 glusterBlockCallRPC_1(char *host, void *cobj,
-                      operations opt, char **out)
+                      operations opt, bool *rpc_sent, char **out)
 {
   CLIENT *clnt = NULL;
   int ret = -1;
@@ -297,6 +297,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   struct sockaddr_in sain = {0, };
 
 
+  *rpc_sent = FALSE;
   if ((sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
     LOG("mgmt", GB_LOG_ERROR, "socket creation failed (%s)",
         strerror (errno));
@@ -333,6 +334,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   switch(opt) {
   case CREATE_SRV:
     strcpy(((blockCreate *)cobj)->ipaddr, host);
+    *rpc_sent = TRUE;
 
     reply = block_create_1((blockCreate *)cobj, clnt);
     if (!reply) {
@@ -342,6 +344,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     }
     break;
   case DELETE_SRV:
+    *rpc_sent = TRUE;
     reply = block_delete_1((blockDelete *)cobj, clnt);
     if (!reply) {
       LOG("mgmt", GB_LOG_ERROR, "%son host %s",
@@ -350,6 +353,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     }
     break;
   case MODIFY_SRV:
+    *rpc_sent = TRUE;
     reply = block_modify_1((blockModify *)cobj, clnt);
     if (!reply) {
       LOG("mgmt", GB_LOG_ERROR, "%son host %s",
@@ -468,15 +472,17 @@ glusterBlockCreateRemote(void *data)
   blockRemoteObj *args = (blockRemoteObj *)data;
   blockCreate cobj = *(blockCreate *)args->obj;
   char *errMsg = NULL;
+  bool rpc_sent = FALSE;
 
 
   GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
                         ret, errMsg, out, "%s: CONFIGINPROGRESS\n", args->addr);
 
-  ret = glusterBlockCallRPC_1(args->addr, &cobj, CREATE_SRV, &args->reply);
+  ret = glusterBlockCallRPC_1(args->addr, &cobj, CREATE_SRV, &rpc_sent,
+                              &args->reply);
   if (ret) {
     saveret = ret;
-    if (errno == ENETUNREACH || errno == ECONNREFUSED  || errno == ETIMEDOUT) {
+    if (!rpc_sent) {
       GB_ASPRINTF(&errMsg, ": %s", strerror(errno));
       LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on "
           "host %s volume %s", strerror(errno), FAILED_REMOTE_CREATE,
@@ -592,15 +598,18 @@ glusterBlockDeleteRemote(void *data)
   blockRemoteObj *args = (blockRemoteObj *)data;
   blockDelete dobj = *(blockDelete *)args->obj;
   char *errMsg = NULL;
+  bool rpc_sent = FALSE;
 
 
   GB_METAUPDATE_OR_GOTO(lock, args->glfs, dobj.block_name, args->volume,
                         ret, errMsg, out, "%s: CLEANUPINPROGRESS\n", args->addr);
 
-  ret = glusterBlockCallRPC_1(args->addr, &dobj, DELETE_SRV, &args->reply);
+  ret = glusterBlockCallRPC_1(args->addr, &dobj, DELETE_SRV, &rpc_sent,
+                              &args->reply);
   if (ret) {
     saveret = ret;
-    if (errno == ENETUNREACH || errno == ECONNREFUSED  || errno == ETIMEDOUT) {
+    if (!rpc_sent) {
+      GB_ASPRINTF(&errMsg, ": %s", strerror(errno));
       LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on "
           "host %s volume %s", strerror(errno), FAILED_REMOTE_DELETE,
           dobj.block_name, args->addr, args->volume);
@@ -806,16 +815,19 @@ glusterBlockModifyRemote(void *data)
   blockRemoteObj *args = (blockRemoteObj *)data;
   blockModify cobj = *(blockModify *)args->obj;
   char *errMsg = NULL;
+  bool rpc_sent = FALSE;
 
 
   GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
                         ret, errMsg, out, "%s: AUTH%sENFORCEING\n", args->addr,
                         cobj.auth_mode?"":"CLEAR");
 
-  ret = glusterBlockCallRPC_1(args->addr, &cobj, MODIFY_SRV, &args->reply);
+  ret = glusterBlockCallRPC_1(args->addr, &cobj, MODIFY_SRV, &rpc_sent,
+                              &args->reply);
   if (ret) {
     saveret = ret;
-    if (errno == ENETUNREACH || errno == ECONNREFUSED  || errno == ETIMEDOUT) {
+    if (!rpc_sent) {
+      GB_ASPRINTF(&errMsg, ": %s", strerror(errno));
       LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on "
           "host %s volume %s", strerror(errno), FAILED_REMOTE_MODIFY,
           cobj.block_name, args->addr, args->volume);
