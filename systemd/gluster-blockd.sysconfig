@@ -10,5 +10,9 @@
 #GB_GLFS_LRU_COUNT=5
 
 
+# supported loglevels [ NONE, ERROR, WARNING, INFO, DEBUG, TRACE ]
+#GB_LOG_LEVEL=INFO
+
+
 # Expert use only, just incase if we have any extra args to pass for daemon
 #GB_EXTRA_ARGS=""

@@ -6,8 +6,9 @@ After=rpcbind.service iscsid.service target.service tcmu-runner.service
 [Service]
 Type=simple
 Environment="GB_GLFS_LRU_COUNT=5"
+Environment="GB_LOG_LEVEL=INFO"
 EnvironmentFile=-@sysconfigdir@/gluster-blockd
-ExecStart=@prefix@/sbin/gluster-blockd --glfs-lru-count $GB_GLFS_LRU_COUNT $GB_EXTRA_ARGS
+ExecStart=@prefix@/sbin/gluster-blockd --glfs-lru-count $GB_GLFS_LRU_COUNT --log-level $GB_LOG_LEVEL $GB_EXTRA_ARGS
 KillMode=process
 
 [Install]
