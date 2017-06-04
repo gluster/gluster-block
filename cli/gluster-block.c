@@ -56,7 +56,7 @@ const char *argp_program_version = ""                                 \
 
 
 static int
-glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
+glusterBlockCliRPC_1(void *cobj, clioperations opt)
 {
   CLIENT *clnt = NULL;
   int ret = -1;
@@ -68,18 +68,19 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
   blockListCli *list_obj;
   blockModifyCli *modify_obj;
   blockResponse *reply = NULL;
+  char          errMsg[2048] = {0};
 
 
   if (strlen(GB_UNIX_ADDRESS) > SUN_PATH_MAX) {
-    LOG("cli", GB_LOG_ERROR,
-        "%s: path length is more than SUN_PATH_MAX: (%zu > %zu chars)",
-        GB_UNIX_ADDRESS, strlen(GB_UNIX_ADDRESS), SUN_PATH_MAX);
+    snprintf (errMsg, sizeof (errMsg), "%s: path length is more than "
+              "SUN_PATH_MAX: (%zu > %zu chars)", GB_UNIX_ADDRESS,
+              strlen(GB_UNIX_ADDRESS), SUN_PATH_MAX);
     goto out;
   }
 
   if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
-    LOG("cli", GB_LOG_ERROR, "%s: socket creation failed (%s)", GB_UNIX_ADDRESS,
-        strerror (errno));
+    snprintf (errMsg, sizeof (errMsg), "%s: socket creation failed (%s)",
+              GB_UNIX_ADDRESS, strerror (errno));
     goto out;
   }
 
@@ -89,14 +90,12 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
   if (connect(sockfd, (struct sockaddr *) &saun,
               sizeof(struct sockaddr_un)) < 0) {
     if (errno == ENOENT || errno == ECONNREFUSED) {
-      MSG("%s\n", "Connection failed. Please check if gluster-block daemon is operational.");
-      if (sockfd != -1) {
-        close (sockfd);
-      }
-      return -1;
+      snprintf (errMsg, sizeof (errMsg), "Connection failed. Please check if "
+                "gluster-block daemon is operational.");
+    } else {
+      snprintf (errMsg, sizeof (errMsg), "%s: connect failed (%s)",
+                GB_UNIX_ADDRESS, strerror (errno));
     }
-    LOG("cli", GB_LOG_ERROR, "%s: connect failed (%s)", GB_UNIX_ADDRESS,
-        strerror (errno));
     goto out;
   }
 
@@ -104,8 +103,8 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
                          GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS,
                          &sockfd, 0, 0);
   if (!clnt) {
-    LOG("cli", GB_LOG_ERROR, "%s, unix addr %s",
-        clnt_spcreateerror("client create failed"), GB_UNIX_ADDRESS);
+    snprintf (errMsg, sizeof (errMsg), "%s, unix addr %s",
+              clnt_spcreateerror("client create failed"), GB_UNIX_ADDRESS);
     goto out;
   }
 
@@ -161,14 +160,19 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt, char **out)
     break;
   }
 
+ out:
   if (reply) {
-    if (GB_STRDUP(*out, reply->out) < 0) {
-      goto out;
-    }
     ret = reply->exit;
+    MSG("%s", reply->out);
+  } else if (errMsg[0]) {
+    LOG("cli", GB_LOG_ERROR, "%s", errMsg);
+    MSG("%s\n", errMsg);
+  } else {
+    MSG("%s\n", "Did not receive any response from gluster-block daemon."
+        " Please check log files to find the reason");
+    ret = -1;
   }
 
- out:
   if (clnt && reply) {
     if (!clnt_freeres(clnt, (xdrproc_t)xdr_blockResponse, (char *)reply)) {
       LOG("cli", GB_LOG_ERROR, "%s",
@@ -282,7 +286,6 @@ glusterBlockModify(int argcount, char **options, int json)
   size_t optind = 2;
   blockModifyCli mobj = {0, };
   int ret = -1;
-  char *out = NULL;
 
 
   GB_ARGCHECK_OR_RETURN(argcount, 5, "modify", GB_MODIFY_HELP_STR);
@@ -312,19 +315,14 @@ glusterBlockModify(int argcount, char **options, int json)
     }
   }
 
-  ret = glusterBlockCliRPC_1(&mobj, MODIFY_CLI, &out);
+  ret = glusterBlockCliRPC_1(&mobj, MODIFY_CLI);
   if (ret) {
     LOG("cli", GB_LOG_ERROR,
         "failed getting info of block %s on volume %s",
         mobj.block_name, mobj.volume);
   }
 
-  if (out) {
-    MSG("%s", out);
-  }
-
  out:
-  GB_FREE(out);
 
   return ret;
 }
@@ -335,7 +333,6 @@ glusterBlockCreate(int argcount, char **options, int json)
   size_t optind = 2;
   int ret = -1;
   ssize_t sparse_ret;
-  char *out = NULL;
   blockCreateCli cobj = {0, };
 
 
@@ -408,20 +405,15 @@ glusterBlockCreate(int argcount, char **options, int json)
   }
   cobj.size = sparse_ret;  /* size is unsigned long long */
 
-  ret = glusterBlockCliRPC_1(&cobj, CREATE_CLI, &out);
+  ret = glusterBlockCliRPC_1(&cobj, CREATE_CLI);
   if (ret) {
     LOG("cli", GB_LOG_ERROR,
         "failed creating block %s on volume %s with hosts %s",
         cobj.block_name, cobj.volume, cobj.block_hosts);
   }
 
-  if (out) {
-    MSG("%s", out);
-  }
-
  out:
   GB_FREE(cobj.block_hosts);
-  GB_FREE(out);
 
   return ret;
 }
@@ -431,7 +423,6 @@ static int
 glusterBlockList(int argcount, char **options, int json)
 {
   blockListCli cobj = {0};
-  char *out = NULL;
   int ret = -1;
 
 
@@ -440,17 +431,11 @@ glusterBlockList(int argcount, char **options, int json)
 
   strcpy(cobj.volume, options[2]);
 
-  ret = glusterBlockCliRPC_1(&cobj, LIST_CLI, &out);
+  ret = glusterBlockCliRPC_1(&cobj, LIST_CLI);
   if (ret) {
     LOG("cli", GB_LOG_ERROR, "failed listing blocks from volume %s",
         cobj.volume);
   }
-
-  if (out) {
-    MSG("%s", out);
-  }
-
-  GB_FREE(out);
 
   return ret;
 }
@@ -460,7 +445,6 @@ static int
 glusterBlockDelete(int argcount, char **options, int json)
 {
   blockDeleteCli cobj = {0};
-  char *out = NULL;
   int ret = -1;
 
 
@@ -473,18 +457,13 @@ glusterBlockDelete(int argcount, char **options, int json)
     goto out;
   }
 
-  ret = glusterBlockCliRPC_1(&cobj, DELETE_CLI, &out);
+  ret = glusterBlockCliRPC_1(&cobj, DELETE_CLI);
   if (ret) {
     LOG("cli", GB_LOG_ERROR, "failed deleting block %s on volume %s",
         cobj.block_name, cobj.volume);
   }
 
-  if (out) {
-    MSG("%s", out);
-  }
-
  out:
-  GB_FREE(out);
 
   return ret;
 }
@@ -494,7 +473,6 @@ static int
 glusterBlockInfo(int argcount, char **options, int json)
 {
   blockInfoCli cobj = {0};
-  char *out = NULL;
   int ret = -1;
 
 
@@ -507,19 +485,14 @@ glusterBlockInfo(int argcount, char **options, int json)
     goto out;
   }
 
-  ret = glusterBlockCliRPC_1(&cobj, INFO_CLI, &out);
+  ret = glusterBlockCliRPC_1(&cobj, INFO_CLI);
   if (ret) {
     LOG("cli", GB_LOG_ERROR,
         "failed getting info of block %s on volume %s",
         cobj.block_name, cobj.volume);
   }
 
-  if (out) {
-    MSG("%s", out);
-  }
-
  out:
-  GB_FREE(out);
 
   return ret;
 }
