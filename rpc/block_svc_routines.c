@@ -134,8 +134,8 @@ removeDuplicateSubstr(char **line)
     return;
   }
 
-  /* Allocate size for out. */
-  if (GB_ALLOC_N(out, strlen(temp)) < 0) {
+  /* Allocate size for out including trailing space and \0. */
+  if (GB_ALLOC_N(out, strlen(temp) + strlen(" ") + 1) < 0) {
     return;
   }
 
