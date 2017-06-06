@@ -285,7 +285,6 @@ main (int argc, char **argv)
   pthread_t server_thread;
   struct flock lock = {0, };
   int errnosv = 0;
-  size_t opt = 0;
 
 
   if (glusterBlockDParseArgs(argc, argv)) {

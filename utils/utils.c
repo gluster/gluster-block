@@ -162,7 +162,7 @@ logTimeNow(char *buf, size_t bufSize)
 
   if (tv.tv_sec && gmtime_r(&tv.tv_sec, &tm) != NULL) {
     strftime (buf, bufSize, "%Y-%m-%d %H:%M:%S", &tm);
-    snprintf (buf + strlen(buf), bufSize - strlen(buf), ".%06d", tv.tv_usec);
+    snprintf (buf + strlen(buf), bufSize - strlen(buf), ".%06ld", tv.tv_usec);
     return;
   }
 
