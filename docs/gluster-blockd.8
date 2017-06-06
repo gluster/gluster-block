@@ -1,0 +1,91 @@
+.TH gluster-blockd 8 "management daemon" "06 Jun 2017" "Red Hat, Inc."
+.PP
+
+
+.SH NAME
+gluster-blockd - Gluster Block Management Daemon
+.PP
+
+
+.SH SYNOPSIS
+.B gluster-blockd
+[\fBOPTION...\fR]
+.PP
+
+
+.SH DESCRIPTION
+gluster-blockd daemon is responsible for block management, hence the daemon must be running on all servers.
+.PP
+
+
+.SH OPTIONS
+.SS "Basic Options"
+
+.TP
+\fB\-\-glfs\-lru\-count\fR <COUNT>
+glfs objects cache capacity [max: 512] [default: 5]
+.TP
+\fB\-\-log\-level\fR <LOGLEVEL>
+Logging severity. Valid options are TRACE, DEBUG, INFO, WARNING, ERROR and NONE [default: INFO].
+
+
+.SS "Miscellaneous Options"
+.TP
+\fB usage | help\fR
+Display a usage message.
+.TP
+\fB version\fR
+Print the program version.
+
+
+.SH EXAMPLES
+.nf
+With lru cache capacity 10
+.B # gluster-blockd --glfs-cache-count 10
+
+To choose log-level DEBUG
+.B # gluster-blockd --log-level DEBUG
+
+With lru cache capacity 8 and log-level ERROR
+.B # gluster-blockd --glfs-cache-count 8 --log-level ERROR
+.fi
+.PP
+
+
+.SH FILES
+/var/log/gluster-block/*
+.br
+/var/run/gluster-blockd.socket
+.br
+/var/run/gluster-blockd.lock
+.br
+/etc/sysconfig/gluster-blockd-config
+.PP
+
+
+.SH REPORTING BUGS
+Report bugs via gluster-devel <gluster-devel@gluster.org
+.br
+or <https://github.com/gluster/gluster-block/issues>
+
+
+.SH AUTHOR
+Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
+
+.SH THANKS
+Vijay Bellur <vbellur@redhat.com>
+.br
+Pranith Kumar Karampuri <pkarampu@redhat.com>
+
+
+.SH SEE ALSO
+.nf
+\fBgluster-block\fR(8), \fBtargetcli\fR(8), \fBtcmu-runner\fR(8), \fBglusterfs\fR(8), \fBglusterd\fR(8), \fBgluster\fR(8)
+.fi
+.PP
+
+
+.SH COPYRIGHT
+.nf
+Copyright (c) 2016 Red Hat, Inc. <http://www.redhat.com>
+.PP
