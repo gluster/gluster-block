@@ -62,11 +62,38 @@ managing the command ring buffers
 ------
 **Prerequisites:** *this guide assume we already have*
 - [x] *A gluster volume with name 'block-test'*
-- [x] *In all nodes gluster-blockd.service is running*
 - [x] *Open 24007(for glusterd) 24006(gluster-blockd) 3260(iscsi targets) 111(rpcbind) ports and glusterfs service in your firewall*
 
+<b>Daemon</b>: run gluster-blockd on all the nodes
 ```script
-# gluster-block (0.2)
+# gluster-blockd --help
+gluster-blockd (0.2)
+usage:
+  gluster-blockd [--glfs-lru-count <COUNT>] [--log-level <LOGLEVEL>]
+
+commands:
+  --glfs-lru-count <COUNT>
+        glfs objects cache capacity [max: 512] [default: 5]
+  --log-level <LOGLEVEL>
+        Logging severity. Valid options are,
+        TRACE, DEBUG, INFO, WARNING, ERROR and NONE [default: INFO]
+  --help
+        show this message and exit.
+  --version
+        show version info and exit.
+```
+
+You can run gluster-blockd as systemd service, note '/etc/sysconfig/gluster-blockd' is the configuration file where you can choose to edit various options, while systemd will take care of parsing them all and supply to daemon.
+<pre>
+# cat /etc/sysconfig/gluster-blockd
+# systemctl daemon-reload
+# systemctl restart gluster-blockd
+</pre>
+
+<b>CLI</b>: you can choose to run gluster-block(cli) from any node which has gluster-blockd running
+```script
+# gluster-block --help
+gluster-block (0.2)
 usage:
   gluster-block <command> <volname[/blockname]> [<args>] [--json*]
 
