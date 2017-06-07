@@ -1,18 +1,30 @@
-gluster-block release 0.2 is tagged.
+gluster-block release 0.2.1 is tagged.
+
+This release is more focused on bug fixing.
+
 
 Highlights:
 ----------
-One command for logging-in to all gateways of a target (#9)
-Add support for one way authentication (#5)
-Support json response (#3)
+* Implement LRU cache to hold glfs objects, this makes the cli commands run fast.
+    For example on a single node,
+    create command takes ~1 sec now, while it was ~5 sec before.
 
-Other Fixes:
------------
-Increase the clnt_call() total time out (#15)
-Clue if gluster-block daemon is not operational (#14)
-Show reason for cmd failue on non-existent/not started volume (#10)
-Redirect configshell logs to GB_LOGDIR (#13)
-Use rpcgen to generate all XDR code (#2)
+* Log severity level is configurable now.
+    look for --log-level option of daemon and '/etc/sysconfig/gluster-blockd'
+
+Other Notable Fixes:
+-------------------
+* betterments in messages on failure
+* fix heap-buffer-overflow
+* prevent crashes when errMsg is not set
+* print human readable timestamp in log files
+* improve logging at server side
+* handle SIGPIPE in daemon
+* update journal-data/block meta-data synchronously
+* reuse port 24006 (SO_REUSEADDR) on bind
+* add manual for gluster-blockd
+* updated ReadMe
+* and many more ...
 
 Read more at [1] and [2]
 
