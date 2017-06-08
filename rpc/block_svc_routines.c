@@ -2660,6 +2660,7 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     json_object_object_add(json_obj, "GBID", GB_JSON_OBJ_TO_STR(info->gbid));
     json_object_object_add(json_obj, "SIZE", json_object_new_int64(info->size));
     json_object_object_add(json_obj, "HA", json_object_new_int(info->mpath));
+    json_object_object_add(json_obj, "USER", GB_JSON_OBJ_TO_STR(info->userid));
     json_object_object_add(json_obj, "PASSWORD", GB_JSON_OBJ_TO_STR(info->passwd));
 
     json_array = json_object_new_array();
@@ -2679,9 +2680,9 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     json_object_put(json_obj);
   } else {
     if (GB_ASPRINTF(&tmp, "NAME: %s\nVOLUME: %s\nGBID: %s\nSIZE: %zu\n"
-                    "HA: %zu\nPASSWORD: %s\nBLOCK CONFIG NODE(S):",
+                    "HA: %zu\nUSER: %s\nPASSWORD: %s\nBLOCK CONFIG NODE(S):",
           blk->block_name, info->volume, info->gbid, info->size, info->mpath,
-          info->passwd) == -1) {
+          info->userid, info->passwd) == -1) {
       goto out;
     }
     for (i = 0; i < info->nhosts; i++) {
