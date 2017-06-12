@@ -25,14 +25,17 @@ Note that the gluster-blockd daemon is responsible for block management, hence t
 
 .SH COMMANDS
 .SS
-\fBcreate\fR <VOLNAME/NEW-BLOCKNAME> [ha <COUNT>] [auth enable|disable] <HOST1[,HOST2,..]> <BYTES>
+\fBcreate\fR <VOLNAME/NEW-BLOCKNAME> [ha <COUNT>] [auth <enable|disable>] [prealloc <full|no>] <HOST1[,HOST2,..]> <BYTES>
 create block device.
 .TP
 [ha <COUNT>]
 multipath requirement for high availability (default: 1)
 .TP
-[auth enable|disable]
+[auth <enable|disable>]
 authentication setting (default: disable)
+.TP
+[prealloc <full|no>]
+"full" mode preallocates space by writing zeros to storage. (default: no)
 .TP
 <HOST1,[HOST2....]>
 servers in the pool where targets will be exported.
@@ -81,6 +84,9 @@ To create a block device of size 1GiB
 
 To create a block device of size 1GiB with auth enable
 .B # gluster-block create blockVol/sampleBlock auth enable ${HOST} 1GiB
+
+To create a block device of size 1GiB, by preallocating storage with zero fill
+.B # gluster-block create blockVol/sampleBlock prealloc full ${HOST} 1GiB
 
 To create a block device of size 1GiB with multi-path(replica) 3
 .B # gluster-block create blockVol/sampleBlock ha 3 ${HOST1},${HOST2},${HOST3} 1GiB

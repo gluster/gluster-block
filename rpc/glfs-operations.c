@@ -126,35 +126,38 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
     if (ret) {
       *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
-          "glfs_ftruncate(%s): on volume %s for block %s"
+          "glfs_ftruncate(%s): on volume %s for block %s "
           "of size %zu failed[%s]", gbid, blk->volume, blk->block_name,
           blk->size, strerror(errno));
-
-      if (tgfd && glfs_close(tgfd) != 0) {
-        LOG("gfapi", GB_LOG_ERROR,
-            "glfs_close(%s): on volume %s for block %s failed[%s]",
-            gbid, blk->volume, blk->block_name, strerror(errno));
-      }
-
-      ret = glfs_unlink(glfs, gbid);
-      if (ret && errno != ENOENT) {
-        LOG("gfapi", GB_LOG_ERROR,
-            "glfs_unlink(%s) on volume %s for block %s failed[%s]",
-            gbid, blk->volume, blk->block_name, strerror(errno));
-      }
-
-      ret = -1;
-      goto out;
+      goto unlink;
     }
 
-    if (tgfd && glfs_close(tgfd) != 0) {
+    if (blk->prealloc && glfs_zerofill(tgfd, 0, blk->size)) {
       *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
-          "glfs_close(%s): on volume %s for block %s failed[%s]",
-          gbid, blk->volume, blk->block_name, strerror(errno));
+          "glfs_zerofill(%s): on volume %s for block %s "
+          "of size %zu failed[%s]", gbid, blk->volume, blk->block_name,
+          blk->size, strerror(errno));
       ret = -1;
-      goto out;
+      goto unlink;
     }
+  }
+
+
+unlink:
+  if (tgfd && glfs_close(tgfd) != 0) {
+    *errCode = errno;
+    LOG("gfapi", GB_LOG_ERROR,
+        "glfs_close(%s): on volume %s for block %s failed[%s]",
+        gbid, blk->volume, blk->block_name, strerror(errno));
+    ret = -1;
+  }
+
+  if (ret && glfs_unlink(glfs, gbid) && errno != ENOENT) {
+    *errCode = errno;
+    LOG("gfapi", GB_LOG_ERROR,
+        "glfs_unlink(%s) on volume %s for block %s failed[%s]",
+        gbid, blk->volume, blk->block_name, strerror(errno));
   }
 
  out:

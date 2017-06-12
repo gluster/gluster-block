@@ -121,3 +121,28 @@ glusterBlockFormatSize(const char *dom, size_t bytes)
 
   return buf;
 }
+
+
+/* Return value and meaning
+ *  1  - true/set
+ *  0  - false/unset
+ * -1  - unknown string
+ */
+int
+convertStringToTrillianParse(const char *opt)
+{
+  int i;
+
+
+  if (!opt) {
+    return -1;
+  }
+
+  for (i = 1; i < GB_BOOL_MAX; i++) {
+    if (!strcmp(opt, ConvertStringToTrillianLookup[i])) {
+      return i%2;
+    }
+  }
+
+  return -1;
+}

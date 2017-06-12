@@ -93,13 +93,16 @@ You can run gluster-blockd as systemd service, note '/etc/sysconfig/gluster-bloc
 <b>CLI</b>: you can choose to run gluster-block(cli) from any node which has gluster-blockd running
 ```script
 # gluster-block --help
-gluster-block (0.2)
+gluster-block (0.2.1)
 usage:
   gluster-block <command> <volname[/blockname]> [<args>] [--json*]
 
 commands:
-  create  <volname/blockname> [ha <count>] [auth enable|disable] <host1[,host2,...]> <size>
-        create block device.
+  create  <volname/blockname> [ha <count>]
+                              [auth <enable|disable>]
+                              [prealloc <full|no>]
+                              <host1[,host2,...]> <size>
+        create block device [defaults: ha 1, auth disable, prealloc no]
 
   list    <volname>
         list available block devices.

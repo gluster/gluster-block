@@ -50,10 +50,58 @@ static const char *const JsonResponseFormatLookup[] = {
 };
 
 
+/* Always add new boolean data in a way that, word with jist
+ * 'yes/true' first to assign a odd number to it */
+typedef enum  ConvertStringToTrillian {
+  GB_BOOL_YES             = 1,
+  GB_BOOL_NO              = 2,
+
+  GB_BOOL_TRUE            = 3,
+  GB_BOOL_FALSE           = 4,
+
+  GB_BOOL_ENABLE          = 5,
+  GB_BOOL_DISABLE         = 6,
+
+  GB_BOOL_ONE             = 7,
+  GB_BOOL_ZERO            = 8,
+
+  GB_BOOL_SET             = 9,
+  GB_BOOL_UNSET           = 10,
+
+  GB_BOOL_FULL            = 11,
+
+  GB_BOOL_MAX
+} ConvertStringToBool;
+
+
+static const char *const ConvertStringToTrillianLookup[] = {
+  [GB_BOOL_YES]             = "yes",
+  [GB_BOOL_NO]              = "no",
+
+  [GB_BOOL_TRUE]            = "true",
+  [GB_BOOL_FALSE]           = "false",
+
+  [GB_BOOL_ENABLE]          = "enable",
+  [GB_BOOL_DISABLE]         = "disable",
+
+  [GB_BOOL_ONE]             = "1",   /* true */
+  [GB_BOOL_ZERO]            = "0",
+
+  [GB_BOOL_SET]             = "set",
+  [GB_BOOL_UNSET]           = "unset",
+
+  [GB_BOOL_FULL]            = "full",
+
+  [GB_BOOL_MAX]             = NULL,
+};
+
+
 enum JsonResponseFormat jsonResponseFormatParse(const char *opt);
 
 ssize_t glusterBlockParseSize(const char *dom, char *value);
 
 char* glusterBlockFormatSize(const char *dom, size_t bytes);
+
+int convertStringToTrillianParse(const char *opt);
 
 # endif /* _COMMON_H */

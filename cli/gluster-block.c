@@ -189,8 +189,11 @@ glusterBlockHelp(void)
       "  gluster-block <command> <volname[/blockname]> [<args>] [--json*]\n"
       "\n"
       "commands:\n"
-      "  create  <volname/blockname> [ha <count>] [auth enable|disable] <host1[,host2,...]> <size>\n"
-      "        create block device.\n"
+      "  create  <volname/blockname> [ha <count>]\n"
+      "                              [auth <enable|disable>]\n"
+      "                              [prealloc <full|no>]\n"
+      "                              <host1[,host2,...]> <size>\n"
+      "        create block device [defaults: ha 1, auth disable, prealloc no]\n"
       "\n"
       "  list    <volname>\n"
       "        list available block devices.\n"
@@ -292,10 +295,9 @@ glusterBlockModify(int argcount, char **options, int json)
   /* if auth given then collect status which is next by 'auth' arg */
   if (!strcmp(options[optind], "auth")) {
     optind++;
-    if(strcmp (options[optind], "enable") == 0) {
-       mobj.auth_mode = 1;
-    } else if (strcmp (options[optind], "disable") == 0) {
-       mobj.auth_mode = 0;
+    ret = convertStringToTrillianParse(options[optind++]);
+    if(ret >= 0) {
+      mobj.auth_mode = ret;
     } else {
       MSG("%s\n", "'auth' option is incorrect");
       MSG("%s\n", GB_MODIFY_HELP_STR);
@@ -354,10 +356,9 @@ glusterBlockCreate(int argcount, char **options, int json)
     /* if auth given then collect boolean which is next by 'auth' arg */
     if (!strcmp(options[optind], "auth")) {
       optind++;
-      if(strcmp (options[optind], "enable") == 0) {
-         cobj.auth_mode = 1;
-      } else if (strcmp (options[optind], "disable") == 0) {
-         cobj.auth_mode = 0;
+      ret = convertStringToTrillianParse(options[optind++]);
+      if(ret >= 0) {
+        cobj.auth_mode = ret;
       } else {
         MSG("%s\n", "'auth' option is incorrect");
         MSG("%s\n", GB_CREATE_HELP_STR);
@@ -366,7 +367,24 @@ glusterBlockCreate(int argcount, char **options, int json)
                                  cobj.volume, cobj.block_name);
         goto out;
       }
+    }
+  }
+
+  if (argcount - optind >= 2) {  /* atleast 2 needed */
+    /* if prealloc given then collect boolean which is next by 'prealloc' arg */
+    if (!strcmp(options[optind], "prealloc")) {
       optind++;
+      ret = convertStringToTrillianParse(options[optind++]);
+      if(ret >= 0) {
+        cobj.prealloc = ret;
+      } else {
+        MSG("%s\n", "'prealloc' option is incorrect");
+        MSG("%s\n", GB_CREATE_HELP_STR);
+        LOG("cli", GB_LOG_ERROR, "Create failed while parsing argument "
+                                 "to prealloc  for <%s/%s>",
+                                 cobj.volume, cobj.block_name);
+        goto out;
+      }
     }
   }
 
