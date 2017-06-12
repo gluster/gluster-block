@@ -2635,6 +2635,7 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
   char         *tmp        = NULL;
   char         *out        = NULL;
   int          i           = 0;
+  char         *hr_size    = NULL;           /* Human Readable size */
 
   if (!reply) {
     return;
@@ -2649,8 +2650,16 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     return;
   }
 
-  if (!info) {
-    return;
+  if (!info)
+    goto out;
+
+  hr_size = glusterBlockFormatSize("mgmt", info->size);
+  if (!hr_size) {
+    GB_ASPRINTF (&errMsg, "%s", "failed in glusterBlockFormatSize");
+    blockFormatErrorResponse(INFO_SRV, blk->json_resp, ENOMEM,
+                             errMsg, reply);
+    GB_FREE(errMsg);
+    goto out;
   }
 
   if (blk->json_resp) {
@@ -2658,7 +2667,7 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     json_object_object_add(json_obj, "NAME", GB_JSON_OBJ_TO_STR(blk->block_name));
     json_object_object_add(json_obj, "VOLUME", GB_JSON_OBJ_TO_STR(info->volume));
     json_object_object_add(json_obj, "GBID", GB_JSON_OBJ_TO_STR(info->gbid));
-    json_object_object_add(json_obj, "SIZE", json_object_new_int64(info->size));
+    json_object_object_add(json_obj, "SIZE", GB_JSON_OBJ_TO_STR(hr_size));
     json_object_object_add(json_obj, "HA", json_object_new_int(info->mpath));
     json_object_object_add(json_obj, "PASSWORD", GB_JSON_OBJ_TO_STR(info->passwd));
 
@@ -2670,7 +2679,7 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
       }
     }
 
-    json_object_object_add(json_obj, "BLOCK CONFIG NODE(S)", json_array);
+    json_object_object_add(json_obj, "EXPORTED NODE(S)", json_array);
 
     GB_ASPRINTF(&reply->out, "%s\n",
                 json_object_to_json_string_ext(json_obj,
@@ -2678,10 +2687,10 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     json_object_put(json_array);
     json_object_put(json_obj);
   } else {
-    if (GB_ASPRINTF(&tmp, "NAME: %s\nVOLUME: %s\nGBID: %s\nSIZE: %zu\n"
-                    "HA: %zu\nPASSWORD: %s\nBLOCK CONFIG NODE(S):",
-          blk->block_name, info->volume, info->gbid, info->size, info->mpath,
-          info->passwd) == -1) {
+    if (GB_ASPRINTF(&tmp, "NAME: %s\nVOLUME: %s\nGBID: %s\nSIZE: %s\n"
+                    "HA: %zu\nPASSWORD: %s\nEXPORTED NODE(S):",
+                    blk->block_name, info->volume, info->gbid, hr_size,
+                    info->mpath, info->passwd) == -1) {
       goto out;
     }
     for (i = 0; i < info->nhosts; i++) {
@@ -2702,9 +2711,10 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
  out:
   /*catch all*/
   if (!reply->out) {
-    blockFormatErrorResponse(DELETE_SRV, blk->json_resp, errCode,
+    blockFormatErrorResponse(INFO_SRV, blk->json_resp, errCode,
                              GB_DEFAULT_ERRMSG, reply);
   }
+  GB_FREE(hr_size);
   return;
 }
 

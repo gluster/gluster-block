@@ -52,8 +52,8 @@ static const char *const JsonResponseFormatLookup[] = {
 
 enum JsonResponseFormat jsonResponseFormatParse(const char *opt);
 
-int convertStringToTrillianParse(const char *opt);
+ssize_t glusterBlockParseSize(const char *dom, char *value);
 
-ssize_t glusterBlockCreateParseSize(const char *dom, char *value);
+char* glusterBlockFormatSize(const char *dom, size_t bytes);
 
 # endif /* _COMMON_H */

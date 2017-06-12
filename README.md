@@ -163,9 +163,9 @@ sample-block
 NAME: sample-block
 VOLUME: block-test
 GBID: 6b60c53c-8ce0-4d8d-a42c-5b546bca3d09
-SIZE: 1073741824
+SIZE: 1.0 GiB
 HA: 3
-BLOCK CONFIG NODE(S): 192.168.1.11 192.168.1.12 192.168.1.13
+EXPORTED NODE(S): 192.168.1.11 192.168.1.12 192.168.1.13
 </pre>
 <b>NOTE:</b> Block targets created using gluster-block utility will use TPG: 1 and LUN: 0.
 

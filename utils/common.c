@@ -38,7 +38,7 @@ jsonResponseFormatParse(const char *opt)
 
 
 ssize_t
-glusterBlockCreateParseSize(const char *dom, char *value)
+glusterBlockParseSize(const char *dom, char *value)
 {
   char *postfix;
   char *tmp;
@@ -85,6 +85,7 @@ glusterBlockCreateParseSize(const char *dom, char *value)
   case 'k':
     sizef *= 1024;
     /* fall through */
+  case 'B':
   case 'b':
   case '\0':
     return sizef;
@@ -95,4 +96,28 @@ glusterBlockCreateParseSize(const char *dom, char *value)
          "megabytes, gigabytes and terabytes.");
     return -1;
   }
+}
+
+
+char *
+glusterBlockFormatSize(const char *dom, size_t bytes)
+{
+  char *buf;
+  size_t i = 0;
+  size_t rem = 0;
+  const char* units[] = {"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"};
+
+
+  while (bytes >= 1024) {
+    rem = (bytes % 1024);
+    bytes /= 1024;
+    i++;
+  }
+
+  if (GB_ASPRINTF(&buf, "%.1f %s", (float)bytes + (float)rem / 1024.0, units[i]) < 0) {
+    LOG(dom, GB_LOG_ERROR, "%s", "glusterBlockFormatSize() failed");
+    buf = NULL;
+  }
+
+  return buf;
 }

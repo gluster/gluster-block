@@ -386,7 +386,7 @@ glusterBlockCreate(int argcount, char **options, int json)
   }
 
   /* last arg will be size */
-  sparse_ret = glusterBlockCreateParseSize("cli", options[optind]);
+  sparse_ret = glusterBlockParseSize("cli", options[optind]);
   if (sparse_ret < 0) {
     MSG("%s\n", "'<size>' is incorrect");
     MSG("%s\n", GB_CREATE_HELP_STR);
