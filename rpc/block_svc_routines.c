@@ -974,14 +974,14 @@ glusterBlockModifyRemoteAsync(MetaInfo *info,
                                             args, count, &local->attempt,
                                             &local->success);
     if (ret)
-            goto out;
+      goto out;
   } else {
     /* collect return */
     ret = glusterBlockCollectAttemptSuccess(glfs, mobj->block_name, args,
                                             count, &local->rb_attempt,
                                             &local->rb_success);
     if (ret)
-            goto out;
+      goto out;
   }
   for (i = 0; i < count; i++) {
     if (isRetValueDependencyError(args[i].exit)) {
@@ -1861,42 +1861,60 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 
 
 static int
+gbRunnerExitStatus(int exitStatus)
+{
+  if (!WIFEXITED(exitStatus)) {
+    LOG("mgmt", GB_LOG_ERROR, "%s", "Hint: child exited abnormally");
+    return -1;
+  }
+
+  return WEXITSTATUS(exitStatus);
+}
+
+
+static int
+gbRunner(char *cmd)
+{
+  int childExitStatus;
+
+
+  childExitStatus = system(cmd);
+
+  return gbRunnerExitStatus(childExitStatus);
+}
+
+
+static int
 blockNodeSanityCheck(blockResponse *reply)
 {
   int ret;
 
 
   /* Check if tcmu-runner is running */
-  ret = WEXITSTATUS(system("ps aux ww | grep -w '[t]cmu-runner' > /dev/null"));
-  if (ret == 1) {
+  ret = gbRunner("ps aux ww | grep -w '[t]cmu-runner' > /dev/null");
+  if (ret == -1 || ret == 1) {
     LOG("mgmt", GB_LOG_ERROR, "%s", "tcmu-runner not running");
     reply->exit = ESRCH;
-    if (GB_ASPRINTF(&reply->out, "tcmu-runner not running") == -1) {
-      return -1;
-    }
+    GB_ASPRINTF(&reply->out, "tcmu-runner not running");
     return -1;
   }
 
   /* Check targetcli has user:glfs handler listed */
-  ret = WEXITSTATUS(system(GB_TGCLI_GLFS_CHECK));
-  if (ret == 1) {
+  ret = gbRunner(GB_TGCLI_GLFS_CHECK);
+  if (ret == -1 || ret == 1) {
     LOG("mgmt", GB_LOG_ERROR, "%s",
         "tcmu-runner running, but targetcli doesn't list user:glfs handler");
     reply->exit = ENODEV;
-    if (GB_ASPRINTF(&reply->out,
-                    "tcmu-runner running, but targetcli doesn't list "
-                    "user:glfs handler") == -1) {
-      return -1;
-    }
+    GB_ASPRINTF(&reply->out,
+                "tcmu-runner running, but targetcli doesn't list "
+                "user:glfs handler");
     return -1;
   }
 
   if (ret == EKEYEXPIRED) {
     LOG("mgmt", GB_LOG_ERROR, "%s", "targetcli not found");
     reply->exit = EKEYEXPIRED;
-    if (GB_ASPRINTF(&reply->out, "targetcli not found") == -1) {
-      return -1;
-    }
+    GB_ASPRINTF(&reply->out, "targetcli not found");
     return -1;
   }
 
@@ -2046,7 +2064,7 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
     } else {
       reply->out[newLen++] = '\0';
     }
-    reply->exit = WEXITSTATUS(pclose(fp));
+    reply->exit = gbRunnerExitStatus(pclose(fp));
   } else {
       LOG("mgmt", GB_LOG_ERROR,
           "popen(): for block %s on volume %s executing command %s failed(%s)",
@@ -2226,6 +2244,7 @@ blockResponse *
 block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
 {
   FILE *fp;
+  int ret;
   char *iqn = NULL;
   char *backstore = NULL;
   char *exec = NULL;
@@ -2249,11 +2268,13 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
   }
 
   /* Check if block exist on this node ? */
-  if (WEXITSTATUS(system(exec)) == 1) {
+  ret = gbRunner(exec);
+  if (ret == -1) {
+    GB_ASPRINTF(&reply->out, "command exit abnormally for %s", blk->block_name);
+    goto out;
+  } else if (ret == 1) {
     reply->exit = 0;
-    if (GB_ASPRINTF(&reply->out, "No %s.", blk->block_name) == -1) {
-      goto out;
-    }
+    GB_ASPRINTF(&reply->out, "No %s.", blk->block_name);
     goto out;
   }
   GB_FREE(exec);
@@ -2290,7 +2311,7 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
     } else {
       reply->out[newLen++] = '\0';
     }
-    reply->exit = WEXITSTATUS(pclose(fp));
+    reply->exit = gbRunnerExitStatus(pclose(fp));
   } else {
       LOG("mgmt", GB_LOG_ERROR,
           "popen(): for block %s executing command %s failed(%s)",
@@ -2343,11 +2364,13 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
   }
 
   /* Check if block exist on this node ? */
-  if (WEXITSTATUS(system(exec)) == 1) {
+  ret = gbRunner(exec);
+  if (ret == -1) {
+    GB_ASPRINTF(&reply->out, "command exit abnormally for %s", blk->block_name);
+    goto out;
+  } else if (ret == 1) {
     reply->exit = 0;
-    if (GB_ASPRINTF(&reply->out, "No %s.", blk->block_name) == -1) {
-      goto out;
-    }
+    GB_ASPRINTF(&reply->out, "No %s.", blk->block_name);
     goto out;
   }
   GB_FREE(exec);
@@ -2368,7 +2391,7 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
     } else {
       out[newLen++] = '\0';
     }
-    ret = WEXITSTATUS(pclose(fp));
+    ret = gbRunnerExitStatus(pclose(fp));
     if (ret) {
       LOG("mgmt", GB_LOG_ERROR,
           "reading command %s output for block %s on volume %s failed",
@@ -2444,16 +2467,13 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  ret = WEXITSTATUS(system(exec));
+  ret = gbRunner(exec);
   if (ret) {
     LOG("mgmt", GB_LOG_ERROR,
         "system(): for block %s executing command %s failed(%s)",
         blk->block_name, exec, strerror(errno));
     reply->exit = ret;
-    if (GB_ASPRINTF(&reply->out,
-                    "cannot execute auth commands.") == -1) {
-      goto out;
-    }
+    GB_ASPRINTF(&reply->out, "cannot execute auth commands.");
     goto out;
   }
 
