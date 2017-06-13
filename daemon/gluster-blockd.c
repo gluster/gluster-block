@@ -149,17 +149,18 @@ glusterBlockServerThreadProc(void *vargp)
   struct sockaddr_in sain = {0, };
   int sockfd;
   int opt = 1;
+  char errMsg[2048] = {0};
 
 
   if ((sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
-    LOG("mgmt", GB_LOG_ERROR, "TCP socket creation failed (%s)",
-        strerror (errno));
+    snprintf(errMsg, sizeof (errMsg), "TCP socket creation failed (%s)",
+             strerror (errno));
     goto out;
   }
 
   if (setsockopt (sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof (opt)) < 0) {
-    LOG("mgmt", GB_LOG_ERROR,
-        "setsockopt() for SO_REUSEADDR failed (%s)", strerror (errno));
+    snprintf (errMsg, sizeof (errMsg), "Setting option to re-use address "
+              "failed (%s)", strerror (errno));
     goto out;
   }
 
@@ -168,26 +169,24 @@ glusterBlockServerThreadProc(void *vargp)
   sain.sin_port = htons(GB_TCP_PORT);
 
   if (bind(sockfd, (struct sockaddr *) &sain, sizeof (sain)) < 0) {
-    LOG("mgmt", GB_LOG_ERROR, "bind on port %d failed (%s)",
-        GB_TCP_PORT, strerror (errno));
+    snprintf(errMsg, sizeof (errMsg), "bind on port %d failed (%s)",
+             GB_TCP_PORT, strerror (errno));
     goto out;
   }
 
   transp = svctcp_create(sockfd, 0, 0);
   if (!transp) {
-    LOG("mgmt", GB_LOG_ERROR,
-        "RPC service transport create failed for tcp (%s)",
-        strerror (errno));
+    snprintf(errMsg, sizeof (errMsg), "%s", "RPC service transport create "
+             "failed for tcp");
     goto out;
   }
 
-	if (!svc_register(transp, GLUSTER_BLOCK, GLUSTER_BLOCK_VERS,
+  if (!svc_register(transp, GLUSTER_BLOCK, GLUSTER_BLOCK_VERS,
                     gluster_block_1, IPPROTO_TCP)) {
-		LOG("mgmt", GB_LOG_ERROR,
-        "unable to register (GLUSTER_BLOCK, GLUSTER_BLOCK_VERS: %s)",
-        strerror (errno));
+    snprintf (errMsg, sizeof (errMsg), "%s", "Please check if rpcbind "
+              "service is running.");
     goto out;
-	}
+  }
 
   svc_run ();
 
@@ -200,6 +199,11 @@ glusterBlockServerThreadProc(void *vargp)
     close(sockfd);
   }
 
+  if (errMsg[0]) {
+    LOG ("mgmt", GB_LOG_ERROR, "%s", errMsg);
+    MSG("%s\n", errMsg);
+    exit(EXIT_FAILURE);
+  }
   return NULL;
 }
 
