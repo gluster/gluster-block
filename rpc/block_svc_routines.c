@@ -571,6 +571,7 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
   for (i = 0; i < mpath; i++) {
     args[i].glfs = glfs;
     args[i].obj = (void *)cobj;
+    args[i].volume = cobj->volume;
     args[i].addr = list->hosts[i + listindex];
   }
 
