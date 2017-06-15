@@ -1893,7 +1893,7 @@ blockNodeSanityCheck(blockResponse *reply)
 
   /* Check if tcmu-runner is running */
   ret = gbRunner("ps aux ww | grep -w '[t]cmu-runner' > /dev/null");
-  if (ret == -1 || ret == 1) {
+  if (ret) {
     LOG("mgmt", GB_LOG_ERROR, "%s", "tcmu-runner not running");
     reply->exit = ESRCH;
     GB_ASPRINTF(&reply->out, "tcmu-runner not running");
@@ -1902,7 +1902,7 @@ blockNodeSanityCheck(blockResponse *reply)
 
   /* Check targetcli has user:glfs handler listed */
   ret = gbRunner(GB_TGCLI_GLFS_CHECK);
-  if (ret == -1 || ret == 1) {
+  if (ret) {
     LOG("mgmt", GB_LOG_ERROR, "%s",
         "tcmu-runner running, but targetcli doesn't list user:glfs handler");
     reply->exit = ENODEV;
