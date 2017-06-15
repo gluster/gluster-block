@@ -51,6 +51,7 @@ rm -rf ${RPM_BUILD_ROOT}
 %{_sbindir}/gluster-block
 %{_sbindir}/gluster-blockd
 %{_mandir}/man8/gluster-block*.8*
+%dir %{_localstatedir}/log/gluster-block
 %if ( 0%{?_with_systemd:1} )
 %{_unitdir}/gluster-blockd.service
 %config(noreplace) %{_sysconfdir}/sysconfig/gluster-blockd
