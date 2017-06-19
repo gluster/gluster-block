@@ -174,7 +174,7 @@ EXPORTED NODE(S): 192.168.1.11 192.168.1.12 192.168.1.13
 
 ##### On the Initiator machine
 <pre>
-# dnf install iscsi-initiator-utils
+# dnf install iscsi-initiator-utils device-mapper-multipath
 # lsblk (note the available devices)
 
 You can skip configuring multipath, if you choose not to enable mpath.
