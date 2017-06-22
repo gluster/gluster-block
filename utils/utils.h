@@ -98,6 +98,12 @@ extern size_t logLevel;
                 fd = fopen (GFAPI_LOG_FILE, "a");                      \
               else                                                     \
                 fd = stderr;                                           \
+              if (fd == NULL) {                                        \
+                fprintf(stderr, "Error opening log file: %s\n"         \
+                        "Logging to stderr.\n",                        \
+                        strerror(errno));                              \
+                fd = stderr;                                           \
+              }                                                        \
               logTimeNow(timestamp, GB_TIME_STRING_BUFLEN);            \
               fprintf(fd, "[%s] %s: " fmt " [at %s+%d :<%s>]\n",       \
                       timestamp, LogLevelLookup[level],                \
