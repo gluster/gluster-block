@@ -27,6 +27,7 @@ BuildRequires:    systemd-units
 
 Requires:         tcmu-runner >= 1.0.4
 Requires:         targetcli >= 2.1.fb43
+Requires:         rpcbind
 
 %description
 gluster-block is a CLI utility, which aims at making gluster backed block
@@ -57,6 +58,9 @@ rm -rf ${RPM_BUILD_ROOT}
 %endif
 
 %changelog
+* Tue Jun 22 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
+- update with missing dependencies
+
 * Tue Jun 06 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - add gluster-blockd sysconfig template
 
