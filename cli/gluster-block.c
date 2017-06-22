@@ -242,7 +242,7 @@ glusterBlockParseVolumeBlock(char *volumeblock, char *volume, char *block,
   /* part before '/' is the volume name */
   sep = strchr(volumeblock, '/');
   if (!sep) {
-    MSG("argument '<volname/blockname>'(%s) is incorrect",
+    MSG("argument '<volname/blockname>'(%s) is incorrect\n",
         volumeblock);
     MSG("%s\n", helpstr);
     LOG("cli", GB_LOG_ERROR, "%s failed while parsing <volname/blockname>", op);
@@ -261,12 +261,12 @@ glusterBlockParseVolumeBlock(char *volumeblock, char *volume, char *block,
   strncpy(block, sep+1, strlen(sep+1));
   if (!glusterBlockIsNameAcceptable (volume)) {
     MSG("volume name(%s) should contain only aplhanumeric,'-' "
-        "and '_' characters", volume);
+        "and '_' characters\n", volume);
     goto out;
   }
   if (!glusterBlockIsNameAcceptable (block)) {
     MSG("block name(%s) should contain only aplhanumeric,'-' "
-        "and '_' characters", block);
+        "and '_' characters\n", block);
     goto out;
   }
   ret = 0;
