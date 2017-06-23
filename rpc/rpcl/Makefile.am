@@ -21,3 +21,8 @@ block_clnt.c: block.x
 
 block_svc.c: block.x
 	rpcgen -m -o $(top_builddir)/rpc/rpcl/$@ $^
+
+dist-hook:
+	find $(distdir) -type f \
+		-not -name 'block.x' -not -name 'rpc-pragmas.h' \
+		-not -name 'block_svc.h' -not -name 'Makefile.*' -delete
