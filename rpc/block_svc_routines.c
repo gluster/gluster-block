@@ -508,6 +508,9 @@ glusterBlockCreateRemote(void *data)
           "host %s volume %s", strerror(errno), FAILED_REMOTE_CREATE,
           cobj.block_name, args->addr, args->volume);
       goto out;
+    } else if (args->reply) {
+      errMsg = args->reply;
+      args->reply = NULL;
     }
 
     if (isRetValueDependencyError(ret)) {
@@ -635,6 +638,9 @@ glusterBlockDeleteRemote(void *data)
           "host %s volume %s", strerror(errno), FAILED_REMOTE_DELETE,
           dobj.block_name, args->addr, args->volume);
       goto out;
+    } else if (args->reply) {
+      errMsg = args->reply;
+      args->reply = NULL;
     }
 
     if (isRetValueDependencyError(ret)) {
@@ -853,6 +859,9 @@ glusterBlockModifyRemote(void *data)
           "host %s volume %s", strerror(errno), FAILED_REMOTE_MODIFY,
           cobj.block_name, args->addr, args->volume);
       goto out;
+    } else if (args->reply) {
+      errMsg = args->reply;
+      args->reply = NULL;
     }
 
     if (isRetValueDependencyError(ret)) {
@@ -1249,8 +1258,13 @@ blockStr2arrayAddToJsonObj (json_object *json_obj, char *string, char *label,
 
 
 static void
-blockFormatDependencyErrors(int errCode, char **errMsg)
+blockFormatDependencyErrors(int errCode, char **errMsg, char *reply_errMsg)
 {
+  if (isRetValueDependencyError(errCode) && reply_errMsg) {
+    GB_STRDUP(*errMsg, reply_errMsg);
+    return;
+  }
+
   if (errCode == ESRCH) {
     GB_ASPRINTF(errMsg, "tcmu-runner is not running in few nodes");
   } else if (errCode == ENODEV) {
@@ -1511,7 +1525,7 @@ block_modify_cli_1_svc(blockModifyCli *blk, struct svc_req *rqstp)
   ret = 0;
 
  out:
-  blockFormatDependencyErrors(errCode, &errMsg);
+  blockFormatDependencyErrors(errCode, &errMsg, NULL);
 
   GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
 
@@ -1839,7 +1853,8 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   }
 
  exist:
-  blockFormatDependencyErrors(errCode, &errMsg);
+  blockFormatDependencyErrors(errCode, &errMsg,
+                              savereply?savereply->errMsg:NULL);
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
  out:
@@ -2217,7 +2232,7 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
   }
 
  out:
-  blockFormatDependencyErrors(errCode, &errMsg);
+  blockFormatDependencyErrors(errCode, &errMsg, NULL);
 
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
