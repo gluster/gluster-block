@@ -23,6 +23,7 @@ stamp-h1
 *.spec
 gluster-blockd.service
 *.tar.gz
+VERSION
 
 cscope.*
 tags

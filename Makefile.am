@@ -40,9 +40,12 @@ gitclean: clean distclean
 		ltmain.sh missing stamp-h1
 	rm -rf autom4te.cache ar-lib *.tar.gz m4
 
-dist-hook: gen-ChangeLog
+dist-hook: gen-ChangeLog gen-VERSION
 
-.PHONY: gen-ChangeLog
+.PHONY: gen-ChangeLog gen-VERSION
 
 gen-ChangeLog:
 	(cd $(srcdir) && git diff && echo ===== git log ==== && git log) > $(distdir)/ChangeLog
+
+gen-VERSION:
+	(cd $(srcdir) && git describe --always --tags | cut -f2 -d'v' | cut -f1 -d'-') > $(distdir)/VERSION
