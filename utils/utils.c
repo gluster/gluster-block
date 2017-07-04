@@ -214,7 +214,7 @@ gbReallocN(void *ptrptr, size_t size, size_t count,
     return -1;
   }
   tmp = realloc(*(void**)ptrptr, size * count);
-  if (!tmp && (size * count)) {
+  if (!tmp && ((size * count) != 0)) {
     errno = ENOMEM;
     return -1;
   }
