@@ -1795,8 +1795,6 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
                         blk->volume, gbid, blk->size, blk->mpath);
 
   if (glusterBlockCreateEntry(glfs, blk, gbid, &errCode, &errMsg)) {
-    GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
-                          errCode, errMsg, exist, "ENTRYCREATE: FAIL\n");
     LOG("mgmt", GB_LOG_ERROR, "%s volume: %s host: %s",
         FAILED_CREATING_FILE, blk->volume, blk->block_hosts);
     goto exist;

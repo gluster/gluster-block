@@ -91,6 +91,7 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
                         int *errCode, char **errMsg)
 {
   struct glfs_fd *tgfd;
+  char *tmp;
   int ret;
 
   ret = glfs_mkdir (glfs, GB_STOREDIR, 0);
@@ -162,9 +163,19 @@ unlink:
 
  out:
   if (ret) {
-    GB_ASPRINTF (errMsg, "Not able to create metadata for %s/%s[%s]", blk->volume,
-                 blk->block_name, strerror(*errCode));
+    GB_ASPRINTF (errMsg, "Not able to create storage for %s/%s [%s]",
+                 blk->volume, blk->block_name, strerror(*errCode));
+
+    GB_ASPRINTF(&tmp, "%s/%s", GB_METADIR, blk->block_name);
+
+    if (glfs_unlink(glfs, tmp) && errno != ENOENT) {
+      LOG("gfapi", GB_LOG_ERROR,
+          "glfs_unlink(%s) on volume %s for block %s failed[%s]",
+          tmp, blk->volume, blk->block_name, strerror(errno));
+    }
+    GB_FREE(tmp);
   }
+
   return ret;
 }
 
