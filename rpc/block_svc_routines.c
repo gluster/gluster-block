@@ -1942,6 +1942,7 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   FILE *fp;
   char *tmp = NULL;
   char *backstore = NULL;
+  char *backstore_attr = NULL;
   char *iqn = NULL;
   char *tpg = NULL;
   char *lun = NULL;
@@ -1971,6 +1972,12 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   if (GB_ASPRINTF(&backstore, "%s %s %s %zu %s@%s%s/%s %s", GB_TGCLI_GLFS,
                   GB_CREATE, blk->block_name, blk->size, blk->volume,
                   blk->ipaddr, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
+    goto out;
+  }
+
+  if (GB_ASPRINTF(&backstore_attr,
+                  "(%s/%s set attribute cmd_time_out=0 > %s || echo > %s)",
+                  GB_TGCLI_GLFS, blk->block_name, DEVNULLPATH, DEVNULLPATH) == -1) {
     goto out;
   }
 
@@ -2040,21 +2047,27 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
       goto out;
     }
     if (!tmp) {
-      if (GB_ASPRINTF(&exec, "%s && %s && %s && %s %s && %s && %s %s && %s",
-          GB_TGCLI_GLOBALS, backstore, iqn, tpg?tpg:"", lun, portal, attr,
-          blk->auth_mode?authcred:"", GB_TGCLI_SAVE) == -1) {
+      if (GB_ASPRINTF(&exec, "%s && %s && %s && %s && %s %s && %s && %s %s",
+          GB_TGCLI_GLOBALS, backstore, backstore_attr, iqn, tpg?tpg:"", lun,
+          portal, attr, blk->auth_mode?authcred:"") == -1) {
         goto out;
       }
       tmp = exec;
     } else {
-      if (GB_ASPRINTF(&exec, "%s && %s && %s && %s %s && %s",
+      if (GB_ASPRINTF(&exec, "%s && %s && %s && %s %s",
           tmp, lun, portal, attr,
-          blk->auth_mode?authcred:"", GB_TGCLI_SAVE) == -1) {
+          blk->auth_mode?authcred:"") == -1) {
         goto out;
       }
       GB_FREE(tmp);
       tmp = exec;
     }
+
+    if (GB_ASPRINTF(&exec, "%s && %s", tmp, GB_TGCLI_SAVE) == -1) {
+        goto out;
+    }
+    GB_FREE(tmp);
+
     GB_FREE(authcred);
     GB_FREE(attr);
     GB_FREE(portal);
@@ -2097,6 +2110,7 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   GB_FREE(tpg);
   GB_FREE(iqn);
   GB_FREE(backstore);
+  GB_FREE(backstore_attr);
   blockServerDefFree(list);
 
   return reply;
