@@ -16,8 +16,9 @@
 
 
 # define  GB_CREATE_HELP_STR  "gluster-block create <volname/blockname> "\
-                                "[ha <count>] [auth enable|disable] "\
-                                "<HOST1[,HOST2,...]> <size> [--json*]"
+                                "[ha <count>] [auth <enable|disable>] "\
+                                "[prealloc <full|no>] <HOST1[,HOST2,...]> "\
+                                "<size> [--json*]"
 
 # define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> [--json*]"
 # define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "\
