@@ -35,6 +35,7 @@
             }                                                         \
           } while(0)
 
+# define  GB_DEFAULT_SECTOR_SIZE  512
 
 extern const char *argp_program_version;
 
@@ -190,7 +191,7 @@ glusterBlockHelp(void)
       "                              [auth <enable|disable>]\n"
       "                              [prealloc <full|no>]\n"
       "                              <host1[,host2,...]> <size>\n"
-      "        create block device [defaults: ha 1, auth disable, prealloc no]\n"
+      "        create block device [defaults: ha 1, auth disable, prealloc no, size in bytes]\n"
       "\n"
       "  list    <volname>\n"
       "        list available block devices.\n"
@@ -407,6 +408,11 @@ glusterBlockCreate(int argcount, char **options, int json)
     MSG("%s\n", GB_CREATE_HELP_STR);
     LOG("cli", GB_LOG_ERROR, "failed while parsing size for block <%s/%s>",
         cobj.volume, cobj.block_name);
+    goto out;
+  } else if (sparse_ret < GB_DEFAULT_SECTOR_SIZE) {
+    MSG("minimum acceptable block size is %d bytes\n", GB_DEFAULT_SECTOR_SIZE);
+    LOG("cli", GB_LOG_ERROR, "minimum acceptable block size is %d bytes <%s/%s>",
+        GB_DEFAULT_SECTOR_SIZE, cobj.volume, cobj.block_name);
     goto out;
   }
   cobj.size = sparse_ret;  /* size is unsigned long long */
