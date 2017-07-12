@@ -2027,10 +2027,9 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
         goto out;
       }
     } else {
-      if (GB_ASPRINTF(&attr, "%s/%s%s/tpg%zu set attribute tpg_enabled_sendtargets=0 %s %s > %s",
+      if (GB_ASPRINTF(&attr, "%s/%s%s/tpg%zu set attribute tpg_enabled_sendtargets=0 %s %s",
                    GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
-                   blk->auth_mode?"authentication=1":"",
-                   GB_TGCLI_ATTRIBUTES, DEVNULLPATH) == -1) {
+                   blk->auth_mode?"authentication=1":"", GB_TGCLI_ATTRIBUTES) == -1) {
         goto out;
       }
       if (GB_ASPRINTF(&portal, "%s/%s%s/tpg%zu/portals create %s > %s",
@@ -2063,16 +2062,16 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
       tmp = exec;
     }
 
-    if (GB_ASPRINTF(&exec, "%s && %s", tmp, GB_TGCLI_SAVE) == -1) {
-        goto out;
-    }
-    GB_FREE(tmp);
-
     GB_FREE(authcred);
     GB_FREE(attr);
     GB_FREE(portal);
     GB_FREE(lun);
   }
+
+  if (GB_ASPRINTF(&exec, "%s && %s", tmp, GB_TGCLI_SAVE) == -1) {
+    goto out;
+  }
+  GB_FREE(tmp);
 
   LOG("mgmt", GB_LOG_DEBUG, "command, %s", exec);
 
