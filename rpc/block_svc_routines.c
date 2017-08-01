@@ -293,21 +293,17 @@ blockRemoteCreateRespParse(char *output, blockRemoteCreateResp **savereply)
 }
 
 
-int
-glusterBlockCallRPC_1(char *host, void *cobj,
-                      operations opt, bool *rpc_sent, char **out)
+static int glusterBlockHostConnect(char *host, struct sockaddr_in **sainptr)
 {
-  CLIENT *clnt = NULL;
-  int ret = -1;
-  int sockfd;
-  int errsv = 0;
-  blockResponse *reply =  NULL;
+  int sockfd = -1;
   struct hostent *server;
   struct sockaddr_in sain = {0, };
+  int errsv = 0;
 
 
-  *rpc_sent = FALSE;
+
   if ((sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+    errsv = errno;
     LOG("mgmt", GB_LOG_ERROR, "socket creation failed (%s)",
         strerror (errno));
     goto out;
@@ -315,6 +311,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
 
   server = gethostbyname(host);
   if (!server) {
+    errsv = errno;
     LOG("mgmt", GB_LOG_ERROR, "gethostbyname(%s) failed (%s)",
         host, strerror (errno));
     goto out;
@@ -326,14 +323,51 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   sain.sin_port = htons(GB_TCP_PORT);
 
   if (connect(sockfd, (struct sockaddr *) &sain, sizeof(sain)) < 0) {
+    errsv = errno;
     LOG("mgmt", GB_LOG_ERROR, "connect on %s failed (%s)", host,
         strerror (errno));
+    goto out;
+  }
+
+  if (sainptr) {
+    *sainptr = &sain;
+  }
+
+  return sockfd;
+
+out:
+  if (sockfd != -1) {
+    close(sockfd);
+  }
+
+  if (errsv) {
+    errno = errsv;
+  }
+  return -1;
+}
+
+
+
+int
+glusterBlockCallRPC_1(char *host, void *cobj,
+                      operations opt, bool *rpc_sent, char **out)
+{
+  CLIENT *clnt = NULL;
+  int ret = -1;
+  int sockfd;
+  int errsv = 0;
+  blockResponse *reply =  NULL;
+  struct sockaddr_in *sain = NULL;
+
+
+  *rpc_sent = FALSE;
+  sockfd = glusterBlockHostConnect(host, &sain);
+  if ( sockfd == -1) {
     errsv = errno;
     goto out;
   }
 
-  clnt = clnttcp_create ((struct sockaddr_in *) &sain, GLUSTER_BLOCK,
-                         GLUSTER_BLOCK_VERS, &sockfd, 0, 0);
+  clnt = clnttcp_create (sain, GLUSTER_BLOCK, GLUSTER_BLOCK_VERS, &sockfd, 0, 0);
   if (!clnt) {
     LOG("mgmt", GB_LOG_ERROR, "%son inet host %s",
         clnt_spcreateerror("client create failed"), host);
@@ -712,8 +746,7 @@ glusterBlockDeleteFillArgs(MetaInfo *info, bool deleteall, blockRemoteObj *args,
 
 
 static int
-glusterBlockCollectAttemptSuccess(struct glfs *glfs, char *blockname,
-                                  blockRemoteObj *args, size_t count,
+glusterBlockCollectAttemptSuccess(blockRemoteObj *args, size_t count,
                                   char **attempt, char **success)
 {
   char *a_tmp = NULL;
@@ -746,6 +779,93 @@ glusterBlockCollectAttemptSuccess(struct glfs *glfs, char *blockname,
   *attempt = NULL;
   *success = NULL;
   return -1;
+}
+
+
+void *
+glusterBlockDeleteHostConnect(void *data)
+{
+  int ret;
+  blockRemoteObj *args = (blockRemoteObj *)data;
+
+
+  args->exit = ret = glusterBlockHostConnect(args->addr, NULL);
+  if (ret > 0) {
+    args->exit = 0;
+  }
+
+  return NULL;
+}
+
+
+static int
+glusterBlockConnectAsync(char *blockname, MetaInfo *info,
+                         int count, char **errMsg)
+{
+  pthread_t  *tid = NULL;
+  blockRemoteObj *args = NULL;
+  char *notreachable = NULL;
+  char *reachable = NULL;
+  char *a_tmp = NULL;
+  char *s_tmp = NULL;
+  int ret = -1;
+  size_t i;
+
+
+  if (GB_ALLOC_N(tid, count) < 0) {
+    goto out;
+  }
+
+  if (GB_ALLOC_N(args, count) < 0) {
+    goto out;
+  }
+
+  count = glusterBlockDeleteFillArgs(info, true, args, NULL, NULL);
+
+  for (i = 0; i < count; i++) {
+    pthread_create(&tid[i], NULL, glusterBlockDeleteHostConnect, &args[i]);
+  }
+
+  for (i = 0; i < count; i++) {
+    pthread_join(tid[i], NULL);
+  }
+
+  ret = 0;
+  for (i = 0; i < count; i++) {
+    if (args[i].exit) {
+      ret = -1;
+      if (GB_ASPRINTF(&notreachable, "%s %s",
+                      (a_tmp==NULL?"":a_tmp), args[i].addr) == -1) {
+        goto fail;
+      }
+      GB_FREE(a_tmp);
+      a_tmp = notreachable;
+    } else {
+      if (GB_ASPRINTF(&reachable, "%s %s",
+                      (s_tmp==NULL?"":s_tmp), args[i].addr) == -1) {
+        goto fail;
+      }
+      GB_FREE(s_tmp);
+      s_tmp = reachable;
+    }
+  }
+
+  if (ret) {
+    GB_ASPRINTF(errMsg, "block delete: %s: failed: Some of the nodes are down\n"
+                        "Nodes reachable: %s\nNodes down: %s",
+                        blockname, reachable?reachable:"None",
+                        notreachable?notreachable:"None");
+  }
+
+ fail:
+  GB_FREE(a_tmp);
+  GB_FREE(s_tmp);
+
+ out:
+  GB_FREE(args);
+  GB_FREE(tid);
+
+  return ret;
 }
 
 
@@ -786,8 +906,7 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
     pthread_join(tid[i], NULL);
   }
 
-  ret = glusterBlockCollectAttemptSuccess (glfs, dobj->block_name, args,
-                                           count, &d_attempt, &d_success);
+  ret = glusterBlockCollectAttemptSuccess(args, count, &d_attempt, &d_success);
   if (ret) {
     goto out;
   }
@@ -980,15 +1099,13 @@ glusterBlockModifyRemoteAsync(MetaInfo *info,
 
   if (!rollback) {
     /* collect return */
-    ret = glusterBlockCollectAttemptSuccess(glfs, mobj->block_name,
-                                            args, count, &local->attempt,
+    ret = glusterBlockCollectAttemptSuccess(args, count, &local->attempt,
                                             &local->success);
     if (ret)
       goto out;
   } else {
     /* collect return */
-    ret = glusterBlockCollectAttemptSuccess(glfs, mobj->block_name, args,
-                                            count, &local->rb_attempt,
+    ret = glusterBlockCollectAttemptSuccess(args, count, &local->rb_attempt,
                                             &local->rb_success);
     if (ret)
       goto out;
@@ -2190,11 +2307,13 @@ blockResponse *
 block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 {
   blockRemoteDeleteResp *savereply = NULL;
+  MetaInfo *info = NULL;
   static blockResponse *reply = NULL;
   struct glfs *glfs;
   struct glfs_fd *lkfd = NULL;
   char *errMsg = NULL;
   int errCode = 0;
+  int ret;
 
 
   LOG("mgmt", GB_LOG_INFO, "delete cli request, volume=%s blockname=%s",
@@ -2236,6 +2355,22 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
+  if (GB_ALLOC(info) < 0) {
+    goto out;
+  }
+
+  ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
+  if (ret) {
+    goto out;
+  }
+
+  ret = glusterBlockConnectAsync(blk->block_name, info,
+                                 glusterBlockDeleteFillArgs(info, true, NULL, NULL, NULL),
+                                 &errMsg);
+  if (ret) {
+    goto out;
+  }
+
   errCode = glusterBlockCleanUp(glfs, blk->block_name, TRUE, savereply);
   if (errCode) {
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockCleanUp: return %d "
@@ -2243,6 +2378,7 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
   }
 
  out:
+  GB_FREE(info);
   blockFormatDependencyErrors(errCode, &errMsg, NULL);
 
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
