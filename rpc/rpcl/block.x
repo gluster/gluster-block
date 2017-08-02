@@ -47,6 +47,7 @@ struct blockCreateCli {
 struct blockDeleteCli {
   char      block_name[255];
   char      volume[255];
+  bool      force;
   enum JsonResponseFormat     json_resp;
 };
 

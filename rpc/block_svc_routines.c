@@ -1131,7 +1131,7 @@ glusterBlockModifyRemoteAsync(MetaInfo *info,
 
 static int
 glusterBlockCleanUp(struct glfs *glfs, char *blockname,
-                    bool deleteall, blockRemoteDeleteResp *drobj)
+                    bool deleteall, bool forcedel, blockRemoteDeleteResp *drobj)
 {
   int ret = -1;
   size_t i;
@@ -1190,7 +1190,7 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
       }
     }
 
-    if (cleanupsuccess == info->nhosts) {
+    if (forcedel || cleanupsuccess == info->nhosts) {
       GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
                             ret, errMsg, out, "ENTRYDELETE: INPROGRESS\n");
       if (glusterBlockDeleteEntry(glfs, info->volume, info->gbid)) {
@@ -1215,6 +1215,11 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
  out:
   blockFreeMetaInfo(info);
   GB_FREE (errMsg);
+
+  /* ignore asyncret if force delete is used */
+  if (forcedel) {
+    asyncret = 0;
+  }
 
   return asyncret?asyncret:ret;
 }
@@ -1275,7 +1280,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
           "No Spare nodes to create (%s): rollingback creation of target"
           " on volume %s with given hosts %s",
           blk->block_name, blk->volume, blk->block_hosts);
-      glusterBlockCleanUp(glfs, blk->block_name, TRUE, (*reply)->obj);
+      glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, (*reply)->obj);
       needcleanup = FALSE;   /* already clean attempted */
       ret = -1;
       goto out;
@@ -1284,7 +1289,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
           "Not enough Spare nodes for (%s): rollingback creation of target"
           " on volume %s with given hosts %s",
           blk->block_name, blk->volume, blk->block_hosts);
-      glusterBlockCleanUp(glfs, blk->block_name, TRUE, (*reply)->obj);
+      glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, (*reply)->obj);
       needcleanup = FALSE;   /* already clean attempted */
       ret = -1;
       goto out;
@@ -1315,7 +1320,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
 
  out:
   if (needcleanup) {
-      glusterBlockCleanUp(glfs, blk->block_name, FALSE, (*reply)->obj);
+      glusterBlockCleanUp(glfs, blk->block_name, FALSE, FALSE, (*reply)->obj);
   }
 
   blockFreeMetaInfo(info);
@@ -1948,7 +1953,7 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
           " rollingback the create request for block %s on volume %s with hosts %s",
           errCode, blk->block_name, blk->volume, blk->block_hosts);
 
-      glusterBlockCleanUp(glfs, blk->block_name, TRUE, savereply->obj);
+      glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, savereply->obj);
 
       goto exist;
     }
@@ -2355,23 +2360,25 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  if (GB_ALLOC(info) < 0) {
-    goto out;
+  if (!blk->force) {
+    if (GB_ALLOC(info) < 0) {
+      goto out;
+    }
+
+    ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
+    if (ret) {
+      goto out;
+    }
+
+    ret = glusterBlockConnectAsync(blk->block_name, info,
+                                   glusterBlockDeleteFillArgs(info, true, NULL, NULL, NULL),
+                                   &errMsg);
+    if (ret) {
+      goto out;
+    }
   }
 
-  ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
-  if (ret) {
-    goto out;
-  }
-
-  ret = glusterBlockConnectAsync(blk->block_name, info,
-                                 glusterBlockDeleteFillArgs(info, true, NULL, NULL, NULL),
-                                 &errMsg);
-  if (ret) {
-    goto out;
-  }
-
-  errCode = glusterBlockCleanUp(glfs, blk->block_name, TRUE, savereply);
+  errCode = glusterBlockCleanUp(glfs, blk->block_name, TRUE, TRUE, savereply);
   if (errCode) {
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockCleanUp: return %d "
         "on block %s for volume %s", errCode, blk->block_name, blk->volume);

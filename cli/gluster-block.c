@@ -20,7 +20,7 @@
                                 "[prealloc <full|no>] <HOST1[,HOST2,...]> "\
                                 "<size> [--json*]"
 
-# define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> [--json*]"
+# define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> [force] [--json*]"
 # define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "\
                                "<auth enable|disable> [--json*]"
 # define  GB_INFO_HELP_STR    "gluster-block info <volname/blockname> [--json*]"
@@ -202,7 +202,7 @@ glusterBlockHelp(void)
       "  info    <volname/blockname>\n"
       "        details about block device.\n"
       "\n"
-      "  delete  <volname/blockname>\n"
+      "  delete  <volname/blockname> [force]\n"
       "        delete block device.\n"
       "\n"
       "  modify  <volname/blockname> <auth enable|disable>\n"
@@ -458,7 +458,20 @@ glusterBlockDelete(int argcount, char **options, int json)
   int ret = -1;
 
 
-  GB_ARGCHECK_OR_RETURN(argcount, 3, "delete", GB_DELETE_HELP_STR);
+  if (argcount < 3 || argcount > 4) {
+    MSG("Inadequate arguments for delete:\n%s\n", GB_DELETE_HELP_STR);
+      return -1;
+  }
+
+  if (argcount == 4) {
+    if (strcmp(options[3], "force")) {
+      MSG("unknown option '%s' for delete:\n%s\n", options[3], GB_DELETE_HELP_STR);
+      return -1;
+    } else {
+      cobj.force = true;
+    }
+  }
+
   cobj.json_resp = json;
 
   if (glusterBlockParseVolumeBlock (options[2], cobj.volume,
@@ -518,7 +531,7 @@ glusterBlockParseArgs(int count, char **options)
 
   opt = glusterBlockCLIOptEnumParse(options[1]);
   if (!opt || opt >= GB_CLI_OPT_MAX) {
-    MSG("unknown option: %s\n", options[1]);
+    MSG("Unknown option: %s\n", options[1]);
     return -1;
   }
 
