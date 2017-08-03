@@ -27,7 +27,7 @@
 
 # define   GB_TGCLI_GLFS_PATH   "/backstores/user:glfs"
 # define   GB_TGCLI_GLFS        "targetcli " GB_TGCLI_GLFS_PATH
-# define   GB_TGCLI_CHECK       GB_TGCLI_GLFS " ls | grep ' %s ' > " DEVNULLPATH
+# define   GB_TGCLI_CHECK       GB_TGCLI_GLFS " ls | grep ' %s ' | grep '/%s ' > " DEVNULLPATH
 # define   GB_TGCLI_ISCSI_PATH  "/iscsi"
 # define   GB_TGCLI_SAVE        "/ saveconfig"
 # define   GB_TGCLI_ATTRIBUTES  "generate_node_acls=1 demo_mode_write_protect=0"
@@ -2410,7 +2410,10 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name) == -1) {
+  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name, blk->gbid) == -1) {
+    LOG("mgmt", GB_LOG_WARNING,
+        "block backend with name '%s' doesn't exist with matching gbid %s",
+        blk->block_name, blk->gbid);
     goto out;
   }
 
@@ -2483,7 +2486,10 @@ block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name) == -1) {
+  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name, blk->gbid) == -1) {
+    LOG("mgmt", GB_LOG_WARNING,
+        "block backend with name '%s' doesn't exist with matching gbid %s, volume '%s'",
+        blk->block_name, blk->gbid, blk->volume);
     goto out;
   }
 
