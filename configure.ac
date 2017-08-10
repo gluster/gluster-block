@@ -23,7 +23,12 @@ AC_ARG_WITH(systemddir,
 AC_SUBST(systemddir)
 AM_CONDITIONAL([USE_SYSTEMD], test [ -d '/usr/lib/systemd/system' ])
 
-AC_SUBST(sysconfigdir, '/etc/sysconfig')
+AC_ARG_WITH(sysconfigdir,
+            AC_HELP_STRING([--with-sysconfigdir=DIR],
+                           [system service configuration in DIR @<:@/etc/sysconfig@:>@]),
+            [sysconfigdir=$withval],
+            [sysconfigdir='/etc/sysconfig'])
+AC_SUBST(sysconfigdir)
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign nostdinc silent-rules])
 AC_CONFIG_HEADERS([config.h])
