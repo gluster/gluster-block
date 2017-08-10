@@ -16,7 +16,8 @@ AC_INIT([gluster-block],
 AC_SUBST([PACKAGE_RELEASE], 1)
 
 AC_ARG_WITH(systemddir,
-            [--with-systemddir=DIR systemd service files in DIR @<:@PREFIX/lib/systemd/system@:>@],
+            AC_HELP_STRING([--with-systemddir=DIR],
+                           [systemd service files in DIR @<:@PREFIX/lib/systemd/system@:>@]),
             [systemddir=$withval],
             [systemddir='${prefix}/lib/systemd/system'])
 AC_SUBST(systemddir)
