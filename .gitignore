@@ -21,7 +21,7 @@ m4/
 stamp-h1
 .deps
 *.spec
-*.service
+gluster-blockd.service
 *.tar.gz
 
 cscope.*

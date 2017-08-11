@@ -1,7 +1,9 @@
 [Unit]
 Description=Gluster block storage utility
-Requires=rpcbind.service target.service tcmu-runner.service
-After=rpcbind.service target.service tcmu-runner.service
+Requisite=glusterd.service
+Requires=rpcbind.service
+BindsTo=gluster-block-target.service
+After=gluster-block-target.service
 
 [Service]
 Type=simple

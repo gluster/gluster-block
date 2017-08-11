@@ -54,10 +54,14 @@ rm -rf ${RPM_BUILD_ROOT}
 %{_mandir}/man8/gluster-block*.8*
 %if ( 0%{?_with_systemd:1} )
 %{_unitdir}/gluster-blockd.service
+%{_unitdir}/gluster-block-target.service
 %config(noreplace) %{_sysconfdir}/sysconfig/gluster-blockd
 %endif
 
 %changelog
+* Fri Aug 11 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
+- add wrapper target service unit
+
 * Tue Jun 22 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - update with missing dependencies
 

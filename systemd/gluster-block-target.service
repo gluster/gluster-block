@@ -1,0 +1,14 @@
+# This file is part of gluster-block.
+#
+# This is a wrapper unit over target.service which ensures that
+# tcmu-runner.service is running which intern has a check to see if
+# glusterd.service is active
+#
+
+.include /usr/lib/systemd/system/target.service
+
+[Unit]
+Conflicts=target.service
+Requisite=glusterd.service
+BindsTo=tcmu-runner.service
+After=glusterd.service tcmu-runner.service
