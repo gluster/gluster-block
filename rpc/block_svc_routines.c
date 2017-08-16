@@ -27,15 +27,11 @@
 
 # define   GB_TGCLI_GLFS_PATH   "/backstores/user:glfs"
 # define   GB_TGCLI_GLFS        "targetcli " GB_TGCLI_GLFS_PATH
-# define   GB_TGCLI_GLFS_CHECK  GB_TGCLI_GLFS " ls > " DEVNULLPATH
 # define   GB_TGCLI_CHECK       GB_TGCLI_GLFS " ls | grep ' %s ' > " DEVNULLPATH
 # define   GB_TGCLI_ISCSI       "targetcli /iscsi"
-# define   GB_TGCLI_GLOBALS     "targetcli set "                        \
-                                "global auto_add_default_portal=false " \
-                                "auto_enable_tpgt=false "               \
-                                "logfile=%s > " DEVNULLPATH
-# define   GB_TGCLI_SAVE        "targetcli / saveconfig > " DEVNULLPATH
-# define   GB_TGCLI_ATTRIBUTES  "generate_node_acls=1 demo_mode_write_protect=0 > " DEVNULLPATH
+# define   GB_TGCLI_ISCSI_PATH  "/iscsi"
+# define   GB_TGCLI_SAVE        "/ saveconfig"
+# define   GB_TGCLI_ATTRIBUTES  "generate_node_acls=1 demo_mode_write_protect=0"
 # define   GB_TGCLI_IQN_PREFIX  "iqn.2016-12.org.gluster-block:"
 
 # define   GB_JSON_OBJ_TO_STR(x) json_object_new_string(x?x:"")
@@ -208,7 +204,10 @@ blockRemoteCreateRespParse(char *output, blockRemoteCreateResp **savereply)
 {
   char *line;
   blockRemoteCreateResp *local = *savereply;
+  char *portal = NULL;
   char *errMsg = NULL;
+  size_t i;
+  bool dup;
 
 
   if (!local) {
@@ -246,21 +245,31 @@ blockRemoteCreateRespParse(char *output, blockRemoteCreateResp **savereply)
       /* Not needed as reponse doesn't need them now. */
       break;
     case GB_PORTAL_RESP:
+      portal = getLastWordNoDot(line);
       if (!local->nportal) {
         if (GB_ALLOC(local->portal) < 0) {
           goto out;
         }
-        if (GB_STRDUP(local->portal[local->nportal],
-                      getLastWordNoDot(line)) < 0) {
+        if (GB_STRDUP(local->portal[local->nportal], portal) < 0) {
           goto out;
         }
         local->nportal++;
       } else {
+        dup = false;
+        for (i = 0; i < local->nportal; i++) {
+          if (strstr(local->portal[i], portal)){
+            /* portal already feeded */
+            dup = true;
+            break;
+          }
+        }
+        if (dup) {
+          break;
+        }
         if (GB_REALLOC_N(local->portal, local->nportal + 1) < 0) {
           goto out;
         }
-        if (GB_STRDUP(local->portal[local->nportal],
-                      getLastWordNoDot(line)) < 0) {
+        if (GB_STRDUP(local->portal[local->nportal], portal) < 0) {
           goto out;
         }
         local->nportal++;
@@ -275,8 +284,6 @@ blockRemoteCreateRespParse(char *output, blockRemoteCreateResp **savereply)
       }
       GB_FREE (errMsg);
       break;
-    case GB_REMOTE_CREATE_RESP_MAX:
-      goto out;
     }
 
     line = strtok(NULL, "\n");
@@ -507,17 +514,6 @@ blockServerParse(char *blkServers)
 }
 
 
-static bool
-isRetValueDependencyError(int ret)
-{
-    if (ret == EKEYEXPIRED || ret == ESRCH || ret == ENODEV) {
-      return TRUE;
-    }
-
-    return FALSE;
-}
-
-
 void *
 glusterBlockCreateRemote(void *data)
 {
@@ -545,13 +541,6 @@ glusterBlockCreateRemote(void *data)
     } else if (args->reply) {
       errMsg = args->reply;
       args->reply = NULL;
-    }
-
-    if (isRetValueDependencyError(ret)) {
-      LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence create block %s on "
-          "host %s volume %s failed", FAILED_DEPENDENCY, strerror(ret),
-          cobj.block_name, args->addr, args->volume);
-      goto out;
     }
 
     GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
@@ -631,12 +620,9 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
 
   ret = 0;
   for (i = 0; i < mpath; i++) {
-    /* this means in oneof the nodes dependency package not installed*/
-    if (isRetValueDependencyError(args[i].exit)) {
-      ret = args[i].exit;
-      goto out; /* important to catch */
-    } else if (args[i].exit) {
+    if (args[i].exit) {
       ret = -1;
+      break;
     }
   }
 
@@ -675,13 +661,6 @@ glusterBlockDeleteRemote(void *data)
     } else if (args->reply) {
       errMsg = args->reply;
       args->reply = NULL;
-    }
-
-    if (isRetValueDependencyError(ret)) {
-      LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence delete block %s on "
-          "host %s volume %s failed", FAILED_DEPENDENCY, strerror(ret),
-          dobj.block_name, args->addr, args->volume);
-      goto out;
     }
 
     GB_METAUPDATE_OR_GOTO(lock, args->glfs, dobj.block_name, args->volume,
@@ -933,11 +912,9 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
 
   ret = 0;
   for (i = 0; i < count; i++) {
-    if (isRetValueDependencyError(args[i].exit)) {
-      ret = args[i].exit;
-      break; /* important to catch */
-    } else if (args[i].exit) {
+    if (args[i].exit) {
       ret = -1;
+      break;
     }
   }
 
@@ -981,13 +958,6 @@ glusterBlockModifyRemote(void *data)
     } else if (args->reply) {
       errMsg = args->reply;
       args->reply = NULL;
-    }
-
-    if (isRetValueDependencyError(ret)) {
-      LOG("mgmt", GB_LOG_ERROR, "%s [%s] hence modify block %s on "
-          "host %s volume %s failed", FAILED_DEPENDENCY, strerror(ret),
-          cobj.block_name, args->addr, args->volume);
-      goto out;
     }
 
     GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
@@ -1111,11 +1081,9 @@ glusterBlockModifyRemoteAsync(MetaInfo *info,
       goto out;
   }
   for (i = 0; i < count; i++) {
-    if (isRetValueDependencyError(args[i].exit)) {
-      ret = args[i].exit;
-      break; /* important to catch */
-    } else if (args[i].exit) {
+    if (args[i].exit) {
       ret = -1;
+      break;
     }
   }
 
@@ -1162,10 +1130,6 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
     LOG("mgmt", GB_LOG_WARNING,
         "glusterBlockDeleteRemoteAsync: return %d %s for block %s on volume %s",
         asyncret, FAILED_REMOTE_AYNC_DELETE, blockname, info->volume);
-
-    if (isRetValueDependencyError(asyncret)) {
-      goto out;
-    }
   }
 
   /* delete metafile and block file */
@@ -1376,25 +1340,6 @@ blockStr2arrayAddToJsonObj (json_object *json_obj, char *string, char *label,
   }
   json_object_object_add(json_obj, label, json_array1);
   *json_array = json_array1;
-}
-
-
-static void
-blockFormatDependencyErrors(int errCode, char **errMsg, char *reply_errMsg)
-{
-  if (isRetValueDependencyError(errCode) && reply_errMsg) {
-    GB_STRDUP(*errMsg, reply_errMsg);
-    return;
-  }
-
-  if (errCode == ESRCH) {
-    GB_ASPRINTF(errMsg, "tcmu-runner is not running in few nodes");
-  } else if (errCode == ENODEV) {
-    GB_ASPRINTF(errMsg, "tcmu-runner running, but targetcli doesn't list "
-                        "user:glfs handler in few nodes");
-  } else if (errCode == EKEYEXPIRED) {
-    GB_ASPRINTF(errMsg, "targetcli is not installed on few nodes");
-  }
 }
 
 
@@ -1647,8 +1592,6 @@ block_modify_cli_1_svc(blockModifyCli *blk, struct svc_req *rqstp)
   ret = 0;
 
  out:
-  blockFormatDependencyErrors(errCode, &errMsg, NULL);
-
   GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
 
  nolock:
@@ -1948,15 +1891,6 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   errCode = glusterBlockCreateRemoteAsync(list, 0, blk->mpath,
                                           glfs, &cobj, &savereply);
   if (errCode) {
-    if (isRetValueDependencyError(errCode)) {
-      LOG("mgmt", GB_LOG_ERROR, "glusterBlockCreateRemoteAsync: return %d"
-          " rollingback the create request for block %s on volume %s with hosts %s",
-          errCode, blk->block_name, blk->volume, blk->block_hosts);
-
-      glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, savereply->obj);
-
-      goto exist;
-    }
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockCreateRemoteAsync: return %d"
         " %s for block %s on volume %s with hosts %s", errCode,
         FAILED_REMOTE_AYNC_CREATE, blk->block_name,
@@ -1973,8 +1907,6 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   }
 
  exist:
-  blockFormatDependencyErrors(errCode, &errMsg,
-                              savereply?savereply->errMsg:NULL);
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
  out:
@@ -1993,68 +1925,6 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
   GB_FREE (cobj.block_hosts);
 
   return reply;
-}
-
-
-static int
-gbRunnerExitStatus(int exitStatus)
-{
-  if (!WIFEXITED(exitStatus)) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "Hint: child exited abnormally");
-    return -1;
-  }
-
-  return WEXITSTATUS(exitStatus);
-}
-
-
-static int
-gbRunner(char *cmd)
-{
-  int childExitStatus;
-
-
-  childExitStatus = system(cmd);
-
-  return gbRunnerExitStatus(childExitStatus);
-}
-
-
-static int
-blockNodeSanityCheck(blockResponse *reply)
-{
-  int ret;
-
-
-  /* Check if tcmu-runner is running */
-  ret = gbRunner("ps aux ww | grep -w '[t]cmu-runner' > /dev/null");
-  if (ret) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "tcmu-runner not running");
-    reply->exit = ESRCH;
-    GB_ASPRINTF(&reply->out, "tcmu-runner not running");
-    return -1;
-  }
-
-  /* Check targetcli has user:glfs handler listed */
-  ret = gbRunner(GB_TGCLI_GLFS_CHECK);
-  if (ret) {
-    LOG("mgmt", GB_LOG_ERROR, "%s",
-        "tcmu-runner running, but targetcli doesn't list user:glfs handler");
-    reply->exit = ENODEV;
-    GB_ASPRINTF(&reply->out,
-                "tcmu-runner running, but targetcli doesn't list "
-                "user:glfs handler");
-    return -1;
-  }
-
-  if (ret == EKEYEXPIRED) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "targetcli not found");
-    reply->exit = EKEYEXPIRED;
-    GB_ASPRINTF(&reply->out, "targetcli not found");
-    return -1;
-  }
-
-  return 0;
 }
 
 
@@ -2088,23 +1958,19 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  if (blockNodeSanityCheck(reply)) {
-    goto out;
-  }
-
-  if (GB_ASPRINTF(&backstore, "%s %s %s %zu %s@%s%s/%s %s", GB_TGCLI_GLFS,
+  if (GB_ASPRINTF(&backstore, "%s %s %s %zu %s@%s%s/%s %s", GB_TGCLI_GLFS_PATH,
                   GB_CREATE, blk->block_name, blk->size, blk->volume,
                   blk->ipaddr, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
     goto out;
   }
 
   if (GB_ASPRINTF(&backstore_attr,
-                  "(%s/%s set attribute cmd_time_out=0 > %s || echo > %s)",
-                  GB_TGCLI_GLFS, blk->block_name, DEVNULLPATH, DEVNULLPATH) == -1) {
+                  "%s/%s set attribute cmd_time_out=0",
+                  GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
     goto out;
   }
 
-  if (GB_ASPRINTF(&iqn, "%s %s %s%s", GB_TGCLI_ISCSI, GB_CREATE,
+  if (GB_ASPRINTF(&iqn, "%s %s %s%s", GB_TGCLI_ISCSI_PATH, GB_CREATE,
                   GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
     goto out;
   }
@@ -2114,14 +1980,14 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   /* i = 2; because tpg1 is created by default while iqn create */
   for (i = 2; i <= list->nhosts; i++) {
     if (!tmp) {
-      if (GB_ASPRINTF(&tpg, "%s/%s%s create tpg%zu > %s && ",
-                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i, DEVNULLPATH) == -1) {
+      if (GB_ASPRINTF(&tpg, "%s/%s%s create tpg%zu\n",
+                   GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i) == -1) {
         goto out;
       }
       tmp = tpg;
     } else {
-      if (GB_ASPRINTF(&tpg, "%s %s/%s%s create tpg%zu > %s && ", tmp,
-                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i, DEVNULLPATH) == -1) {
+      if (GB_ASPRINTF(&tpg, "%s %s/%s%s create tpg%zu\n", tmp,
+                   GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i) == -1) {
         goto out;
       }
       GB_FREE(tmp);
@@ -2131,58 +1997,52 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   tmp = NULL;
 
   for (i = 1; i <= list->nhosts; i++) {
-    if (GB_ASPRINTF(&lun, "%s/%s%s/tpg%zu/luns %s %s/%s > %s",  GB_TGCLI_ISCSI,
+    if (GB_ASPRINTF(&lun, "%s/%s%s/tpg%zu/luns %s %s/%s",  GB_TGCLI_ISCSI_PATH,
                  GB_TGCLI_IQN_PREFIX, blk->gbid, i, GB_CREATE,
-                 GB_TGCLI_GLFS_PATH, blk->block_name, DEVNULLPATH) == -1) {
+                 GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
       goto out;
     }
 
     if (!strcmp(blk->ipaddr, list->hosts[i-1])) {
-      if (GB_ASPRINTF(&attr, "%s/%s%s/tpg%zu enable > %s && %s/%s%s/tpg%zu set attribute %s %s",
-                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i, DEVNULLPATH,
-                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+      if (GB_ASPRINTF(&attr, "%s/%s%s/tpg%zu enable\n%s/%s%s/tpg%zu set attribute %s %s",
+                   GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+                   GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
                    blk->auth_mode?"authentication=1":"", GB_TGCLI_ATTRIBUTES) == -1) {
         goto out;
       }
       if (GB_ASPRINTF(&portal, "%s/%s%s/tpg%zu/portals create %s ",
-                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+                   GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
                    blk->ipaddr) == -1) {
         goto out;
       }
     } else {
       if (GB_ASPRINTF(&attr, "%s/%s%s/tpg%zu set attribute tpg_enabled_sendtargets=0 %s %s",
-                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+                   GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
                    blk->auth_mode?"authentication=1":"", GB_TGCLI_ATTRIBUTES) == -1) {
         goto out;
       }
-      if (GB_ASPRINTF(&portal, "%s/%s%s/tpg%zu/portals create %s > %s",
-                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
-                   list->hosts[i-1], DEVNULLPATH) == -1) {
+      if (GB_ASPRINTF(&portal, "%s/%s%s/tpg%zu/portals create %s",
+                   GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+                   list->hosts[i-1]) == -1) {
         goto out;
       }
     }
 
     if (blk->auth_mode &&
-        GB_ASPRINTF(&authcred, "&& %s/%s%s/tpg%zu set auth userid=%s password=%s > %s",
-          GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
-          blk->gbid, blk->passwd, DEVNULLPATH) == -1) {
+        GB_ASPRINTF(&authcred, "\n%s/%s%s/tpg%zu set auth userid=%s password=%s",
+          GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+          blk->gbid, blk->passwd) == -1) {
       goto out;
     }
     if (!tmp) {
-      if (GB_ASPRINTF(&global_opts, GB_TGCLI_GLOBALS, gbConf.configShellLogFile) == -1) {
-        goto out;
-      }
-
-      if (GB_ASPRINTF(&exec, "%s && %s && %s && %s && %s %s && %s && %s %s",
-          global_opts, backstore, backstore_attr, iqn, tpg?tpg:"", lun,
+      if (GB_ASPRINTF(&exec, "%s\n%s\n%s\n%s %s\n%s\n%s %s",
+          backstore, backstore_attr, iqn, tpg?tpg:"", lun,
           portal, attr, blk->auth_mode?authcred:"") == -1) {
-        GB_FREE(global_opts);
         goto out;
       }
-      GB_FREE(global_opts);
       tmp = exec;
     } else {
-      if (GB_ASPRINTF(&exec, "%s && %s && %s && %s %s",
+      if (GB_ASPRINTF(&exec, "%s\n%s\n%s\n%s\n%s",
           tmp, lun, portal, attr,
           blk->auth_mode?authcred:"") == -1) {
         goto out;
@@ -2197,7 +2057,7 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
     GB_FREE(lun);
   }
 
-  if (GB_ASPRINTF(&exec, "%s && %s", tmp, GB_TGCLI_SAVE) == -1) {
+  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, GB_TGCLI_SAVE) == -1) {
     goto out;
   }
   GB_FREE(tmp);
@@ -2393,7 +2253,6 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 
  out:
   GB_FREE(info);
-  blockFormatDependencyErrors(errCode, &errMsg, NULL);
 
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
@@ -2436,10 +2295,6 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  if (blockNodeSanityCheck(reply)) {
-    goto out;
-  }
-
   if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name) == -1) {
     goto out;
   }
@@ -2456,17 +2311,17 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
   }
   GB_FREE(exec);
 
-  if (GB_ASPRINTF(&iqn, "%s %s %s%s", GB_TGCLI_ISCSI, GB_DELETE,
+  if (GB_ASPRINTF(&iqn, "%s %s %s%s", GB_TGCLI_ISCSI_PATH, GB_DELETE,
                   GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
     goto out;
   }
 
-  if (GB_ASPRINTF(&backstore, "%s %s %s", GB_TGCLI_GLFS,
+  if (GB_ASPRINTF(&backstore, "%s %s %s", GB_TGCLI_GLFS_PATH,
                   GB_DELETE, blk->block_name) == -1) {
     goto out;
   }
 
-  if (GB_ASPRINTF(&exec, "%s && %s && %s", backstore, iqn,
+  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\n%s\nEOF", backstore, iqn,
                   GB_TGCLI_SAVE) == -1) {
     goto out;
   }
@@ -2532,10 +2387,6 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  if (blockNodeSanityCheck(reply)) {
-    goto out;
-  }
-
   if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name) == -1) {
     goto out;
   }
@@ -2592,23 +2443,23 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
   for (i = 1; i <= tpgs; i++) {
     if (blk->auth_mode) {  /* set auth */
       if (GB_ASPRINTF(&authattr, "%s/%s%s/tpg%zu set attribute authentication=1",
-                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i) == -1) {
+                   GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i) == -1) {
         goto out;
       }
 
       if (GB_ASPRINTF(&authcred, "%s/%s%s/tpg%zu set auth userid=%s password=%s",
-                   GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
+                   GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
                    blk->gbid, blk->passwd) == -1) {
         goto out;
       }
 
       if (!tmp) {
-        if (GB_ASPRINTF(&exec, "%s && %s", authattr, authcred) == -1) {
+        if (GB_ASPRINTF(&exec, "%s\n%s", authattr, authcred) == -1) {
           goto out;
         }
         tmp = exec;
       } else {   /* append next series of commands */
-        if (GB_ASPRINTF(&exec, "%s && %s && %s", tmp, authattr, authcred) == -1) {
+        if (GB_ASPRINTF(&exec, "%s\n%s\n%s", tmp, authattr, authcred) == -1) {
           goto out;
         }
         GB_FREE(tmp);
@@ -2617,13 +2468,13 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
     } else {      /* unset auth */
       if (!tmp) {
         if (GB_ASPRINTF(&exec, "%s/%s%s/tpg%zu set attribute authentication=0",
-                     GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i) == -1) {
+                     GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i) == -1) {
           goto out;
         }
         tmp = exec;
       } else {   /* append next series of commands */
-        if (GB_ASPRINTF(&exec, "%s && %s/%s%s/tpg%zu set attribute authentication=0",
-                     tmp, GB_TGCLI_ISCSI, GB_TGCLI_IQN_PREFIX, blk->gbid, i) == -1) {
+        if (GB_ASPRINTF(&exec, "%s\n%s/%s%s/tpg%zu set attribute authentication=0",
+                     tmp, GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i) == -1) {
           goto out;
         }
         GB_FREE(tmp);
@@ -2632,7 +2483,7 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
     }
   }
 
-  if (GB_ASPRINTF(&exec, "%s && %s", tmp, GB_TGCLI_SAVE) == -1) {
+  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, GB_TGCLI_SAVE) == -1) {
     goto out;
   }
 

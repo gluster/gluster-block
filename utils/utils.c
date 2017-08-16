@@ -234,6 +234,29 @@ initLogging(void)
 
 
 int
+gbRunnerExitStatus(int exitStatus)
+{
+  if (!WIFEXITED(exitStatus)) {
+    return -1;
+  }
+
+  return WEXITSTATUS(exitStatus);
+}
+
+
+int
+gbRunner(char *cmd)
+{
+  int childExitStatus;
+
+
+  childExitStatus = system(cmd);
+
+  return gbRunnerExitStatus(childExitStatus);
+}
+
+
+int
 gbAlloc(void *ptrptr, size_t size,
         const char *filename, const char *funcname, size_t linenr)
 {

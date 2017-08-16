@@ -8,7 +8,7 @@
   cases as published by the Free Software Foundation.
 */
 
-
+# define   _GNU_SOURCE
 # include  <fcntl.h>
 # include  <dirent.h>
 # include  <sys/stat.h>
@@ -21,6 +21,10 @@
 # include  "block.h"
 # include  "block_svc.h"
 
+# define   GB_TGCLI_GLOBALS     "set "                        \
+                                "global auto_add_default_portal=false " \
+                                "auto_enable_tpgt=false "               \
+                                "logfile=%s"
 
 
 extern size_t glfsLruCount;
@@ -256,6 +260,47 @@ glusterBlockDParseArgs(int count, char **options)
   return 0;
 }
 
+static int
+blockNodeSanityCheck(void)
+{
+  int ret;
+  char *global_opts;
+
+
+  /* Check if tcmu-runner is running */
+  ret = gbRunner("ps aux ww | grep -w '[t]cmu-runner' > /dev/null");
+  if (ret) {
+    LOG("mgmt", GB_LOG_ERROR, "%s", "tcmu-runner not running");
+    return ESRCH;
+  }
+
+  /* Check targetcli has user:glfs handler listed */
+  ret = gbRunner("targetcli /backstores/user:glfs ls > /dev/null");
+  if (ret) {
+    LOG("mgmt", GB_LOG_ERROR, "%s",
+        "tcmu-runner running, but targetcli doesn't list user:glfs handler");
+    return  ENODEV;
+  }
+
+  if (ret == EKEYEXPIRED) {
+    LOG("mgmt", GB_LOG_ERROR, "%s", "targetcli not found");
+    return EKEYEXPIRED;
+  }
+
+  if (GB_ASPRINTF(&global_opts, GB_TGCLI_GLOBALS, gbConf.configShellLogFile) == -1) {
+    return ENOMEM;
+  }
+  /* Set targetcli globals */
+  ret = gbRunner(global_opts);
+  GB_FREE(global_opts);
+  if (ret) {
+    LOG("mgmt", GB_LOG_ERROR, "%s",
+        "targetcli set global attr failed");
+    return  -1;
+  }
+
+  return 0;
+}
 
 int
 main (int argc, char **argv)
@@ -290,6 +335,11 @@ main (int argc, char **argv)
     LOG("mgmt", GB_LOG_ERROR, "%s",
         "gluster-blockd is already running...");
     close(fd);
+    exit(errnosv);
+  }
+
+  errnosv = blockNodeSanityCheck();
+  if (errnosv) {
     exit(errnosv);
   }
 

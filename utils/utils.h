@@ -438,6 +438,10 @@ void logTimeNow(char* buf, size_t bufSize);
 
 int initLogging(void);
 
+int gbRunnerExitStatus(int exitStatus);
+
+int gbRunner(char *cmd);
+
 int gbAlloc(void *ptrptr, size_t size,
             const char *filename, const char *funcname, size_t linenr);
 
