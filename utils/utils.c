@@ -9,11 +9,14 @@
 */
 
 
+# include  <dirent.h>
+# include  <sys/stat.h>
+
 # include "utils.h"
 # include "config.h"
 
 
-size_t logLevel = GB_LOG_INFO;
+struct gbConf gbConf = {GB_LOG_INFO, GB_LOGDIR, '\0', '\0', '\0', '\0'};
 
 const char *argp_program_version = ""                                 \
   PACKAGE_NAME" ("PACKAGE_VERSION")"                                  \
@@ -169,6 +172,64 @@ logTimeNow(char *buf, size_t bufSize)
 out:
   snprintf(buf, bufSize, "%lu", (unsigned long)time(NULL));
   return;
+}
+
+
+static bool
+glusterBlockLogdirCreate(void)
+{
+  DIR* dir = opendir(gbConf.logDir);
+
+
+  if (dir) {
+    closedir(dir);
+  } else if (errno == ENOENT) {
+    if (mkdir(gbConf.logDir, 0755) == -1) {
+      fprintf(stderr, "mkdir(%s) failed (%s)", gbConf.logDir, strerror (errno));
+      return 0;  /* False */
+    }
+  } else {
+    fprintf(stderr, "opendir(%s) failed (%s)", gbConf.logDir, strerror (errno));
+    return 0;  /* False */
+  }
+
+  return 1;
+}
+
+
+int
+initLogging(void)
+{
+  char *logDir = NULL;
+
+
+  logDir = getenv("GB_LOGDIR");
+  if (!logDir) {
+    logDir = GB_LOGDIR;
+  }
+
+  if (strlen(logDir) > PATH_MAX - GB_MAX_LOGFILENAME) {
+    fprintf(stderr, "strlen of logDir Path > PATH_MAX: %s\n", logDir);
+    return EXIT_FAILURE;
+  }
+
+  /* set logfile paths */
+  snprintf(gbConf.logDir, PATH_MAX,
+           "%s", logDir);
+  snprintf(gbConf.daemonLogFile, PATH_MAX,
+           "%s/gluster-blockd.log", logDir);
+  snprintf(gbConf.cliLogFile, PATH_MAX,
+           "%s/gluster-block-cli.log", logDir);
+  snprintf(gbConf.gfapiLogFile, PATH_MAX,
+           "%s/gluster-block-gfapi.log", logDir);
+  snprintf(gbConf.configShellLogFile, PATH_MAX,
+           "%s/gluster-block-configshell.log", logDir);
+
+  if(!glusterBlockLogdirCreate()) {
+    return EXIT_FAILURE;
+  }
+
+  return 0;
 }
 
 

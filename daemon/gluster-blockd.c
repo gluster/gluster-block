@@ -50,30 +50,6 @@ glusterBlockDHelp(void)
 }
 
 
-static bool
-glusterBlockLogdirCreate(void)
-{
-  DIR* dir = opendir(GB_LOGDIR);
-
-
-  if (dir) {
-    closedir(dir);
-  } else if (errno == ENOENT) {
-    if (mkdir(GB_LOGDIR, 0755) == -1) {
-      LOG("mgmt", GB_LOG_ERROR, "mkdir(%s) failed (%s)",
-          GB_LOGDIR, strerror (errno));
-      return FALSE;
-    }
-  } else {
-    LOG("mgmt", GB_LOG_ERROR, "opendir(%s) failed (%s)",
-        GB_LOGDIR, strerror (errno));
-    return FALSE;
-  }
-
-  return TRUE;
-}
-
-
 void *
 glusterBlockCliThreadProc (void *vargp)
 {
@@ -266,8 +242,8 @@ glusterBlockDParseArgs(int count, char **options)
         MSG("option '%s' needs argument <LOG-LEVEL>\n", options[optind-1]);
         return -1;
       }
-      logLevel = blockLogLevelEnumParse(options[optind]);
-      if (logLevel >= GB_LOG_MAX) {
+      gbConf.logLevel = blockLogLevelEnumParse(options[optind]);
+      if (gbConf.logLevel >= GB_LOG_MAX) {
         MSG("unknown LOG-LEVEL: '%s'\n", options[optind]);
         return -1;
       }
@@ -291,12 +267,12 @@ main (int argc, char **argv)
   int errnosv = 0;
 
 
-  if (glusterBlockDParseArgs(argc, argv)) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockDParseArgs() failed");
-    return -1;
+  if(initLogging()) {
+    exit(EXIT_FAILURE);
   }
 
-  if (!glusterBlockLogdirCreate()) {
+  if (glusterBlockDParseArgs(argc, argv)) {
+    LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockDParseArgs() failed");
     return -1;
   }
 

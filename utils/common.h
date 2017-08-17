@@ -15,28 +15,6 @@
 # include "utils.h"
 # include "block.h"
 
-# define  GB_LOGDIR              DATADIR "/log/gluster-block"
-# define  GB_INFODIR             DATADIR "/run"
-
-# define  GB_LOCK_FILE           GB_INFODIR "/gluster-blockd.lock"
-# define  GB_UNIX_ADDRESS        GB_INFODIR "/gluster-blockd.socket"
-# define  GB_TCP_PORT            24006
-
-# define  DAEMON_LOG_FILE        GB_LOGDIR "/gluster-blockd.log"
-# define  CLI_LOG_FILE           GB_LOGDIR "/gluster-block-cli.log"
-#define   DEVNULLPATH            "/dev/null"
-
-# define  GFAPI_LOG_FILE         GB_LOGDIR "/gluster-block-gfapi.log"
-# define  GFAPI_LOG_LEVEL        7
-
-# define  CONFIGSHELL_LOG_FILE   GB_LOGDIR "/gluster-block-configshell.log"
-
-# define  GB_METADIR             "/block-meta"
-# define  GB_STOREDIR            "/block-store"
-# define  GB_TXLOCKFILE          "meta.lock"
-
-# define  SUN_PATH_MAX           (sizeof(struct sockaddr_un) - sizeof(unsigned short int)) /*sun_family*/
-
 
 static const char *const JsonResponseFormatLookup[] = {
   [GB_JSON_NONE]            = "",

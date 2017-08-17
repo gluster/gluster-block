@@ -22,7 +22,27 @@
 # include  <unistd.h>
 # include  <errno.h>
 # include  <time.h>
+# include  <limits.h>
 # include  <sys/time.h>
+
+# define  GB_LOGDIR              DATADIR "/log/gluster-block"
+# define  GB_INFODIR             DATADIR "/run"
+
+# define  GB_LOCK_FILE           GB_INFODIR "/gluster-blockd.lock"
+# define  GB_UNIX_ADDRESS        GB_INFODIR "/gluster-blockd.socket"
+# define  GB_TCP_PORT            24006
+
+# define  GFAPI_LOG_LEVEL        7
+
+# define   DEVNULLPATH           "/dev/null"
+
+# define  GB_METADIR             "/block-meta"
+# define  GB_STOREDIR            "/block-store"
+# define  GB_TXLOCKFILE          "meta.lock"
+
+# define  GB_MAX_LOGFILENAME     64  /* max strlen of file name */
+
+# define  SUN_PATH_MAX           (sizeof(struct sockaddr_un) - sizeof(unsigned short int)) /*sun_family*/
 
 # define GB_TIME_STRING_BUFLEN  \
          (4 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 6 + 1 +   5)
@@ -83,19 +103,29 @@
             fprintf(stdout, fmt, __VA_ARGS__);                       \
           } while (0)
 
-extern size_t logLevel;
+
+struct gbConf {
+  int  logLevel;
+  char logDir[PATH_MAX];
+  char daemonLogFile[PATH_MAX];
+  char cliLogFile[PATH_MAX];
+  char gfapiLogFile[PATH_MAX];
+  char configShellLogFile[PATH_MAX];
+};
+
+extern struct gbConf gbConf;
 
 # define  LOG(str, level, fmt, ...)                                    \
           do {                                                         \
             FILE *fd;                                                  \
             char timestamp[GB_TIME_STRING_BUFLEN] = {0};               \
-            if (level <= logLevel) {                                   \
+            if (level <= gbConf.logLevel) {                            \
               if (!strcmp(str, "mgmt"))                                \
-                fd = fopen (DAEMON_LOG_FILE, "a");                     \
-              else if (strcmp(str, "cli"))                             \
-                fd = fopen (CLI_LOG_FILE, "a");                        \
-              else if (strcmp(str, "gfapi"))                           \
-                fd = fopen (GFAPI_LOG_FILE, "a");                      \
+                fd = fopen (gbConf.daemonLogFile, "a");                \
+              else if (!strcmp(str, "cli"))                            \
+                fd = fopen (gbConf.cliLogFile, "a");                   \
+              else if (!strcmp(str, "gfapi"))                          \
+                fd = fopen (gbConf.gfapiLogFile, "a");                 \
               else                                                     \
                 fd = stderr;                                           \
               if (fd == NULL) {                                        \
@@ -405,6 +435,8 @@ int blockMetaStatusEnumParse(const char *opt);
 int blockRemoteCreateRespEnumParse(const char *opt);
 
 void logTimeNow(char* buf, size_t bufSize);
+
+int initLogging(void);
 
 int gbAlloc(void *ptrptr, size_t size,
             const char *filename, const char *funcname, size_t linenr);

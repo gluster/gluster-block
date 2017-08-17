@@ -45,13 +45,13 @@ glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg)
     goto out;
   }
 
-  ret = glfs_set_logging(glfs, GFAPI_LOG_FILE, GFAPI_LOG_LEVEL);
+  ret = glfs_set_logging(glfs, gbConf.gfapiLogFile, GFAPI_LOG_LEVEL);
   if (ret) {
     *errCode = errno;
     GB_ASPRINTF (errMsg, "Not able to add logging for volume %s[%s]", volume,
                  strerror(*errCode));
     LOG("gfapi", GB_LOG_ERROR, "glfs_set_logging(%s, %d) on %s failed[%s]",
-        GFAPI_LOG_FILE, GFAPI_LOG_LEVEL, volume, strerror(*errCode));
+        gbConf.gfapiLogFile, GFAPI_LOG_LEVEL, volume, strerror(*errCode));
     goto out;
   }
 

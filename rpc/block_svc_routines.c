@@ -33,7 +33,7 @@
 # define   GB_TGCLI_GLOBALS     "targetcli set "                        \
                                 "global auto_add_default_portal=false " \
                                 "auto_enable_tpgt=false "               \
-                                "logfile=" CONFIGSHELL_LOG_FILE " > " DEVNULLPATH
+                                "logfile=%s > " DEVNULLPATH
 # define   GB_TGCLI_SAVE        "targetcli / saveconfig > " DEVNULLPATH
 # define   GB_TGCLI_ATTRIBUTES  "generate_node_acls=1 demo_mode_write_protect=0 > " DEVNULLPATH
 # define   GB_TGCLI_IQN_PREFIX  "iqn.2016-12.org.gluster-block:"
@@ -2072,6 +2072,7 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   char *attr = NULL;
   char *authcred = NULL;
   char *exec = NULL;
+  char *global_opts = NULL;
   blockResponse *reply = NULL;
   blockServerDefPtr list = NULL;
   size_t i;
@@ -2168,11 +2169,17 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
       goto out;
     }
     if (!tmp) {
-      if (GB_ASPRINTF(&exec, "%s && %s && %s && %s && %s %s && %s && %s %s",
-          GB_TGCLI_GLOBALS, backstore, backstore_attr, iqn, tpg?tpg:"", lun,
-          portal, attr, blk->auth_mode?authcred:"") == -1) {
+      if (GB_ASPRINTF(&global_opts, GB_TGCLI_GLOBALS, gbConf.configShellLogFile) == -1) {
         goto out;
       }
+
+      if (GB_ASPRINTF(&exec, "%s && %s && %s && %s && %s %s && %s && %s %s",
+          global_opts, backstore, backstore_attr, iqn, tpg?tpg:"", lun,
+          portal, attr, blk->auth_mode?authcred:"") == -1) {
+        GB_FREE(global_opts);
+        goto out;
+      }
+      GB_FREE(global_opts);
       tmp = exec;
     } else {
       if (GB_ASPRINTF(&exec, "%s && %s && %s && %s %s",

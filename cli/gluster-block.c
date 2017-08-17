@@ -607,6 +607,11 @@ main(int argc, char *argv[])
 {
   if (argc <= 1) {
     glusterBlockHelp();
+    exit(EXIT_FAILURE);
+  }
+
+  if(initLogging()) {
+    exit(EXIT_FAILURE);
   }
 
   return glusterBlockParseArgs(argc, argv);
