@@ -234,6 +234,55 @@ extern struct gbConf gbConf;
             }                                                        \
           } while (0)
 
+# define  GB_CMD_EXEC_AND_VALIDATE(cmd, sr, blk, vol, opt)             \
+          do {                                                         \
+            FILE *fp;                                                  \
+            char tmp[1024];                                            \
+            LOG("mgmt", GB_LOG_DEBUG, "command, %s", cmd);             \
+            fp = popen(cmd, "r");                                      \
+            if (vol)                                                   \
+              snprintf(tmp, 1024, "%s/%s", vol, blk->block_name);      \
+            else                                                       \
+              snprintf(tmp, 1024, "%s", blk->block_name);              \
+            if (fp) {                                                  \
+              size_t newLen = fread(sr->out, sizeof(char), 8192, fp);  \
+              if (ferror( fp ) != 0)                                   \
+                LOG("mgmt", GB_LOG_ERROR,                              \
+                    "reading command %s output for %s failed", tmp,    \
+                    cmd, strerror(errno));                             \
+              else                                                     \
+                sr->out[newLen++] = '\0';                              \
+              sr->exit = blockValidateCommandOutput(sr->out, opt,      \
+                                                    (void*)blk);       \
+              pclose(fp);                                              \
+            } else {                                                   \
+              LOG("mgmt", GB_LOG_ERROR,                                \
+                  "popen(): for %s executing command %s failed(%s)",   \
+                  tmp, cmd, strerror(errno));                          \
+            }                                                          \
+            LOG("mgmt", GB_LOG_DEBUG, "raw output, %s", sr->out);      \
+            LOG("mgmt", GB_LOG_INFO, "command exit code, %d",          \
+                 sr->exit);                                            \
+          } while (0)
+
+# define GB_OUT_VALIDATE_OR_GOTO(out, label, errStr, blk, vol, fmt ...)\
+         do {                                                          \
+           char *tmp;                                                  \
+           char vol_blk[1024];                                         \
+            if (vol)                                                   \
+              snprintf(vol_blk, 1024, "%s/%s", vol, blk->block_name);  \
+            else                                                       \
+              snprintf(vol_blk, 1024, "%s", blk->block_name);          \
+           if (GB_ASPRINTF(&tmp, fmt) == -1)                           \
+             goto label;                                               \
+           if (!strstr(out, tmp)) {                                    \
+             GB_FREE(tmp);                                             \
+             LOG("mgmt", GB_LOG_ERROR, errStr, vol_blk);               \
+             goto label;                                               \
+           }                                                           \
+           GB_FREE(tmp);                                               \
+         } while (0)
+
 
 # define  CALLOC(x)                                                  \
             calloc(1, x)

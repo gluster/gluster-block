@@ -28,7 +28,6 @@
 # define   GB_TGCLI_GLFS_PATH   "/backstores/user:glfs"
 # define   GB_TGCLI_GLFS        "targetcli " GB_TGCLI_GLFS_PATH
 # define   GB_TGCLI_CHECK       GB_TGCLI_GLFS " ls | grep ' %s ' > " DEVNULLPATH
-# define   GB_TGCLI_ISCSI       "targetcli /iscsi"
 # define   GB_TGCLI_ISCSI_PATH  "/iscsi"
 # define   GB_TGCLI_SAVE        "/ saveconfig"
 # define   GB_TGCLI_ATTRIBUTES  "generate_node_acls=1 demo_mode_write_protect=0"
@@ -44,6 +43,7 @@ typedef enum operations {
   CREATE_SRV = 1,
   DELETE_SRV,
   MODIFY_SRV,
+  MODIFY_TPGC_SRV,
   LIST_SRV,
   INFO_SRV
 } operations;
@@ -1928,10 +1928,127 @@ block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
 }
 
 
+static int
+blockValidateCommandOutput(const char *out, int opt, void *data)
+{
+  blockCreate *cblk = data;
+  blockDelete *dblk = data;
+  blockModify *mblk = data;
+  int ret = -1;
+
+
+  switch (opt) {
+  case CREATE_SRV:
+    /* backend create validation */
+    GB_OUT_VALIDATE_OR_GOTO(out, out, "backend creation failed for: %s", cblk,
+                    cblk->volume,
+                    "Created user-backed storage object %s size %zu.",
+                    cblk->block_name, cblk->size);
+
+    /* target iqn create validation */
+    GB_OUT_VALIDATE_OR_GOTO(out, out, "target iqn creation failed for: %s",
+                    cblk, cblk->volume,
+                    "Created target iqn.2016-12.org.gluster-block:%s.",
+                    cblk->gbid);
+
+    /* LUN create validation */
+    GB_OUT_VALIDATE_OR_GOTO(out, out, "LUN creation failed for: %s",cblk,
+                    cblk->volume,
+                    "Created LUN 0.");
+
+    /* Portal create validation */
+    GB_OUT_VALIDATE_OR_GOTO(out, out, "portal creation failed for %s", cblk,
+                    cblk->volume,
+                    "Created network portal %s:3260.", cblk->ipaddr);
+
+    /* TPG enable validation */
+    GB_OUT_VALIDATE_OR_GOTO(out, out, "TPGT enablement failed for: %s", cblk,
+                    cblk->volume,
+                    "The TPGT has been enabled.");
+
+    GB_OUT_VALIDATE_OR_GOTO(out, out, "generate_node_acls set failed for: %s",
+                    cblk, cblk->volume,
+                    "Parameter generate_node_acls is now '1'");
+
+    GB_OUT_VALIDATE_OR_GOTO(out, out, "demo_mode_write_protect set failed "
+                    "for: %s", cblk, cblk->volume,
+                    "Parameter demo_mode_write_protect is now '0'.");
+
+    if (cblk->auth_mode) {
+      /* authentication validation */
+      GB_OUT_VALIDATE_OR_GOTO(out, out, "attribute authentication set failed "
+                      "for: %s", cblk, cblk->volume,
+                      "Parameter authentication is now '1'.");
+
+      /* userid set validation */
+      GB_OUT_VALIDATE_OR_GOTO(out, out, "userid set failed for: %s", cblk,
+                      cblk->volume,
+                      "Parameter userid is now '%s'.", cblk->gbid);
+
+      /* password set validation */
+      GB_OUT_VALIDATE_OR_GOTO(out, out, "password set failed for: %s", cblk,
+                      cblk->volume,
+                      "Parameter password is now '%s'.", cblk->passwd);
+    }
+
+    ret = 0;
+    break;
+
+  case DELETE_SRV:
+    /* backend delete validation */
+    GB_OUT_VALIDATE_OR_GOTO(out, out, "backend deletion failed for block: %s",
+                    dblk, NULL, "Deleted storage object %s.", dblk->block_name);
+    /* target iqn delete validation */
+    GB_OUT_VALIDATE_OR_GOTO(out, out, "target iqn deletion failed for block: "
+                    "%s", dblk, NULL,
+                    "Deleted Target iqn.2016-12.org.gluster-block:%s.",
+                    dblk->gbid);
+    ret = 0;
+    break;
+
+  case MODIFY_SRV:
+    if (mblk->auth_mode) {
+      /* authentication validation */
+      GB_OUT_VALIDATE_OR_GOTO(out, out, "attribute authentication set failed "
+                      "for: %s", mblk,
+                      mblk->volume, "Parameter authentication is now '1'.");
+
+      /* userid set validation */
+      GB_OUT_VALIDATE_OR_GOTO(out, out, "userid set failed for: %s", mblk,
+                      mblk->volume,
+                      "Parameter userid is now '%s'.", mblk->gbid);
+
+      /* password set validation */
+      GB_OUT_VALIDATE_OR_GOTO(out, out, "password set failed for: %s", mblk,
+                      mblk->volume,
+                      "Parameter password is now '%s'.", mblk->passwd);
+    } else {
+      GB_OUT_VALIDATE_OR_GOTO(out, out, "attribute authentication unset "
+                      "failed for: %s", mblk,
+                      mblk->volume, "Parameter authentication is now '0'.");
+    }
+
+    ret = 0;
+    break;
+
+  case MODIFY_TPGC_SRV:
+    /* iscsi iqn status validation */
+    GB_OUT_VALIDATE_OR_GOTO(out, out, "iscsi status check failed for: %s",
+                    mblk, mblk->volume,
+                    "Status for /iscsi/%s%s: TPGs:", GB_TGCLI_IQN_PREFIX,
+                    mblk->gbid);
+    ret = 0;
+    break;
+  }
+
+out:
+  return ret;
+}
+
+
 blockResponse *
 block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
 {
-  FILE *fp;
   char *tmp = NULL;
   char *backstore = NULL;
   char *backstore_attr = NULL;
@@ -2062,32 +2179,15 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   }
   GB_FREE(tmp);
 
-  LOG("mgmt", GB_LOG_DEBUG, "command, %s", exec);
-
-  if (GB_ALLOC_N(reply->out, 4096) < 0) {
+  if (GB_ALLOC_N(reply->out, 8192) < 0) {
     GB_FREE(reply);
     goto out;
   }
 
-  fp = popen(exec, "r");
-  if (fp) {
-    size_t newLen = fread(reply->out, sizeof(char), 4096, fp);
-    if (ferror( fp ) != 0) {
-      LOG("mgmt", GB_LOG_ERROR,
-          "reading command %s output for block %s on volume %s failed",
-          exec, blk->block_name, blk->volume);
-    } else {
-      reply->out[newLen++] = '\0';
-    }
-    reply->exit = gbRunnerExitStatus(pclose(fp));
-  } else {
-      LOG("mgmt", GB_LOG_ERROR,
-          "popen(): for block %s on volume %s executing command %s failed(%s)",
-          blk->block_name, blk->volume, exec, strerror(errno));
+  GB_CMD_EXEC_AND_VALIDATE(exec, reply, blk, blk->volume, CREATE_SRV);
+  if (reply->exit) {
+    snprintf(reply->out, 8192, "configure failed");
   }
-
-  LOG("mgmt", GB_LOG_DEBUG, "raw output, %s", reply->out);
-  LOG("mgmt", GB_LOG_INFO, "command exit code, %d", reply->exit);
 
  out:
   GB_FREE(exec);
@@ -2279,7 +2379,6 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 blockResponse *
 block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
 {
-  FILE *fp;
   int ret;
   char *iqn = NULL;
   char *backstore = NULL;
@@ -2326,32 +2425,15 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  LOG("mgmt", GB_LOG_DEBUG, "command, %s", exec);
-
-  if (GB_ALLOC_N(reply->out, 4096) < 0) {
+  if (GB_ALLOC_N(reply->out, 8192) < 0) {
     GB_FREE(reply);
     goto out;
   }
 
-  fp = popen(exec, "r");
-  if (fp) {
-    size_t newLen = fread(reply->out, sizeof(char), 4096, fp);
-    if (ferror( fp ) != 0) {
-      LOG("mgmt", GB_LOG_ERROR,
-          "reading command %s output for block %s failed",
-          exec, blk->block_name);
-    } else {
-      reply->out[newLen++] = '\0';
-    }
-    reply->exit = gbRunnerExitStatus(pclose(fp));
-  } else {
-      LOG("mgmt", GB_LOG_ERROR,
-          "popen(): for block %s executing command %s failed(%s)",
-          blk->block_name, exec, strerror(errno));
+  GB_CMD_EXEC_AND_VALIDATE(exec, reply, blk, NULL, DELETE_SRV);
+  if (reply->exit) {
+    snprintf(reply->out, 8192, "delete failed");
   }
-
-  LOG("mgmt", GB_LOG_DEBUG, "raw output, %s", reply->out);
-  LOG("mgmt", GB_LOG_INFO, "command exit code, %d", reply->exit);
 
  out:
   GB_FREE(exec);
@@ -2365,13 +2447,11 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
 blockResponse *
 block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
 {
-  FILE *fp;
   int ret;
   char *authattr = NULL;
   char *authcred = NULL;
   char *exec = NULL;
   blockResponse *reply = NULL;
-  char out[1024] = {0, };
   size_t tpgs = 0;
   size_t i;
   char *tmp = NULL;
@@ -2403,38 +2483,25 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
   }
   GB_FREE(exec);
 
-  if (GB_ASPRINTF(&exec, "%s/%s%s status", GB_TGCLI_ISCSI,
-                      GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
+  if (GB_ASPRINTF(&exec, "targetcli %s/%s%s status", GB_TGCLI_ISCSI_PATH,
+                  GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
+    goto out;
+  }
+
+  if (GB_ALLOC_N(reply->out, 8192) < 0) {
+    GB_FREE(reply);
     goto out;
   }
 
   /* get number of tpg's for this target */
-  fp = popen(exec, "r");
-  if (fp) {
-    size_t newLen = fread(out, sizeof(char), 1024, fp);
-    if (ferror( fp ) != 0) {
-      LOG("mgmt", GB_LOG_ERROR,
-          "reading command %s output for block %s on volume %s failed",
-          exec, blk->block_name, blk->volume);
-    } else {
-      out[newLen++] = '\0';
-    }
-    ret = gbRunnerExitStatus(pclose(fp));
-    if (ret) {
-      LOG("mgmt", GB_LOG_ERROR,
-          "reading command %s output for block %s on volume %s failed",
-          exec, blk->block_name, blk->volume);
-      reply->exit = ret;
-       goto out;
-     }
-   } else {
-      LOG("mgmt", GB_LOG_ERROR,
-          "popen(): for block %s on volume %s executing command %s failed(%s)",
-          blk->block_name, blk->volume, exec, strerror(errno));
+  GB_CMD_EXEC_AND_VALIDATE(exec, reply, blk, blk->volume, MODIFY_TPGC_SRV);
+  if (reply->exit) {
+    snprintf(reply->out, 8192, "modify failed");
+    goto out;
   }
 
   /* out looks like, "Status for /iscsi/iqn.abc:xyz: TPGs: 2" */
-  tmp = strrchr(out, ':');
+  tmp = strrchr(reply->out, ':');
   if (tmp) {
     sscanf(tmp+1, "%zu", &tpgs);
     tmp = NULL;
@@ -2487,29 +2554,10 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  LOG("mgmt", GB_LOG_DEBUG, "command, %s", exec);
-
-
-  if (GB_ALLOC_N(reply->out, 4096) < 0) {
-    GB_FREE(reply);
-    goto out;
+  GB_CMD_EXEC_AND_VALIDATE(exec, reply, blk, blk->volume, MODIFY_SRV);
+  if (reply->exit) {
+    snprintf(reply->out, 8192, "modify failed");
   }
-
-  ret = gbRunner(exec);
-  if (ret) {
-    LOG("mgmt", GB_LOG_ERROR,
-        "system(): for block %s executing command %s failed(%s)",
-        blk->block_name, exec, strerror(errno));
-    reply->exit = ret;
-    GB_ASPRINTF(&reply->out, "cannot execute auth commands.");
-    goto out;
-  }
-
-  /* command execution success */
-  reply->exit = 0;
-
-  LOG("mgmt", GB_LOG_DEBUG, "raw output, %s", reply->out);
-  LOG("mgmt", GB_LOG_INFO, "command exit code, %d", reply->exit);
 
  out:
   GB_FREE(tmp);
