@@ -30,7 +30,7 @@
 
 # define  GB_LOCK_FILE           GB_INFODIR "/gluster-blockd.lock"
 # define  GB_UNIX_ADDRESS        GB_INFODIR "/gluster-blockd.socket"
-# define  GB_TCP_PORT            24006
+# define  GB_TCP_PORT            24010
 
 # define  GFAPI_LOG_LEVEL        7
 

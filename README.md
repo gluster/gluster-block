@@ -62,7 +62,7 @@ managing the command ring buffers
 ------
 **Prerequisites:** *this guide assume we already have*
 - [x] *A gluster volume with name 'block-test'*
-- [x] *Open 24007(for glusterd) 24006(gluster-blockd) 3260(iscsi targets) 111(rpcbind) ports and glusterfs service in your firewall*
+- [x] *Open 24007(for glusterd) 24010(gluster-blockd) 3260(iscsi targets) 111(rpcbind) ports and glusterfs service in your firewall*
 
 <b>Daemon</b>: run gluster-blockd on all the nodes
 ```script
