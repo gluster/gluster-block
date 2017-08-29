@@ -2770,8 +2770,7 @@ blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
 {
   MetaInfo *info = NULL;
   json_object *json_obj = NULL;
-  json_object *json_array1 = NULL;
-  json_object *json_array2 = NULL;
+  json_object *json_array[3] = {0};
   char         *tmp      = NULL;
   char         *tmp2     = NULL;
   char         *portals  = NULL;
@@ -2836,36 +2835,23 @@ blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
                              GB_JSON_OBJ_TO_STR(cobj->passwd));
     }
 
-    json_array1 = json_object_new_array();
+    json_array[0] = json_object_new_array();
 
     for (i = 0; i < savereply->nportal; i++) {
-      json_object_array_add(json_array1,
+      json_object_array_add(json_array[0],
                             GB_JSON_OBJ_TO_STR(savereply->portal[i]));
     }
 
-    json_object_object_add(json_obj, "PORTAL(S)", json_array1);
+    json_object_object_add(json_obj, "PORTAL(S)", json_array[0]);
 
-    if (savereply->obj->d_attempt || savereply->obj->d_success) {
-      json_array2 = json_object_new_array();
+    if (savereply->obj->d_attempt) {
+         blockStr2arrayAddToJsonObj(json_obj, savereply->obj->d_attempt,
+                                    "ROLLBACK FAILED ON", &json_array[1]);
+    }
 
-      if (savereply->obj->d_attempt) {
-        tmp = strtok (savereply->obj->d_attempt, " ");
-        while (tmp!= NULL)
-        {
-          json_object_array_add(json_array2, GB_JSON_OBJ_TO_STR(tmp));
-          tmp = strtok (NULL, " ");
-        }
-      }
-
-      if (savereply->obj->d_success) {
-        tmp = strtok (savereply->obj->d_success, " ");
-        while (tmp!= NULL) {
-          json_object_array_add(json_array2, GB_JSON_OBJ_TO_STR(tmp));
-          tmp = strtok (NULL, " ");
-        }
-      }
-      tmp = NULL;
-      json_object_object_add(json_obj, "ROLLBACK ON", json_array2);
+    if (savereply->obj->d_success) {
+         blockStr2arrayAddToJsonObj(json_obj, savereply->obj->d_success,
+                                    "ROLLBACK SUCCESS ON", &json_array[2]);
     }
 
     json_object_object_add(json_obj, "RESULT",
@@ -2874,8 +2860,11 @@ blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
     GB_ASPRINTF(&reply->out, "%s\n",
                 json_object_to_json_string_ext(json_obj,
                                      mapJsonFlagToJsonCstring(blk->json_resp)));
-    json_object_put(json_array1);
-    json_object_put(json_array2);
+    for (i = 0; i < 3; i++) {
+      if (json_array[i]) {
+        json_object_put(json_array[i]);
+      }
+    }
     json_object_put(json_obj);
   } else {
     for (i = 0; i < savereply->nportal; i++) {
@@ -2889,12 +2878,20 @@ blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
 
     /* save 'failed on'*/
     tmp = NULL;
-    if (savereply->obj->d_attempt || savereply->obj->d_success) {
-      if (GB_ASPRINTF(&tmp, "ROLLBACK ON: %s %s\n",
-            savereply->obj->d_attempt?savereply->obj->d_attempt:"",
+    if (savereply->obj->d_attempt) {
+      if (GB_ASPRINTF(&tmp, "ROLLBACK FAILED ON: %s\n",
+            savereply->obj->d_attempt?savereply->obj->d_attempt:"") == -1) {
+        goto out;
+      }
+    }
+
+    if (savereply->obj->d_success) {
+      tmp2 = tmp;
+      if (GB_ASPRINTF(&tmp, "%sROLLBACK SUCCESS ON: %s\n", tmp2?tmp2:"",
             savereply->obj->d_success?savereply->obj->d_success:"") == -1) {
         goto out;
       }
+      GB_FREE(tmp2);
     }
 
     /* if savereply->iqn==NULL no point in printing auth */
