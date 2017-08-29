@@ -240,15 +240,12 @@ extern struct gbConf gbConf;
             char tmp[1024];                                            \
             LOG("mgmt", GB_LOG_DEBUG, "command, %s", cmd);             \
             fp = popen(cmd, "r");                                      \
-            if (vol)                                                   \
-              snprintf(tmp, 1024, "%s/%s", vol, blk->block_name);      \
-            else                                                       \
-              snprintf(tmp, 1024, "%s", blk->block_name);              \
+            snprintf(tmp, 1024, "%s/%s", vol?vol:"", blk->block_name); \
             if (fp) {                                                  \
               size_t newLen = fread(sr->out, sizeof(char), 8192, fp);  \
               if (ferror( fp ) != 0)                                   \
                 LOG("mgmt", GB_LOG_ERROR,                              \
-                    "reading command %s output for %s failed", tmp,    \
+                    "reading command %s output for %s failed(%s)", tmp,\
                     cmd, strerror(errno));                             \
               else                                                     \
                 sr->out[newLen++] = '\0';                              \
@@ -265,15 +262,13 @@ extern struct gbConf gbConf;
                  sr->exit);                                            \
           } while (0)
 
-# define GB_OUT_VALIDATE_OR_GOTO(out, label, errStr, blk, vol, fmt ...)\
+# define GB_OUT_VALIDATE_OR_GOTO(out, label, errStr, blk, vol, ...)    \
          do {                                                          \
            char *tmp;                                                  \
            char vol_blk[1024];                                         \
-            if (vol)                                                   \
-              snprintf(vol_blk, 1024, "%s/%s", vol, blk->block_name);  \
-            else                                                       \
-              snprintf(vol_blk, 1024, "%s", blk->block_name);          \
-           if (GB_ASPRINTF(&tmp, fmt) == -1)                           \
+           snprintf(vol_blk, 1024, "%s/%s", vol?vol:"",                \
+                    blk->block_name);                                  \
+           if (GB_ASPRINTF(&tmp, __VA_ARGS__) == -1)                   \
              goto label;                                               \
            if (!strstr(out, tmp)) {                                    \
              GB_FREE(tmp);                                             \

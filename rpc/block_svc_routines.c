@@ -411,6 +411,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
       goto out;
     }
     break;
+  case MODIFY_TPGC_SRV:
   case LIST_SRV:
   case INFO_SRV:
       goto out;
@@ -2059,7 +2060,6 @@ block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
   char *attr = NULL;
   char *authcred = NULL;
   char *exec = NULL;
-  char *global_opts = NULL;
   blockResponse *reply = NULL;
   blockServerDefPtr list = NULL;
   size_t i;
