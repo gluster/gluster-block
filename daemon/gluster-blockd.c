@@ -21,10 +21,10 @@
 # include  "block.h"
 # include  "block_svc.h"
 
-# define   GB_TGCLI_GLOBALS     "set "                        \
+# define   GB_TGCLI_GLOBALS     "targetcli set "                        \
                                 "global auto_add_default_portal=false " \
                                 "auto_enable_tpgt=false "               \
-                                "logfile=%s"
+                                "logfile=%s && targetcli / saveconfig"
 
 
 extern size_t glfsLruCount;
