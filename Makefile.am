@@ -11,6 +11,8 @@ EXTRA_DIST = autogen.sh README.md COPYING-GPLV2 COPYING-LGPLV3 \
 
 if USE_SYSTEMD
 RPM_WITH_FLAGS = --with systemd
+else
+RPM_WITH_FLAGS = --with initd
 endif
 
 rpms: prep

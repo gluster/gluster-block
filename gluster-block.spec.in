@@ -2,8 +2,10 @@
 ##-----------------------------------------------------------------------------
 ## All %%global definitions should be placed here and keep them sorted
 ##
-%if ( 0%{?fedora} ) || ( 0%{?rhel} && 0%{?rhel} > 6 )
+%if ( 0%{?fedora} ) || ( 0%{?rhel} && 0%{?rhel} > 6 ) || ( 0%{?centos_version} && 0%{?centos_version} > 6)
 %global _with_systemd true
+%else
+%global _with_initd true
 %endif
 
 
@@ -42,12 +44,19 @@ make
 
 %install
 make DESTDIR=${RPM_BUILD_ROOT} install
+%if ( 0%{?_with_initd:1} )
+mv %{buildroot}/%{_initddir}/gluster-blockd.initd %{buildroot}/%{_initddir}/gluster-blockd
+%endif
 
 %clean
 rm -rf ${RPM_BUILD_ROOT}
 
 %files
+%if ( 0%{?_with_initd:1} )
+%doc COPYING-GPLV2 COPYING-LGPLV3
+%else
 %license COPYING-GPLV2 COPYING-LGPLV3
+%endif
 %doc README.md INSTALL
 %{_sbindir}/gluster-block
 %{_sbindir}/gluster-blockd
@@ -55,10 +64,15 @@ rm -rf ${RPM_BUILD_ROOT}
 %if ( 0%{?_with_systemd:1} )
 %{_unitdir}/gluster-blockd.service
 %{_unitdir}/gluster-block-target.service
-%config(noreplace) %{_sysconfdir}/sysconfig/gluster-blockd
+%else
+%attr(755, root, root) %{_initddir}/gluster-blockd
 %endif
+%config(noreplace) %{_sysconfdir}/sysconfig/gluster-blockd
 
 %changelog
+* Fri Sep 15 2017 Ji-Hyeon Gim <potatogim@potatogim.net>
+- update with sysconfig handling for non-systemd distros
+
 * Fri Aug 11 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - add wrapper target service unit
 

@@ -23,6 +23,13 @@ AC_ARG_WITH(systemddir,
 AC_SUBST(systemddir)
 AM_CONDITIONAL([USE_SYSTEMD], test [ -d '/usr/lib/systemd/system' ])
 
+AC_ARG_WITH(initddir,
+            AC_HELP_STRING([--with-initddir=DIR],
+                           [initd service files in DIR @<:@/etc/rc.d/init.d@:>@]),
+            [initddir=$withval],
+            [initddir='/etc/rc.d/init.d'])
+AC_SUBST(initddir)
+
 AC_ARG_WITH(sysconfigdir,
             AC_HELP_STRING([--with-sysconfigdir=DIR],
                            [system service configuration in DIR @<:@/etc/sysconfig@:>@]),
@@ -32,6 +39,7 @@ AC_SUBST(sysconfigdir)
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign nostdinc silent-rules])
 AC_CONFIG_HEADERS([config.h])
+
 AC_CONFIG_FILES([gluster-block.spec
                  Makefile
                  rpc/Makefile
@@ -42,6 +50,7 @@ AC_CONFIG_FILES([gluster-block.spec
                  systemd/Makefile
                  systemd/gluster-blockd.service
                  systemd/gluster-block-target.service
+                 systemd/gluster-blockd.initd
                  docs/Makefile])
 AC_CONFIG_MACRO_DIR([m4])
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
