@@ -1,8 +1,8 @@
-DISTCLEANFILES = Makefile.in gluster-blockd.service
+DISTCLEANFILES = Makefile.in gluster-blockd.service gluster-block-target.service
 
-CLEANFILES = *~ gluster-blockd.service
+CLEANFILES = *~ gluster-blockd.service gluster-block-target.service
 
-EXTRA_DIST = gluster-blockd.service.in gluster-block-target.service   \
+EXTRA_DIST = gluster-blockd.service.in gluster-block-target.service.in   \
              gluster-blockd.sysconfig
 
 if USE_SYSTEMD
