@@ -14,6 +14,7 @@
 # include  <sys/stat.h>
 # include  <pthread.h>
 # include  <rpc/pmap_clnt.h>
+# include  <signal.h>
 
 # include  "config.h"
 # include  "common.h"
