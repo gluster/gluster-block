@@ -59,7 +59,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   blockInfoCli *info_obj;
   blockListCli *list_obj;
   blockModifyCli *modify_obj;
-  blockResponse *reply = NULL;
+  blockResponse reply = {0,};
   char          errMsg[2048] = {0};
 
 
@@ -103,8 +103,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   switch(opt) {
   case CREATE_CLI:
     create_obj = cobj;
-    reply = block_create_cli_1(create_obj, clnt);
-    if (!reply) {
+    if (block_create_cli_1(create_obj, &reply, clnt) != RPC_SUCCESS) {
       LOG("cli", GB_LOG_ERROR,
           "%sblock %s create on volume %s with hosts %s failed\n",
           clnt_sperror(clnt, "block_create_cli_1"), create_obj->block_name,
@@ -114,8 +113,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
     break;
   case DELETE_CLI:
     delete_obj = cobj;
-    reply = block_delete_cli_1(delete_obj, clnt);
-    if (!reply) {
+    if (block_delete_cli_1(delete_obj, &reply, clnt) != RPC_SUCCESS) {
       LOG("cli", GB_LOG_ERROR, "%sblock %s delete on volume %s failed",
           clnt_sperror(clnt, "block_delete_cli_1"),
           delete_obj->block_name, delete_obj->volume);
@@ -124,8 +122,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
     break;
   case INFO_CLI:
     info_obj = cobj;
-    reply = block_info_cli_1(info_obj, clnt);
-    if (!reply) {
+    if (block_info_cli_1(info_obj, &reply, clnt) != RPC_SUCCESS) {
       LOG("cli", GB_LOG_ERROR, "%sblock %s info on volume %s failed",
           clnt_sperror(clnt, "block_info_cli_1"),
           info_obj->block_name, info_obj->volume);
@@ -134,8 +131,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
     break;
   case LIST_CLI:
     list_obj = cobj;
-    reply = block_list_cli_1(list_obj, clnt);
-    if (!reply) {
+    if (block_list_cli_1(list_obj, &reply, clnt) != RPC_SUCCESS) {
       LOG("cli", GB_LOG_ERROR, "%sblock list on volume %s failed",
           clnt_sperror(clnt, "block_list_cli_1"), list_obj->volume);
       goto out;
@@ -143,8 +139,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
     break;
   case MODIFY_CLI:
     modify_obj = cobj;
-    reply = block_modify_cli_1(modify_obj, clnt);
-    if (!reply) {
+    if (block_modify_cli_1(modify_obj, &reply, clnt) != RPC_SUCCESS) {
       LOG("cli", GB_LOG_ERROR, "%sblock modify on volume %s failed",
           clnt_sperror(clnt, "block_modify_cli_1"), modify_obj->volume);
       goto out;
@@ -153,9 +148,9 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   }
 
  out:
-  if (reply) {
-    ret = reply->exit;
-    MSG("%s", reply->out);
+  if (reply.out) {
+    ret = reply.exit;
+    MSG("%s", reply.out);
   } else if (errMsg[0]) {
     LOG("cli", GB_LOG_ERROR, "%s", errMsg);
     MSG("%s\n", errMsg);
@@ -165,8 +160,9 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
     ret = -1;
   }
 
-  if (clnt && reply) {
-    if (!clnt_freeres(clnt, (xdrproc_t)xdr_blockResponse, (char *)reply)) {
+  if (clnt) {
+    if (reply.out && !clnt_freeres(clnt, (xdrproc_t)xdr_blockResponse,
+                                   (char *)&reply)) {
       LOG("cli", GB_LOG_ERROR, "%s",
           clnt_sperror(clnt, "clnt_freeres failed"));
     }

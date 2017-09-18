@@ -363,7 +363,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   int ret = -1;
   int sockfd;
   int errsv = 0;
-  blockResponse *reply =  NULL;
+  blockResponse reply = {0,};
   struct sockaddr_in *sain = NULL;
 
 
@@ -386,8 +386,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     strcpy(((blockCreate *)cobj)->ipaddr, host);
     *rpc_sent = TRUE;
 
-    reply = block_create_1((blockCreate *)cobj, clnt);
-    if (!reply) {
+    if (block_create_1((blockCreate *)cobj, &reply, clnt) != RPC_SUCCESS) {
       LOG("mgmt", GB_LOG_ERROR, "%son host %s",
           clnt_sperror(clnt, "block remote create failed"), host);
       goto out;
@@ -395,8 +394,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     break;
   case DELETE_SRV:
     *rpc_sent = TRUE;
-    reply = block_delete_1((blockDelete *)cobj, clnt);
-    if (!reply) {
+    if (block_delete_1((blockDelete *)cobj, &reply, clnt) != RPC_SUCCESS) {
       LOG("mgmt", GB_LOG_ERROR, "%son host %s",
           clnt_sperror(clnt, "block remote delete failed"), host);
       goto out;
@@ -404,8 +402,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     break;
   case MODIFY_SRV:
     *rpc_sent = TRUE;
-    reply = block_modify_1((blockModify *)cobj, clnt);
-    if (!reply) {
+    if (block_modify_1((blockModify *)cobj, &reply, clnt) != RPC_SUCCESS) {
       LOG("mgmt", GB_LOG_ERROR, "%son host %s",
           clnt_sperror(clnt, "block remote modify failed"), host);
       goto out;
@@ -417,16 +414,15 @@ glusterBlockCallRPC_1(char *host, void *cobj,
       goto out;
   }
 
-  if (reply) {
-    if (GB_STRDUP(*out, reply->out) < 0) {
-      goto out;
-    }
-    ret = reply->exit;
+  if (GB_STRDUP(*out, reply.out) < 0) {
+    goto out;
   }
+  ret = reply.exit;
 
  out:
-  if (clnt && reply) {
-    if (!clnt_freeres(clnt, (xdrproc_t)xdr_blockResponse, (char *)reply)) {
+  if (clnt) {
+    if (reply.out && !clnt_freeres(clnt, (xdrproc_t)xdr_blockResponse,
+                                   (char *)&reply)) {
       LOG("mgmt", GB_LOG_ERROR, "%s",
           clnt_sperror(clnt, "clnt_freeres failed"));
 
@@ -1467,7 +1463,7 @@ blockModifyCliFormatResponse (blockModifyCli *blk, struct blockModify *mobj,
 }
 
 blockResponse *
-block_modify_cli_1_svc(blockModifyCli *blk, struct svc_req *rqstp)
+block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
 {
   int ret = -1;
   static blockModify mobj = {0};
@@ -1781,7 +1777,7 @@ blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
 }
 
 blockResponse *
-block_create_cli_1_svc(blockCreateCli *blk, struct svc_req *rqstp)
+block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
 {
   int errCode = -1;
   uuid_t uuid;
@@ -2048,7 +2044,7 @@ out:
 
 
 blockResponse *
-block_create_1_svc(blockCreate *blk, struct svc_req *rqstp)
+block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
 {
   char *tmp = NULL;
   char *backstore = NULL;
@@ -2276,7 +2272,7 @@ blockDeleteCliFormatResponse(blockDeleteCli *blk, int errCode, char *errMsg,
 }
 
 blockResponse *
-block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
+block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
 {
   blockRemoteDeleteResp *savereply = NULL;
   MetaInfo *info = NULL;
@@ -2377,7 +2373,7 @@ block_delete_cli_1_svc(blockDeleteCli *blk, struct svc_req *rqstp)
 
 
 blockResponse *
-block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
+block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
 {
   int ret;
   char *iqn = NULL;
@@ -2445,7 +2441,7 @@ block_delete_1_svc(blockDelete *blk, struct svc_req *rqstp)
 
 
 blockResponse *
-block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
+block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
 {
   int ret;
   char *authattr = NULL;
@@ -2570,7 +2566,7 @@ block_modify_1_svc(blockModify *blk, struct svc_req *rqstp)
 
 
 blockResponse *
-block_list_cli_1_svc(blockListCli *blk, struct svc_req *rqstp)
+block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
 {
   blockResponse *reply;
   struct glfs *glfs;
@@ -2815,7 +2811,7 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
 }
 
 blockResponse *
-block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
+block_info_cli_1_svc_st(blockInfoCli *blk, struct svc_req *rqstp)
 {
   blockResponse *reply;
   struct glfs *glfs;
@@ -2883,4 +2879,107 @@ block_info_cli_1_svc(blockInfoCli *blk, struct svc_req *rqstp)
   blockFreeMetaInfo(info);
 
   return reply;
+}
+
+
+bool_t
+block_create_1_svc(blockCreate *blk, blockResponse *reply, struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(create, blk, reply, rqstp, ret);
+  return ret;
+}
+
+
+bool_t
+block_delete_1_svc(blockDelete *blk, blockResponse *reply, struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(delete, blk, reply, rqstp, ret);
+  return ret;
+}
+
+
+bool_t
+block_modify_1_svc(blockModify *blk, blockResponse *reply, struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(modify, blk, reply, rqstp, ret);
+  return ret;
+}
+
+
+bool_t
+block_create_cli_1_svc(blockCreateCli *blk, blockResponse *reply,
+                       struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(create_cli, blk, reply, rqstp, ret);
+  return ret;
+}
+
+
+bool_t
+block_modify_cli_1_svc(blockModifyCli *blk, blockResponse *reply,
+                       struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(modify_cli, blk, reply, rqstp, ret);
+  return ret;
+}
+
+
+bool_t
+block_list_cli_1_svc(blockListCli *blk, blockResponse *reply,
+                     struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(list_cli, blk, reply, rqstp, ret);
+  return ret;
+}
+
+
+bool_t
+block_info_cli_1_svc(blockInfoCli *blk, blockResponse *reply,
+                     struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(info_cli, blk, reply, rqstp, ret);
+  return ret;
+}
+
+
+bool_t
+block_delete_cli_1_svc(blockDeleteCli *blk, blockResponse *reply,
+                       struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(delete_cli, blk, reply, rqstp, ret);
+  return ret;
+}
+
+
+int
+gluster_block_1_freeresult (SVCXPRT *transp, xdrproc_t xdr_result, caddr_t result)
+{
+  xdr_free (xdr_result, result);
+
+  return 1;
+}
+
+
+int
+gluster_block_cli_1_freeresult (SVCXPRT *transp, xdrproc_t xdr_result, caddr_t result)
+{
+  xdr_free (xdr_result, result);
+
+  return 1;
 }

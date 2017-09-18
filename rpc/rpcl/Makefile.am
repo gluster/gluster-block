@@ -10,17 +10,17 @@ DISTCLEANFILES = Makefile.in $(BUILT_SOURCES)
 CLEANFILES = *~ $(BUILT_SOURCES)
 
 block.h: block.x
-	rpcgen -h -o $(top_builddir)/rpc/rpcl/$@ $^
+	rpcgen -hM -o $(top_builddir)/rpc/rpcl/$@ $^
 
 block_xdr.c: block.x
-	rpcgen -c -o $(top_builddir)/rpc/rpcl/$@ $^
+	rpcgen -cM -o $(top_builddir)/rpc/rpcl/$@ $^
 
 block_clnt.c: block.x
-	rpcgen -l -o $(top_builddir)/rpc/rpcl/$@ $^
+	rpcgen -lM -o $(top_builddir)/rpc/rpcl/$@ $^
 	$(SED) -i 's|TIMEOUT = { 25, 0 }|TIMEOUT = { 300, 0 }|' $(top_builddir)/rpc/rpcl/$@
 
 block_svc.c: block.x
-	rpcgen -m -o $(top_builddir)/rpc/rpcl/$@ $^
+	rpcgen -mM -o $(top_builddir)/rpc/rpcl/$@ $^
 
 dist-hook:
 	find $(distdir) -type f \

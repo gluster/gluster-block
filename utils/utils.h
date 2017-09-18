@@ -278,6 +278,18 @@ extern struct gbConf gbConf;
            GB_FREE(tmp);                                               \
          } while (0)
 
+# define GB_RPC_CALL(op, blk, reply, rqstp, ret)                    \
+        do {                                                        \
+          blockResponse *resp = block_##op##_1_svc_st(blk, rqstp);  \
+          if (resp) {                                               \
+            memcpy(reply, resp, sizeof(*reply));                    \
+            GB_FREE(resp);                                          \
+            ret = true;                                             \
+          } else {                                                  \
+            ret = false;                                            \
+          }                                                         \
+        } while (0)
+
 
 # define  CALLOC(x)                                                  \
             calloc(1, x)
