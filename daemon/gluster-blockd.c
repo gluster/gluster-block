@@ -22,9 +22,9 @@
 # include  "block.h"
 # include  "block_svc.h"
 
-# define   GB_TGCLI_GLOBALS     "targetcli set "                        \
-                                "global auto_add_default_portal=false " \
-                                "auto_enable_tpgt=false "               \
+# define   GB_TGCLI_GLOBALS     "targetcli set "                               \
+                                "global auto_add_default_portal=false "        \
+                                "auto_enable_tpgt=false loglevel_file=info "   \
                                 "logfile=%s && targetcli / saveconfig"
 
 
