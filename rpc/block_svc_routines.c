@@ -299,50 +299,69 @@ blockRemoteCreateRespParse(char *output, blockRemoteCreateResp **savereply)
   return -1;
 }
 
+struct addrinfo *
+glusterBlockGetSockaddr(char *host)
+{
+  int ret;
+  struct addrinfo hints, *res;
 
-static int glusterBlockHostConnect(char *host, struct sockaddr_in **sainptr)
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+
+  ret = getaddrinfo(host, GB_TCP_PORT_STR, &hints, &res);
+  if (ret) {
+    LOG("mgmt", GB_LOG_ERROR, "getaddrinfo(%s) failed (%s)",
+        host, gai_strerror(ret));
+    goto out;
+  }
+
+  return res;
+
+ out:
+  return NULL;
+}
+
+
+static int glusterBlockHostConnect(char *host)
 {
   int sockfd = -1;
-  struct hostent *server;
-  struct sockaddr_in sain = {0, };
   int errsv = 0;
+  struct addrinfo *res = NULL;
 
 
 
-  if ((sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+  if(!(res = glusterBlockGetSockaddr(host))) {
+    goto out;
+  }
+
+  if ((sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0) {
     errsv = errno;
     LOG("mgmt", GB_LOG_ERROR, "socket creation failed (%s)",
         strerror (errno));
     goto out;
   }
 
-  server = gethostbyname(host);
-  if (!server) {
-    errsv = errno;
-    LOG("mgmt", GB_LOG_ERROR, "gethostbyname(%s) failed (%s)",
-        host, strerror (errno));
-    goto out;
-  }
-
-  sain.sin_family = AF_INET;
-  bcopy((char *)server->h_addr, (char *)&sain.sin_addr.s_addr,
-        server->h_length);
-  sain.sin_port = htons(GB_TCP_PORT);
-
-  if (connect(sockfd, (struct sockaddr *) &sain, sizeof(sain)) < 0) {
+  if (connect(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
     errsv = errno;
     LOG("mgmt", GB_LOG_ERROR, "connect on %s failed (%s)", host,
         strerror (errno));
     goto out;
   }
 
-  if (sainptr) {
-    *sainptr = &sain;
+  if (res) {
+    freeaddrinfo(res);
   }
 
-  return sockfd;
+  close(sockfd);
+
+  return 0;
 
 out:
+  if (res) {
+    freeaddrinfo(res);
+  }
+
   if (sockfd != -1) {
     close(sockfd);
   }
@@ -361,20 +380,19 @@ glusterBlockCallRPC_1(char *host, void *cobj,
 {
   CLIENT *clnt = NULL;
   int ret = -1;
-  int sockfd;
+  int sockfd = -1;
   int errsv = 0;
   blockResponse reply = {0,};
-  struct sockaddr_in *sain = NULL;
+  struct addrinfo *res = NULL;
 
 
   *rpc_sent = FALSE;
-  sockfd = glusterBlockHostConnect(host, &sain);
-  if ( sockfd == -1) {
-    errsv = errno;
+
+  if (!(res = glusterBlockGetSockaddr(host))) {
     goto out;
   }
 
-  clnt = clnttcp_create (sain, GLUSTER_BLOCK, GLUSTER_BLOCK_VERS, &sockfd, 0, 0);
+  clnt = clnttcp_create ((struct sockaddr_in *)res->ai_addr, GLUSTER_BLOCK, GLUSTER_BLOCK_VERS, &sockfd, 0, 0);
   if (!clnt) {
     LOG("mgmt", GB_LOG_ERROR, "%son inet host %s",
         clnt_spcreateerror("client create failed"), host);
@@ -428,6 +446,10 @@ glusterBlockCallRPC_1(char *host, void *cobj,
 
     }
     clnt_destroy (clnt);
+  }
+
+  if (res) {
+    freeaddrinfo(res);
   }
 
   if (sockfd != -1) {
@@ -502,6 +524,7 @@ blockServerParse(char *blkServers)
     }
   }
 
+  GB_FREE(base);
   return list;
 
  out:
@@ -765,10 +788,7 @@ glusterBlockDeleteHostConnect(void *data)
   blockRemoteObj *args = (blockRemoteObj *)data;
 
 
-  args->exit = ret = glusterBlockHostConnect(args->addr, NULL);
-  if (ret > 0) {
-    args->exit = 0;
-  }
+  args->exit = ret = glusterBlockHostConnect(args->addr);
 
   return NULL;
 }
