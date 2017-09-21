@@ -20,11 +20,12 @@ License:          GPLv2 or LGPLv3+
 URL:              https://github.com/gluster/gluster-block
 Source0:          @PACKAGE_NAME@-@PACKAGE_VERSION@.tar.gz
 
-BuildRequires:    glusterfs-api-devel >= 3.6.0
-BuildRequires:    json-c-devel
+BuildRequires:    pkgconfig(glusterfs-api)
+BuildRequires:    pkgconfig(json-c)
 BuildRequires:    help2man >= 1.36
 %if ( 0%{?_with_systemd:1} )
-BuildRequires:    systemd-units
+%{?systemd_requires}
+BuildRequires:    systemd
 %endif
 
 Requires:         tcmu-runner >= 1.0.4
@@ -36,28 +37,38 @@ gluster-block is a CLI utility, which aims at making gluster backed block
 storage creation and maintenance as simple as possible.
 
 %prep
-%setup
+%setup -q
 
 %build
 %configure
-make
+%make_build
 
 %install
-make DESTDIR=${RPM_BUILD_ROOT} install
+%make_install
 %if ( 0%{?_with_initd:1} )
 mv %{buildroot}/%{_initddir}/gluster-blockd.initd %{buildroot}/%{_initddir}/gluster-blockd
 %endif
+
+%if ( 0%{?_with_systemd:1} )
+%post
+%systemd_post gluster-blockd.service
+
+%preun
+%systemd_preun gluster-blockd.service
+
+%postun
+%systemd_postun_with_restart gluster-blockd.service
 
 %clean
 rm -rf ${RPM_BUILD_ROOT}
 
 %files
+%doc README.md
 %if ( 0%{?_with_initd:1} )
 %doc COPYING-GPLV2 COPYING-LGPLV3
 %else
 %license COPYING-GPLV2 COPYING-LGPLV3
 %endif
-%doc README.md INSTALL
 %{_sbindir}/gluster-block
 %{_sbindir}/gluster-blockd
 %{_mandir}/man8/gluster-block*.8*
@@ -70,6 +81,13 @@ rm -rf ${RPM_BUILD_ROOT}
 %config(noreplace) %{_sysconfdir}/sysconfig/gluster-blockd
 
 %changelog
+* Thu Sep 21 2017 Niels de Vos <ndevos@redhat.com>
+- added systemd macros in the scriptlets
+- use pkgconfig for BuildRequires
+- run setup in quiet mode
+- run make_* macros instead of make commands in build/install section
+- drop the INSTALL file from the documentation
+
 * Fri Sep 15 2017 Ji-Hyeon Gim <potatogim@potatogim.net>
 - update with sysconfig handling for non-systemd distros
 
