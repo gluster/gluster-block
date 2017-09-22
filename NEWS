@@ -1,30 +1,23 @@
-gluster-block release 0.2.1 is tagged.
-
-This release is more focused on bug fixing.
-
+gluster-block release 0.3 is tagged.
 
 Highlights:
 ----------
-* Implement LRU cache to hold glfs objects, this makes the cli commands run fast.
-    For example on a single node,
-    create command takes ~1 sec now, while it was ~5 sec before.
-
-* Log severity level is configurable now.
-    look for --log-level option of daemon and '/etc/sysconfig/gluster-blockd'
+* Improvements to cli response time
+* Support preallocated block device creation
+* Switch to MT-safe rpc routines
+* Switch to port 24010 for management connections
+* Do not allow delete if all the nodes are not up
+* Init scripts added
 
 Other Notable Fixes:
 -------------------
-* betterments in messages on failure
-* fix heap-buffer-overflow
-* prevent crashes when errMsg is not set
-* print human readable timestamp in log files
-* improve logging at server side
-* handle SIGPIPE in daemon
-* update journal-data/block meta-data synchronously
-* reuse port 24006 (SO_REUSEADDR) on bind
-* add manual for gluster-blockd
-* updated ReadMe
-* and many more ...
+* Fix configshell file loglevel to INFO
+* Fix systemd dependency list
+* Support logdir choosing via Environment variable
+* Fix LOG segfault if log dir does not exist - fall back to stderr.
+* Fix (null) prints in log-file while trying to log volname
+* Block info shows size in human readable format
+* And many more ...
 
 Read more at [1] and [2]
 
