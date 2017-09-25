@@ -58,6 +58,7 @@ mv %{buildroot}/%{_initddir}/gluster-blockd.initd %{buildroot}/%{_initddir}/glus
 
 %postun
 %systemd_postun_with_restart gluster-blockd.service
+%endif
 
 %clean
 rm -rf ${RPM_BUILD_ROOT}
@@ -81,6 +82,9 @@ rm -rf ${RPM_BUILD_ROOT}
 %config(noreplace) %{_sysconfdir}/sysconfig/gluster-blockd
 
 %changelog
+* Mon Sep 25 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
+- Fix Unclosed %if block in the spec file
+
 * Thu Sep 21 2017 Niels de Vos <ndevos@redhat.com>
 - added systemd macros in the scriptlets
 - use pkgconfig for BuildRequires
