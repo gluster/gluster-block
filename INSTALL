@@ -16,13 +16,13 @@ Install from Source:
  $ ./configure
  [...]
  ------------------ Summary ------------------
-  gluster-block version 0.1
+  gluster-block version 0.3
    Prefix.........: /usr/local
    C Compiler.....: gcc -g -O2
    Linker.........: /usr/bin/ld -m elf_x86_64
  ---------------------------------------------
 
- In case if you notice failures, install the dependencies suggested by configure
+ In case if you notice failures, install the dependencies suggested by configure.
 
 5. Now just run 'make' and later run 'make install' to install the package.
 
