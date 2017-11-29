@@ -2270,7 +2270,7 @@ optfail:
 
 static int
 glusterBlockCleanUp(struct glfs *glfs, char *blockname,
-                    bool deleteall, bool forcedel, blockRemoteDeleteResp *drobj)
+                    bool deleteall, bool forcedel, bool unlink, blockRemoteDeleteResp *drobj)
 {
   int ret = -1;
   size_t i;
@@ -2328,7 +2328,7 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
     if (forcedel || cleanupsuccess == info->nhosts) {
       GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
                             ret, errMsg, out, "ENTRYDELETE: INPROGRESS\n");
-      if (glusterBlockDeleteEntry(glfs, info->volume, info->gbid)) {
+      if (unlink && glusterBlockDeleteEntry(glfs, info->volume, info->gbid)) {
         GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
                               ret, errMsg, out, "ENTRYDELETE: FAIL\n");
         LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s", FAILED_DELETING_FILE,
@@ -2415,7 +2415,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
           "No Spare nodes to create (%s): rollingback creation of target"
           " on volume %s with given hosts %s",
           blk->block_name, blk->volume, blk->block_hosts);
-      glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, (*reply)->obj);
+      glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, TRUE, (*reply)->obj);
       needcleanup = FALSE;   /* already clean attempted */
       ret = -1;
       goto out;
@@ -2424,7 +2424,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
           "Not enough Spare nodes for (%s): rollingback creation of target"
           " on volume %s with given hosts %s",
           blk->block_name, blk->volume, blk->block_hosts);
-      glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, (*reply)->obj);
+      glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, TRUE, (*reply)->obj);
       needcleanup = FALSE;   /* already clean attempted */
       ret = -1;
       goto out;
@@ -2455,7 +2455,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
 
  out:
   if (needcleanup) {
-      glusterBlockCleanUp(glfs, blk->block_name, FALSE, FALSE, (*reply)->obj);
+      glusterBlockCleanUp(glfs, blk->block_name, FALSE, FALSE, TRUE, (*reply)->obj);
   }
 
   blockFreeMetaInfo(info);
@@ -3616,7 +3616,7 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  errCode = glusterBlockCleanUp(glfs, blk->block_name, TRUE, TRUE, savereply);
+  errCode = glusterBlockCleanUp(glfs, blk->block_name, TRUE, TRUE, blk->unlink, savereply);
   if (errCode) {
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockCleanUp: return %d "
         "on block %s for volume %s", errCode, blk->block_name, blk->volume);

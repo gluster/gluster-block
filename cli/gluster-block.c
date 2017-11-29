@@ -19,11 +19,11 @@
                                 "[prealloc <full|no>] [storage <filename>] "   \
                                 "<HOST1[,HOST2,...]> <size> [--json*]"
 # define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> "      \
-                              "[force] [--json*]"
+                                "[unlink-storage <yes|no>] [force] [--json*]"
 # define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "      \
-                               "<auth enable|disable> [--json*]"
+                                "<auth enable|disable> [--json*]"
 # define  GB_REPLACE_HELP_STR "gluster-block replace <volname/blockname> "     \
-                               "<old-node> <new-node> [force] [--json*]"
+                                "<old-node> <new-node> [force] [--json*]"
 # define  GB_INFO_HELP_STR    "gluster-block info <volname/blockname> [--json*]"
 # define  GB_LIST_HELP_STR    "gluster-block list <volname> [--json*]"
 
@@ -212,7 +212,7 @@ glusterBlockHelp(void)
       "  info    <volname/blockname>\n"
       "        details about block device.\n"
       "\n"
-      "  delete  <volname/blockname> [force]\n"
+      "  delete  <volname/blockname> [unlink-storage <yes|no>] [force]\n"
       "        delete block device.\n"
       "\n"
       "  modify  <volname/blockname> <auth enable|disable>\n"
@@ -505,36 +505,59 @@ glusterBlockList(int argcount, char **options, int json)
 static int
 glusterBlockDelete(int argcount, char **options, int json)
 {
-  blockDeleteCli cobj = {0};
+  blockDeleteCli dobj = {0};
+  size_t optind = 2;
   int ret = -1;
 
 
-  if (argcount < 3 || argcount > 4) {
+  if (argcount < 3 || argcount > 6) {
     MSG("Inadequate arguments for delete:\n%s\n", GB_DELETE_HELP_STR);
       return -1;
   }
 
-  if (argcount == 4) {
-    if (strcmp(options[3], "force")) {
-      MSG("unknown option '%s' for delete:\n%s\n", options[3], GB_DELETE_HELP_STR);
-      return -1;
-    } else {
-      cobj.force = true;
-    }
-  }
+  dobj.json_resp = json;
 
-  cobj.json_resp = json;
+  /* default: delete storage */
+  dobj.unlink = 1;
 
-  if (glusterBlockParseVolumeBlock (options[2], cobj.volume, cobj.block_name,
-                                    sizeof(cobj.volume), sizeof(cobj.block_name),
-                                    GB_DELETE_HELP_STR, "delete")) {
+  if (glusterBlockParseVolumeBlock (options[optind++], dobj.volume,
+                                    dobj.block_name, sizeof(dobj.volume),
+                                    sizeof(dobj.block_name), GB_DELETE_HELP_STR,
+                                    "delete")) {
     goto out;
   }
 
-  ret = glusterBlockCliRPC_1(&cobj, DELETE_CLI);
+  if ((argcount - optind) && !strcmp(options[optind], "unlink-storage")) {
+    optind++;
+    ret = convertStringToTrillianParse(options[optind++]);
+    if(ret >= 0) {
+      dobj.unlink = ret;
+    } else {
+      MSG("%s\n", "'unlink-storage' option is incorrect");
+      MSG("%s\n", GB_DELETE_HELP_STR);
+      LOG("cli", GB_LOG_ERROR, "Delete failed while parsing argument "
+                               "to unlink-storage  for <%s/%s>",
+                               dobj.volume, dobj.block_name);
+      goto out;
+    }
+  }
+
+  if ((argcount - optind) && !strcmp(options[optind], "force")) {
+    optind++;
+    dobj.force = true;
+  }
+
+  if (argcount - optind) {
+    MSG("Unknown option: '%s'\n%s\n", options[optind], GB_DELETE_HELP_STR);
+    LOG("cli", GB_LOG_ERROR, "Delete failed parsing argument unknow option '%s'"
+        " for <%s/%s>", options[optind], dobj.volume, dobj.block_name);
+    goto out;
+  }
+
+  ret = glusterBlockCliRPC_1(&dobj, DELETE_CLI);
   if (ret) {
     LOG("cli", GB_LOG_ERROR, "failed deleting block %s on volume %s",
-        cobj.block_name, cobj.volume);
+        dobj.block_name, dobj.volume);
   }
 
  out:
