@@ -88,14 +88,27 @@ glusterBlockParseSize(const char *dom, char *value)
   case 'B':
   case 'b':
   case '\0':
-    return sizef;
     break;
   default:
-    LOG(dom, GB_LOG_ERROR, "%s",
-         "You may use k/K, M, G or T suffixes for kilobytes, "
-         "megabytes, gigabytes and terabytes.");
-    return -1;
+    goto fail;
   }
+
+  if ((strlen(tmp) > 1) &&
+      ((tmp[0] == 'b') || (tmp[0] == 'B') ||
+       (strncasecmp(tmp+1, "ib", strlen(tmp+1)) != 0)))
+  {
+    goto fail;
+  }
+
+  /* success */
+  return sizef;
+
+fail:
+  LOG(dom, GB_LOG_ERROR, "%s",
+      "Unknown size unit. "
+      "You may use b/B, k/K(iB), M(iB), G(iB), and T(iB) suffixes for "
+      "bytes, kibibytes, mebibytes, gibibytes, and tebibytes.");
+  return -1;
 }
 
 
