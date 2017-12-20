@@ -59,33 +59,31 @@ glusterBlockParseSize(const char *dom, char *value)
     tmp = tmp + 1;
   }
 
-  switch (*tmp) {
-  case 'Y':
+  switch (tolower(*tmp)) {
+  case 'y':
     sizef *= 1024;
     /* fall through */
-  case 'Z':
+  case 'z':
     sizef *= 1024;
     /* fall through */
-  case 'E':
+  case 'e':
     sizef *= 1024;
     /* fall through */
-  case 'P':
+  case 'p':
     sizef *= 1024;
     /* fall through */
-  case 'T':
+  case 't':
     sizef *= 1024;
     /* fall through */
-  case 'G':
+  case 'g':
     sizef *= 1024;
     /* fall through */
-  case 'M':
+  case 'm':
     sizef *= 1024;
     /* fall through */
-  case 'K':
   case 'k':
     sizef *= 1024;
     /* fall through */
-  case 'B':
   case 'b':
   case '\0':
     break;
@@ -106,7 +104,7 @@ glusterBlockParseSize(const char *dom, char *value)
 fail:
   LOG(dom, GB_LOG_ERROR, "%s",
       "Unknown size unit. "
-      "You may use b/B, k/K(iB), M(iB), G(iB), and T(iB) suffixes for "
+      "You may use b/B, k/K(iB), m/M(iB), g/G(iB), and t/T(iB) suffixes for "
       "bytes, kibibytes, mebibytes, gibibytes, and tebibytes.");
   return -1;
 }

@@ -24,6 +24,7 @@
 # include  <time.h>
 # include  <limits.h>
 # include  <sys/time.h>
+# include  <ctype.h>
 
 # define  GB_LOGDIR              DATADIR "/log/gluster-block"
 # define  GB_INFODIR             DATADIR "/run"

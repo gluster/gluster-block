@@ -12,7 +12,6 @@
 # include  "common.h"
 # include  "block.h"
 # include  "config.h"
-# include  <ctype.h>
 
 
 # define  GB_CREATE_HELP_STR  "gluster-block create <volname/blockname> "\
