@@ -63,6 +63,9 @@ LT_INIT
 # Checks for programs.
 AC_PROG_CC
 
+# For legacy reasons.
+AM_PROG_CC_C_O
+
 AC_CHECK_PROG(RPCGEN, rpcgen, yes, no)
 if test "x$RPCGEN" = "xno"; then
   AC_MSG_ERROR([rpcgen not found, needed for building])
