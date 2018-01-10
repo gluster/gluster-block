@@ -1,0 +1,98 @@
+##
+# Nature: cli command
+#
+# Label: 'create'
+#
+# Description: capability to create block storage in local node
+#
+# Since: 0.1
+##
+create: true
+
+##
+# Nature: cli sub-command
+#
+# Label:  'ha'
+#
+# Description: capability to replicate configuration of block for high availability
+#
+# Since: 0.1
+##
+create_ha: true
+
+##
+# Nature: cli sub-command
+#
+# Label:  'prealloc'
+#
+# Description: capability to preallocate underline storage
+#
+# Since: 0.3
+##
+create_prealloc: true
+
+##
+# Nature: cli sub-command
+#
+# Label:  'auth'
+#
+# Description: capability to set CHAP authentication for block
+#
+# Since: 0.2
+##
+create_auth: true
+
+##
+# Nature: cli command
+#
+# Label: 'delete'
+#
+# Description: capability to delete a block storage
+#
+# Since: 0.1
+##
+delete: true
+
+##
+# Nature: cli command
+#
+# Label: 'force'
+#
+# Description: capability to delete a block storage forcefully
+#
+# Since: 0.1
+##
+delete_force: true
+
+##
+# Nature: cli command
+#
+# Label: 'modify'
+#
+# Description: capability to modify already existing block
+#
+# Since: 0.2
+##
+modify: true
+
+##
+# Nature: cli sub-command
+#
+# Label: 'auth'
+#
+# Description: capability to modify CHAP authentication caps for existing block
+#
+# Since: 0.2
+##
+modify_auth: true
+
+##
+# Nature: cli sub-command
+#
+# Label: '--json'
+#
+# Description: capability to furnish results of any command in json formated way
+#
+# Since: 0.2
+##
+json: true

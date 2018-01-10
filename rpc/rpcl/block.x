@@ -87,6 +87,7 @@ program GLUSTER_BLOCK {
     blockResponse BLOCK_CREATE(blockCreate) = 1;
     blockResponse BLOCK_DELETE(blockDelete) = 2;
     blockResponse BLOCK_MODIFY(blockModify) = 3;
+    blockResponse BLOCK_VERSION() = 4;
   } = 1;
 } = 21215311; /* B2 L12 O15 C3 K11 */
 

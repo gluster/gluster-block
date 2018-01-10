@@ -31,6 +31,9 @@
 
 # define  GB_LOCK_FILE           GB_INFODIR "/gluster-blockd.lock"
 # define  GB_UNIX_ADDRESS        GB_INFODIR "/gluster-blockd.socket"
+
+# define  GB_CAPS_FILE           CONFDIR "/gluster-block-caps.info"
+
 # define  GB_TCP_PORT            24010
 # define  GB_TCP_PORT_STR        "24010"
 
@@ -58,6 +61,11 @@
 # define  FAILED_REMOTE_AYNC_CREATE "failed in remote async create"
 # define  FAILED_CREATING_FILE      "failed while creating block file in gluster volume"
 # define  FAILED_CREATING_META      "failed while creating block meta file from volume"
+
+/* Target Capabilities */
+# define  FAILED_CAPS               "failed in capabilities check"
+# define  FAILED_REMOTE_CAPS        "failed in remote capabilities check"
+# define  FAILED_REMOTE_AYNC_CAPS   "failed in remote async capabilities check"
 
 /* Target List */
 # define  FAILED_LIST               "failed in list"

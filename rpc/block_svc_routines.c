@@ -10,6 +10,7 @@
 
 
 # include  "common.h"
+# include  "capabilities.h"
 # include  "glfs-operations.h"
 
 # include  <pthread.h>
@@ -18,8 +19,8 @@
 # include  <json-c/json.h>
 
 
-# define   UUID_BUF_SIZE     38
-# define   GB_DEFAULT_ERRCODE 255
+# define   UUID_BUF_SIZE        38
+# define   GB_DEFAULT_ERRCODE   255
 
 # define   GB_CREATE            "create"
 # define   GB_DELETE            "delete"
@@ -37,6 +38,8 @@
 # define   GB_DEFAULT_ERRMSG    "Operation failed, please check the log "\
                                 "file to find the reason."
 
+# define   GB_OLD_CAP_MAX       9
+
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 typedef enum operations {
@@ -45,7 +48,8 @@ typedef enum operations {
   MODIFY_SRV,
   MODIFY_TPGC_SRV,
   LIST_SRV,
-  INFO_SRV
+  INFO_SRV,
+  VERSION_SRV
 } operations;
 
 
@@ -167,6 +171,25 @@ mapJsonFlagToJsonCstring(int jsonflag)
     default:
       return JSON_C_TO_STRING_SPACED;
   }
+}
+
+
+static bool
+blockhostIsValid(char *status)
+{
+  switch (blockMetaStatusEnumParse(status)) {
+  case GB_CONFIG_SUCCESS:
+  case GB_CLEANUP_INPROGRESS:
+  case GB_AUTH_ENFORCEING:
+  case GB_AUTH_ENFORCED:
+  case GB_AUTH_ENFORCE_FAIL:
+  case GB_AUTH_CLEAR_ENFORCED:
+  case GB_AUTH_CLEAR_ENFORCEING:
+  case GB_AUTH_CLEAR_ENFORCE_FAIL:
+    return TRUE;
+  }
+
+  return FALSE;
 }
 
 
@@ -299,6 +322,7 @@ blockRemoteCreateRespParse(char *output, blockRemoteCreateResp **savereply)
   return -1;
 }
 
+
 struct addrinfo *
 glusterBlockGetSockaddr(char *host)
 {
@@ -373,7 +397,6 @@ out:
 }
 
 
-
 int
 glusterBlockCallRPC_1(char *host, void *cobj,
                       operations opt, bool *rpc_sent, char **out)
@@ -382,8 +405,10 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   int ret = -1;
   int sockfd = -1;
   int errsv = 0;
+  size_t i;
   blockResponse reply = {0,};
   struct addrinfo *res = NULL;
+  gbCapResp *obj = NULL;
 
 
   *rpc_sent = FALSE;
@@ -410,6 +435,15 @@ glusterBlockCallRPC_1(char *host, void *cobj,
       goto out;
     }
     break;
+  case VERSION_SRV:
+    *rpc_sent = TRUE;
+    ret = block_version_1((void*)cobj, &reply, clnt);
+    if (ret != RPC_SUCCESS) {
+      LOG("mgmt", GB_LOG_ERROR, "%son host %s",
+          clnt_sperror(clnt, "block remote version failed"), host);
+      goto out;
+    }
+    break;
   case DELETE_SRV:
     *rpc_sent = TRUE;
     if (block_delete_1((blockDelete *)cobj, &reply, clnt) != RPC_SUCCESS) {
@@ -432,10 +466,26 @@ glusterBlockCallRPC_1(char *host, void *cobj,
       goto out;
   }
 
-  if (GB_STRDUP(*out, reply.out) < 0) {
-    goto out;
-  }
   ret = reply.exit;
+  if (opt != VERSION_SRV) {
+    if (GB_STRDUP(*out, reply.out) < 0) {
+      goto out;
+    }
+  } else {
+    if (GB_ALLOC(obj) < 0) {
+      return -1;
+    }
+    obj->capMax = reply.xdata.xdata_len/sizeof(gbCapObj);
+    gbCapObj *caps = (gbCapObj *)reply.xdata.xdata_val;
+    if (GB_ALLOC_N(obj->response, obj->capMax) < 0) {
+      return -1;
+    }
+    for (i = 0; i < obj->capMax; i++) {
+      strncpy(obj->response[i].cap, caps[i].cap, 256);
+      obj->response[i].status = caps[i].status;
+    }
+    *out = (char *) obj;
+  }
 
  out:
   if (clnt) {
@@ -531,6 +581,187 @@ blockServerParse(char *blkServers)
   GB_FREE(base);
   blockServerDefFree(list);
   return NULL;
+}
+
+
+void *
+glusterBlockCapabilitiesRemote(void *data)
+{
+  int ret;
+  blockRemoteObj *args = (blockRemoteObj *)data;
+  bool rpc_sent = FALSE;
+
+
+  /* Get peers capabilities */
+  ret = glusterBlockCallRPC_1(args->addr, NULL, VERSION_SRV, &rpc_sent,
+                              &args->reply);
+  if (ret && ret != RPC_PROCUNAVAIL) {
+    if (!rpc_sent) {
+      LOG("mgmt", GB_LOG_ERROR, "%s hence %s on host %s",
+          strerror(errno), FAILED_REMOTE_CAPS, args->addr);
+      ret = -ENOTCONN;
+    } else {
+      LOG("mgmt", GB_LOG_ERROR, "%s for on host %s",
+          FAILED_REMOTE_CAPS, args->addr);
+      ret = -1;
+    }
+  }
+
+  args->exit = ret;
+
+  return NULL;
+}
+
+
+/* function to imitate caps of older gluster-block versions */
+gbCapResp *
+glusterBlockMimicOldCaps(void)
+{
+  size_t i;
+  gbCapResp *caps = NULL;
+
+
+  if (GB_ALLOC(caps) < 0) {
+    return NULL;
+  }
+
+  caps->capMax = GB_OLD_CAP_MAX;
+  if (GB_ALLOC_N(caps->response, GB_OLD_CAP_MAX) < 0) {
+    GB_FREE(caps);
+    return NULL;
+  }
+
+  strncpy(caps->response[0].cap, "create", 256);
+  strncpy(caps->response[1].cap, "create_ha", 256);
+  strncpy(caps->response[2].cap, "create_prealloc", 256);
+  strncpy(caps->response[3].cap, "create_auth", 256);
+
+  strncpy(caps->response[4].cap, "delete", 256);
+  strncpy(caps->response[5].cap, "delete_force", 256);
+
+  strncpy(caps->response[6].cap, "modify", 256);
+  strncpy(caps->response[7].cap, "modify_auth", 256);
+
+  strncpy(caps->response[8].cap, "json", 256);
+
+  for (i = 0; i < GB_OLD_CAP_MAX; i++) {
+    caps->response[i].status = true;
+  }
+
+  return caps;
+}
+
+
+static int
+blockRemoteCapabilitiesRespParse(size_t count, blockRemoteObj *args,
+                                 bool *minCaps, char **errMsg)
+{
+  size_t i, j, k;
+  int ret = -1;
+  gbCapResp **caps = NULL;
+  bool CAP_MATCH;
+
+
+  if (GB_ALLOC_N(caps, count) < 0) {
+    return -1;
+  }
+  for (i = 0; i < count; i++) {
+      caps[i] = (gbCapResp *) args[i].reply;
+  }
+
+  for (i = 0; i < count; i++) {
+    if (args[i].exit == RPC_PROCUNAVAIL) {
+      caps[i] = glusterBlockMimicOldCaps();
+    } else if (args[i].exit) {
+      ret = args[i].exit;
+      GB_ASPRINTF(errMsg, "host %s returned %d", args[i].addr, ret);
+      goto out;
+    }
+  }
+
+  for (i = 0; i < GB_CAP_MAX; i++) {
+    if (minCaps[i] == false) {
+      continue;
+    }
+    /* Check if all remotes contain this cap */
+    for (j = 0; j < count; j++) {
+      CAP_MATCH=false;
+      if (!caps[j]) {
+        GB_ASPRINTF(errMsg, "capability empty on %s", args[j].addr);
+        goto out;
+      }
+      for (k = 0; k < caps[j]->capMax; k++) {
+        if (!strncmp(gbCapabilitiesLookup[i], caps[j]->response[k].cap, 256) &&
+            caps[j]->response[k].status) {
+            CAP_MATCH=true;
+            break;
+        }
+      }
+      if (!CAP_MATCH) {
+        GB_ASPRINTF(errMsg, "capability '%s' doesn't exit on %s",
+                    gbCapabilitiesLookup[i], args[j].addr);
+        goto out;
+      }
+    }
+  }
+
+  ret = 0;
+ out:
+  for (i = 0; i < count; i++) {
+    if (caps[i]) {
+      GB_FREE(caps[i]->response);
+      GB_FREE(caps[i]);
+    }
+  }
+  GB_FREE(caps);
+  return ret;
+}
+
+
+static int
+glusterBlockCapabilityRemoteAsync(blockServerDef *servers, bool *minCaps,
+                                  char **errMsg)
+{
+  static blockRemoteObj *args = NULL;
+  pthread_t  *tid = NULL;
+  int ret = -1;
+  size_t i;
+
+
+  /* skip if nhosts = 1 */
+  if (!servers || (servers->nhosts <= 1)) {
+    return 0;
+  }
+
+  if (GB_ALLOC_N(tid, servers->nhosts) < 0) {
+    goto out;
+  }
+
+  if (GB_ALLOC_N(args, servers->nhosts) < 0) {
+    goto out;
+  }
+
+  for (i = 0; i < servers->nhosts; i++) {
+    args[i].addr = servers->hosts[i];
+  }
+
+  for (i = 0; i < servers->nhosts; i++) {
+    pthread_create(&tid[i], NULL, glusterBlockCapabilitiesRemote, &args[i]);
+  }
+
+  for (i = 0; i < servers->nhosts; i++) {
+    /* collect exit code */
+    pthread_join(tid[i], NULL);
+  }
+
+  /* Verify the capabilities */
+  ret = blockRemoteCapabilitiesRespParse(servers->nhosts, args, minCaps, errMsg);
+
+ out:
+  GB_FREE(args);
+  GB_FREE(tid);
+
+  return ret;
 }
 
 
@@ -1360,6 +1591,65 @@ blockStr2arrayAddToJsonObj (json_object *json_obj, char *string, char *label,
 }
 
 
+bool *
+glusterBlockBuildMinCaps(void *data, operations opt)
+{
+  blockCreateCli *cblk = NULL;
+  blockDeleteCli *dblk = NULL;
+  blockModifyCli *mblk = NULL;
+  bool *minCaps = NULL;
+
+
+  if (GB_ALLOC_N(minCaps, GB_CAP_MAX) < 0) {
+    return NULL;
+  }
+
+  switch (opt) {
+  case CREATE_SRV:
+    cblk = (blockCreateCli *)data;
+
+    minCaps[GB_CREATE_CAP] = true;
+    if (cblk->mpath > 1) {
+      minCaps[GB_CREATE_HA_CAP] = true;
+    }
+    if (cblk->prealloc) {
+      minCaps[GB_CREATE_PREALLOC_CAP] = true;
+    }
+    if (cblk->auth_mode) {
+      minCaps[GB_CREATE_AUTH_CAP] = true;
+    }
+    if (cblk->json_resp) {
+      minCaps[GB_JSON_CAP] = true;
+    }
+    break;
+  case DELETE_SRV:
+    dblk = (blockDeleteCli *)data;
+
+    minCaps[GB_DELETE_CAP] = true;
+    if (dblk->force) {
+      minCaps[GB_DELETE_FORCE_CAP] = true;
+    }
+    if (dblk->json_resp) {
+      minCaps[GB_JSON_CAP] = true;
+    }
+    break;
+  case MODIFY_SRV:
+    mblk = (blockModifyCli *)data;
+
+    minCaps[GB_MODIFY_CAP] = true;
+    if (mblk->auth_mode) {
+      minCaps[GB_MODIFY_AUTH_CAP] = true;
+    }
+    if (mblk->json_resp) {
+      minCaps[GB_JSON_CAP] = true;
+    }
+    break;
+  }
+
+  return minCaps;
+}
+
+
 static void
 blockModifyCliFormatResponse (blockModifyCli *blk, struct blockModify *mobj,
                               int errCode, char *errMsg,
@@ -1482,6 +1772,85 @@ blockModifyCliFormatResponse (blockModifyCli *blk, struct blockModify *mobj,
 
 }
 
+
+static int
+glusterBlockCheckCapabilities(void* blk, operations opt, blockServerDefPtr list,
+                              char **errMsg)
+{
+  int errCode = 0;
+  bool *minCaps = NULL;
+  char *localErrMsg = NULL;
+
+
+  /* skip if nhosts = 1 */
+  if (!list || (list->nhosts <= 1)) {
+    return 0;
+  }
+
+  minCaps = glusterBlockBuildMinCaps(blk, opt);
+  if (!minCaps) {
+    errCode = ENOMEM;
+    goto out;
+  }
+
+  errCode = glusterBlockCapabilityRemoteAsync(list, minCaps, &localErrMsg);
+  if (errCode) {
+    LOG("mgmt", GB_LOG_ERROR, "glusterBlockCapabilityRemoteAsync() failed (%s)",
+                              localErrMsg);
+    if (errCode == -ENOTCONN) {
+      if (GB_ASPRINTF(errMsg, "Version check failed [%s] (Hint: See if all "
+                      "servers are up and running gluster-blockd daemon)",
+                      localErrMsg) == -1) {
+        errCode = ENOMEM;
+      }
+    } else {
+      if (GB_ASPRINTF(errMsg, "Version check failed between block servers. (%s)",
+                      localErrMsg) == -1) {
+        errCode = ENOMEM;
+      }
+    }
+    goto out;
+  }
+
+ out:
+  GB_FREE(minCaps);
+  GB_FREE(localErrMsg);
+  return errCode;
+}
+
+
+blockServerDefPtr
+glusterBlockGetListFromInfo(MetaInfo *info)
+{
+  size_t i;
+  blockServerDefPtr list = NULL;
+
+
+  if (!info || GB_ALLOC(list) < 0) {
+    return NULL;
+  }
+
+  if (GB_ALLOC_N(list->hosts, info->mpath) < 0) {
+    goto out;
+  }
+
+  for (i = 0; i < info->nhosts; i++) {
+    if (blockhostIsValid (info->list[i]->status)) {
+      if (GB_STRDUP(list->hosts[i], info->list[i]->addr) < 0) {
+        goto out;
+      }
+      list->nhosts++;
+    }
+  }
+
+  return list;
+
+ out:
+  blockServerDefFree(list);
+  return NULL;
+}
+
+
 blockResponse *
 block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
 {
@@ -1498,6 +1867,8 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
   bool rollback = false;
   int errCode = 0;
   char *errMsg = NULL;
+  blockServerDefPtr list = NULL;
+  size_t i;
 
 
   LOG("mgmt", GB_LOG_DEBUG,
@@ -1541,6 +1912,20 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
 
   ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
   if (ret) {
+    goto out;
+  }
+
+  list = glusterBlockGetListFromInfo(info);
+  if (!list) {
+    errCode = ENOMEM;
+    goto out;
+  }
+
+  errCode = glusterBlockCheckCapabilities((void *)blk, MODIFY_SRV, list, &errMsg);
+  if (errCode) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "glusterBlockCheckCapabilities() for block %s on volume %s failed",
+        blk->block_name, blk->volume);
     goto out;
   }
 
@@ -1610,6 +1995,7 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
 
  out:
   GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
+  blockServerDefFree(list);
 
  nolock:
   if (lkfd && glfs_close(lkfd) != 0) {
@@ -1796,6 +2182,7 @@ blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
   return;
 }
 
+
 blockResponse *
 block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
 {
@@ -1834,6 +2221,14 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
       goto optfail;
     }
     reply->exit = ENODEV;
+    goto optfail;
+  }
+
+  errCode = glusterBlockCheckCapabilities((void *)blk, CREATE_SRV, list, &errMsg);
+  if (errCode) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "glusterBlockCheckCapabilities() for block %s on volume %s failed",
+        blk->block_name, blk->volume);
     goto optfail;
   }
 
@@ -2302,6 +2697,8 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
   char *errMsg = NULL;
   int errCode = 0;
   int ret;
+  blockServerDefPtr list = NULL;
+  size_t i;
 
 
   LOG("mgmt", GB_LOG_INFO, "delete cli request, volume=%s blockname=%s",
@@ -2361,6 +2758,20 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
     }
   }
 
+  list = glusterBlockGetListFromInfo(info);
+  if (!list) {
+    errCode = ENOMEM;
+    goto out;
+  }
+
+  errCode = glusterBlockCheckCapabilities((void *)blk, DELETE_SRV, list, &errMsg);
+  if (errCode) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "glusterBlockCheckCapabilities() for block %s on volume %s failed",
+        blk->block_name, blk->volume);
+    goto out;
+  }
+
   errCode = glusterBlockCleanUp(glfs, blk->block_name, TRUE, TRUE, savereply);
   if (errCode) {
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockCleanUp: return %d "
@@ -2368,9 +2779,9 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
   }
 
  out:
-  GB_FREE(info);
-
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
+  blockServerDefFree(list);
+  GB_FREE(info);
 
  optfail:
   if (lkfd && glfs_close(lkfd) != 0) {
@@ -2462,6 +2873,22 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
   return reply;
 }
 
+blockResponse *
+block_version_1_svc_st(void *data, struct svc_req *rqstp)
+{
+  int ret = -1;
+  blockResponse *reply = NULL;
+
+  if (GB_ALLOC(reply) < 0) {
+    return NULL;
+  }
+
+  reply->exit = gbSetCapabilties(&reply);
+
+  GB_ASPRINTF(&reply->out, "In version");
+  return reply;
+
+}
 
 blockResponse *
 block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
@@ -2725,23 +3152,6 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
   return reply;
 }
 
-static bool
-blockhostIsValid (char *status)
-{
-  switch (blockMetaStatusEnumParse(status)) {
-  case GB_CONFIG_SUCCESS:
-  case GB_CLEANUP_INPROGRESS:
-  case GB_AUTH_ENFORCEING:
-  case GB_AUTH_ENFORCED:
-  case GB_AUTH_ENFORCE_FAIL:
-  case GB_AUTH_CLEAR_ENFORCED:
-  case GB_AUTH_CLEAR_ENFORCEING:
-  case GB_AUTH_CLEAR_ENFORCE_FAIL:
-    return TRUE;
-  }
-
-  return FALSE;
-}
 
 void
 blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
@@ -2934,6 +3344,16 @@ block_modify_1_svc(blockModify *blk, blockResponse *reply, struct svc_req *rqstp
   int ret;
 
   GB_RPC_CALL(modify, blk, reply, rqstp, ret);
+  return ret;
+}
+
+
+bool_t
+block_version_1_svc(void *data, blockResponse *reply, struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(version, data, reply, rqstp, ret);
   return ret;
 }
 
