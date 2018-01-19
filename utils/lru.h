@@ -12,7 +12,7 @@
 # ifndef   _LRU_H
 # define   _LRU_H   1
 
-# include  <api/glfs.h>
+# include  <glusterfs/api/glfs.h>
 
 # include  "common.h"
 # include  "list.h"
