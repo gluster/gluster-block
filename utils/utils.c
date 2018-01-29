@@ -340,3 +340,23 @@ gbStrdup(char **dest, const char *src,
 
   return 0;
 }
+
+
+char *
+gbStrcpy(char *dest, const char *src, size_t destbytes,
+         const char *filename, const char *funcname, size_t linenr)
+{
+    char *ret;
+    size_t n = strlen(src);
+
+    if (n > (destbytes - 1))
+      return NULL;
+
+    ret = strncpy(dest, src, n);
+    /* strncpy NULL terminates if the last character is \0.  Therefore
+     * force the last byte to be \0
+     */
+    dest[n] = '\0';
+
+    return ret;
+}

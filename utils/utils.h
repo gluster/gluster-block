@@ -327,6 +327,13 @@ extern struct gbConf gbConf;
             gbStrdup(&(dst), src,                                    \
                      __FILE__, __FUNCTION__, __LINE__)
 
+# define  GB_STRCPY(dst, src, destbytes)                             \
+            gbStrcpy((dst), (src), (destbytes),                      \
+                     __FILE__, __FUNCTION__, __LINE__)
+
+# define  GB_STRCPYSTATIC(dst, src)                                  \
+            GB_STRCPY((dst), (src), (sizeof(dst)))
+
 # define  GB_FREE(ptr)                                               \
             gbFree(1 ? (void *) &(ptr) : (ptr))
 
@@ -531,6 +538,9 @@ int gbReallocN(void *ptrptr, size_t size, size_t count,
 
 int gbStrdup(char **dest, const char *src,
              const char *filename, const char *funcname, size_t linenr);
+
+char* gbStrcpy(char *dest, const char *src, size_t destbytes,
+               const char *filename, const char *funcname, size_t linenr);
 
 void gbFree(void *ptrptr);
 

@@ -77,7 +77,7 @@ glusterBlockCliThreadProc (void *vargp)
   }
 
   saun.sun_family = AF_UNIX;
-  strcpy(saun.sun_path, GB_UNIX_ADDRESS);
+  GB_STRCPYSTATIC(saun.sun_path, GB_UNIX_ADDRESS);
 
   if (unlink(GB_UNIX_ADDRESS) && errno != ENOENT) {
     LOG("mgmt", GB_LOG_ERROR, "unlink(%s) failed (%s)",

@@ -16,7 +16,7 @@ static int lruCount;
 size_t glfsLruCount = 5;  /* default lru cache size */
 
 typedef struct Entry {
-  char volume[256];
+  char volume[255];
   glfs_t *glfs;
 
   struct list_head list;
@@ -56,7 +56,7 @@ appendNewEntry(const char *volname, glfs_t *fs)
   if (GB_ALLOC(tmp) < 0) {
     return -1;
   }
-  strcpy(tmp->volume, volname);
+  GB_STRCPYSTATIC(tmp->volume, volname);
   tmp->glfs = fs;
 
   list_add(&(tmp->list), &Cache);

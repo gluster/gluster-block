@@ -163,8 +163,8 @@ removeDuplicateSubstr(char **line)
   element = strtok(temp, " ");
   while (element) {
     if (!strstr(out, element)) {
-      strcat(out, element);
-      strcat(out, " ");
+      strncat(out, element, strlen(element));
+      strncat(out, " ", 1);
     }
     element = strtok(NULL, " ");
   }
@@ -480,7 +480,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
 
   switch(opt) {
   case CREATE_SRV:
-    strcpy(((blockCreate *)cobj)->ipaddr, host);
+    GB_STRCPYSTATIC(((blockCreate *)cobj)->ipaddr, host);
     *rpc_sent = TRUE;
 
     if (block_create_1((blockCreate *)cobj, &reply, clnt) != RPC_SUCCESS) {
@@ -543,7 +543,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
       return -1;
     }
     for (i = 0; i < obj->capMax; i++) {
-      strncpy(obj->response[i].cap, caps[i].cap, 256);
+      GB_STRCPYSTATIC(obj->response[i].cap, caps[i].cap);
       obj->response[i].status = caps[i].status;
     }
     *out = (char *) obj;
@@ -675,18 +675,18 @@ glusterBlockMimicOldCaps(void)
     return NULL;
   }
 
-  strncpy(caps->response[0].cap, "create", 256);
-  strncpy(caps->response[1].cap, "create_ha", 256);
-  strncpy(caps->response[2].cap, "create_prealloc", 256);
-  strncpy(caps->response[3].cap, "create_auth", 256);
+  GB_STRCPYSTATIC(caps->response[0].cap, "create");
+  GB_STRCPYSTATIC(caps->response[1].cap, "create_ha");
+  GB_STRCPYSTATIC(caps->response[2].cap, "create_prealloc");
+  GB_STRCPYSTATIC(caps->response[3].cap, "create_auth");
 
-  strncpy(caps->response[4].cap, "delete", 256);
-  strncpy(caps->response[5].cap, "delete_force", 256);
+  GB_STRCPYSTATIC(caps->response[4].cap, "delete");
+  GB_STRCPYSTATIC(caps->response[5].cap, "delete_force");
 
-  strncpy(caps->response[6].cap, "modify", 256);
-  strncpy(caps->response[7].cap, "modify_auth", 256);
+  GB_STRCPYSTATIC(caps->response[6].cap, "modify");
+  GB_STRCPYSTATIC(caps->response[7].cap, "modify_auth");
 
-  strncpy(caps->response[8].cap, "json", 256);
+  GB_STRCPYSTATIC(caps->response[8].cap, "json");
 
   for (i = 0; i < GB_OLD_CAP_MAX; i++) {
     caps->response[i].status = true;
@@ -735,7 +735,7 @@ blockRemoteCapabilitiesRespParse(size_t count, blockRemoteObj *args,
         goto out;
       }
       for (k = 0; k < caps[j]->capMax; k++) {
-        if (!strncmp(gbCapabilitiesLookup[i], caps[j]->response[k].cap, 256) &&
+        if (!strcmp(gbCapabilitiesLookup[i], caps[j]->response[k].cap) &&
             caps[j]->response[k].status) {
             CAP_MATCH=true;
             break;
@@ -1684,21 +1684,21 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
     goto out;
   }
 
-  strcpy(cobj->ipaddr, blk->new_node);
-  strcpy(cobj->volume, info->volume);
-  strcpy(cobj->gbid, info->gbid);
+  GB_STRCPYSTATIC(cobj->ipaddr, blk->new_node);
+  GB_STRCPYSTATIC(cobj->volume, info->volume);
+  GB_STRCPYSTATIC(cobj->gbid, info->gbid);
   cobj->size = info->size;
-  strcpy(cobj->passwd, info->passwd);
-  strcpy(cobj->block_name, block);
+  GB_STRCPYSTATIC(cobj->passwd, info->passwd);
+  GB_STRCPYSTATIC(cobj->block_name, block);
 
-  strcpy(robj->volume, info->volume);
-  strcpy(robj->gbid, info->gbid);
-  strcpy(robj->block_name, block);
-  strcpy(robj->ipaddr, blk->new_node);
-  strcpy(robj->ripaddr, blk->old_node);
+  GB_STRCPYSTATIC(robj->volume, info->volume);
+  GB_STRCPYSTATIC(robj->gbid, info->gbid);
+  GB_STRCPYSTATIC(robj->block_name, block);
+  GB_STRCPYSTATIC(robj->ipaddr, blk->new_node);
+  GB_STRCPYSTATIC(robj->ripaddr, blk->old_node);
 
-  strcpy(dobj->block_name, block);
-  strcpy(dobj->gbid, info->gbid);
+  GB_STRCPYSTATIC(dobj->block_name, block);
+  GB_STRCPYSTATIC(dobj->gbid, info->gbid);
 
   /* Fill args[] */
   if (GB_ALLOC_N(args, info->mpath + 1) < 0) {
@@ -2291,8 +2291,8 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
     goto out;
   }
 
-  strcpy(dobj.block_name, blockname);
-  strcpy(dobj.gbid, info->gbid);
+  GB_STRCPYSTATIC(dobj.block_name, blockname);
+  GB_STRCPYSTATIC(dobj.gbid, info->gbid);
 
   count = glusterBlockDeleteFillArgs(info, deleteall, NULL, NULL, NULL);
   asyncret = glusterBlockDeleteRemoteAsync(info, glfs, &dobj, count,
@@ -2671,9 +2671,9 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  strcpy(mobj.block_name, blk->block_name);
-  strcpy(mobj.volume, blk->volume);
-  strcpy(mobj.gbid, info->gbid);
+  GB_STRCPYSTATIC(mobj.block_name, blk->block_name);
+  GB_STRCPYSTATIC(mobj.volume, blk->volume);
+  GB_STRCPYSTATIC(mobj.gbid, info->gbid);
 
   if (blk->auth_mode) {
     if(info->passwd[0] == '\0') {
@@ -2681,9 +2681,9 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
       uuid_unparse(uuid, passwd);
       GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
                             ret, errMsg, out, "PASSWORD: %s\n", passwd);
-      strcpy(mobj.passwd, passwd);
+      GB_STRCPYSTATIC(mobj.passwd, passwd);
     } else {
-      strcpy(mobj.passwd, info->passwd);
+      GB_STRCPYSTATIC(mobj.passwd, info->passwd);
     }
     mobj.auth_mode = 1;
   } else {
@@ -3022,10 +3022,10 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
                         errCode, errMsg, exist, "ENTRYCREATE: SUCCESS\n");
 
-  strcpy(cobj.volume, blk->volume);
-  strcpy(cobj.block_name, blk->block_name);
+  GB_STRCPYSTATIC(cobj.volume, blk->volume);
+  GB_STRCPYSTATIC(cobj.block_name, blk->block_name);
   cobj.size = blk->size;
-  strcpy(cobj.gbid, gbid);
+  GB_STRCPYSTATIC(cobj.gbid, gbid);
   if (GB_STRDUP(cobj.block_hosts,  blk->block_hosts) < 0) {
     errCode = ENOMEM;
     goto exist;
@@ -3035,7 +3035,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
     uuid_generate(uuid);
     uuid_unparse(uuid, passwd);
 
-    strcpy(cobj.passwd, passwd);
+    GB_STRCPYSTATIC(cobj.passwd, passwd);
     cobj.auth_mode = 1;
 
     GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
@@ -3916,8 +3916,8 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
 
   while ((entry = glfs_readdir (tgmdfd))) {
     if (strcmp(entry->d_name, ".") &&
-       strcmp(entry->d_name, "..") &&
-       strcmp(entry->d_name, "meta.lock")) {
+        strcmp(entry->d_name, "..") &&
+        strcmp(entry->d_name, "meta.lock")) {
       if (blk->json_resp) {
         json_object_array_add(json_array,
                               GB_JSON_OBJ_TO_STR(entry->d_name));

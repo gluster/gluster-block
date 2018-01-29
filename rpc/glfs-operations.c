@@ -301,22 +301,22 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
 
   switch (blockMetaKeyEnumParse(opt)) {
   case GB_META_VOLUME:
-    strcpy(info->volume, strchr(line, ' ')+1);
+    GB_STRCPYSTATIC(info->volume, strchr(line, ' ') + 1);
     break;
   case GB_META_GBID:
-    strcpy(info->gbid, strchr(line, ' ')+1);
+     GB_STRCPYSTATIC(info->gbid, strchr(line, ' ') + 1);
     break;
   case GB_META_SIZE:
-    sscanf(strchr(line, ' ')+1, "%zu", &info->size);
+    sscanf(strchr(line, ' '), "%zu", &info->size);
     break;
   case GB_META_HA:
-    sscanf(strchr(line, ' ')+1, "%zu", &info->mpath);
+    sscanf(strchr(line, ' '), "%zu", &info->mpath);
     break;
   case GB_META_ENTRYCREATE:
-    strcpy(info->entry, strchr(line, ' ')+1);
+    GB_STRCPYSTATIC(info->entry, strchr(line, ' ') + 1);
     break;
   case GB_META_PASSWD:
-    strcpy(info->passwd, strchr(line, ' ')+1);
+    GB_STRCPYSTATIC(info->passwd, strchr(line, ' ') + 1);
     break;
 
   default:
@@ -325,15 +325,15 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
         goto out;
       if(GB_ALLOC(info->list[0]) < 0)
         goto out;
-      strcpy(info->list[0]->addr, opt);
-      strcpy(info->list[0]->status, strchr(line, ' ')+1);
+      GB_STRCPYSTATIC(info->list[0]->addr, opt);
+      GB_STRCPYSTATIC(info->list[0]->status, strchr(line, ' ') + 1);
       info->nhosts = 1;
     } else {
       if(GB_REALLOC_N(info->list, info->nhosts+1) < 0)
         goto out;
       for (i = 0; i < info->nhosts; i++) {
         if(!strcmp(info->list[i]->addr, opt)) {
-          strcpy(info->list[i]->status, strchr(line, ' ')+1);
+          GB_STRCPYSTATIC(info->list[i]->status, strchr(line, ' ') + 1);
           flag = 1;
           break;
         }
@@ -341,8 +341,8 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
       if (!flag) {
         if(GB_ALLOC(info->list[info->nhosts]) < 0)
           goto out;
-        strcpy(info->list[info->nhosts]->addr, opt);
-        strcpy(info->list[info->nhosts]->status, strchr(line, ' ')+1);
+        GB_STRCPYSTATIC(info->list[info->nhosts]->addr, opt);
+        GB_STRCPYSTATIC(info->list[info->nhosts]->status, strchr(line, ' ') + 1);
         info->nhosts++;
       }
     }

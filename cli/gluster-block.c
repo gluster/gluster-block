@@ -81,7 +81,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   }
 
   saun.sun_family = AF_UNIX;
-  strcpy(saun.sun_path, GB_UNIX_ADDRESS);
+  GB_STRCPYSTATIC(saun.sun_path, GB_UNIX_ADDRESS);
 
   if (connect(sockfd, (struct sockaddr *) &saun,
               sizeof(struct sockaddr_un)) < 0) {
@@ -235,7 +235,7 @@ static bool
 glusterBlockIsNameAcceptable(char *name)
 {
   int i = 0;
-  if (!name || strlen(name) == 0 || strlen(name) > 255)
+  if (!name || strlen(name) >= 255)
     return FALSE;
   for (i = 0; i < strlen(name); i++) {
     if (!isalnum(name[i]) && (name[i] != '_') && (name[i] != '-'))
@@ -259,6 +259,7 @@ glusterBlockIsAddrAcceptable(char *addr)
 
 static int
 glusterBlockParseVolumeBlock(char *volumeblock, char *volume, char *block,
+                             size_t vol_len, size_t block_len,
                              char *helpstr, char *op)
 {
   int ret = -1;
@@ -292,8 +293,8 @@ glusterBlockParseVolumeBlock(char *volumeblock, char *volume, char *block,
         "and should be less than 255 characters long\n", block);
     goto out;
   }
-  strncpy(volume, tmp, strlen(tmp));
-  strncpy(block, sep+1, strlen(sep+1));
+  GB_STRCPY(volume, tmp, vol_len);
+  GB_STRCPY(block, sep+1, block_len);
   ret = 0;
 
  out:
@@ -314,7 +315,8 @@ glusterBlockModify(int argcount, char **options, int json)
   mobj.json_resp = json;
 
   if (glusterBlockParseVolumeBlock (options[optind++], mobj.volume,
-                                    mobj.block_name, GB_MODIFY_HELP_STR,
+                                    mobj.block_name, sizeof(mobj.volume),
+                                    sizeof(mobj.block_name), GB_MODIFY_HELP_STR,
                                     "modify")) {
     goto out;
   }
@@ -365,9 +367,9 @@ glusterBlockCreate(int argcount, char **options, int json)
   /* default mpath */
   cobj.mpath = 1;
 
-  if (glusterBlockParseVolumeBlock (options[optind++], cobj.volume,
-                                    cobj.block_name, GB_CREATE_HELP_STR,
-                                    "create")) {
+  if (glusterBlockParseVolumeBlock(options[optind++], cobj.volume, cobj.block_name,
+                                    sizeof(cobj.volume), sizeof(cobj.block_name),
+                                    GB_CREATE_HELP_STR, "create")) {
     goto out;
   }
 
@@ -470,7 +472,7 @@ glusterBlockList(int argcount, char **options, int json)
   GB_ARGCHECK_OR_RETURN(argcount, 3, "list", GB_LIST_HELP_STR);
   cobj.json_resp = json;
 
-  strcpy(cobj.volume, options[2]);
+  GB_STRCPYSTATIC(cobj.volume, options[2]);
 
   ret = glusterBlockCliRPC_1(&cobj, LIST_CLI);
   if (ret) {
@@ -505,9 +507,9 @@ glusterBlockDelete(int argcount, char **options, int json)
 
   cobj.json_resp = json;
 
-  if (glusterBlockParseVolumeBlock (options[2], cobj.volume,
-                                    cobj.block_name, GB_DELETE_HELP_STR,
-                                    "delete")) {
+  if (glusterBlockParseVolumeBlock (options[2], cobj.volume, cobj.block_name,
+                                    sizeof(cobj.volume), sizeof(cobj.block_name),
+                                    GB_DELETE_HELP_STR, "delete")) {
     goto out;
   }
 
@@ -533,9 +535,9 @@ glusterBlockInfo(int argcount, char **options, int json)
   GB_ARGCHECK_OR_RETURN(argcount, 3, "info", GB_INFO_HELP_STR);
   cobj.json_resp = json;
 
-  if (glusterBlockParseVolumeBlock (options[2], cobj.volume,
-                                    cobj.block_name, GB_INFO_HELP_STR,
-                                    "info")) {
+  if (glusterBlockParseVolumeBlock (options[2], cobj.volume, cobj.block_name,
+                                    sizeof(cobj.volume), sizeof(cobj.block_name),
+                                    GB_INFO_HELP_STR, "info")) {
     goto out;
   }
 
@@ -567,7 +569,8 @@ glusterBlockReplace(int argcount, char **options, int json)
   }
 
   if (glusterBlockParseVolumeBlock(options[2], robj.volume, robj.block_name,
-        helpMsg, "replace")) {
+                                   sizeof(robj.volume), sizeof(robj.block_name),
+                                   helpMsg, "replace")) {
     goto out;
   }
 
@@ -576,16 +579,16 @@ glusterBlockReplace(int argcount, char **options, int json)
           options[3], GB_REPLACE_HELP_STR);
       goto out;
   }
-  strcpy(robj.old_node, options[3]);
+  GB_STRCPYSTATIC(robj.old_node, options[3]);
 
   if (!glusterBlockIsAddrAcceptable(options[4])) {
       MSG("host addr (%s) should be a valid ip address\n%s\n",
           options[4], GB_REPLACE_HELP_STR);
       goto out;
   }
-  strcpy(robj.new_node, options[4]);
+  GB_STRCPYSTATIC(robj.new_node, options[4]);
 
-  if (!strncmp(robj.old_node, robj.new_node, 255)) {
+  if (!strcmp(robj.old_node, robj.new_node)) {
       MSG("<old-node> (%s) and <new-node> (%s) cannot be same\n%s\n",
           robj.old_node, robj.new_node, GB_REPLACE_HELP_STR);
       goto out;

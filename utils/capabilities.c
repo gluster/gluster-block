@@ -71,7 +71,7 @@ gbSetCapabilties(blockResponse **c)
 
     ret = gbCapabilitiesEnumParse(p);
     if (ret != GB_CAP_MAX) {
-      strncpy(caps[count].cap, gbCapabilitiesLookup[ret], 256);
+      GB_STRCPYSTATIC(caps[count].cap, gbCapabilitiesLookup[ret]);
 
       /* Part after ':' and before '\n' */
       p = sep + 1;
