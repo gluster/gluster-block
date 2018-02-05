@@ -359,6 +359,115 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
 
 
 int
+blockParseValidServers(struct glfs* glfs, char *metafile,
+                       int *errCode, blockServerDefPtr *savelist, char *skiphost)
+{
+  blockServerDefPtr list = *savelist;
+  char fpath[PATH_MAX] = {0};
+  struct glfs_fd *tgmfd = NULL;
+  char line[1024];
+  int ret = -1;
+  char *h, *s, *sep;
+  size_t i, count = 0;
+  bool match;
+
+
+  snprintf(fpath, sizeof fpath, "%s/%s", GB_METADIR, metafile);
+  tgmfd = glfs_open(glfs, fpath, O_RDONLY);
+  if (!tgmfd) {
+    if (errCode) {
+      *errCode = errno;
+    }
+    LOG("gfapi", GB_LOG_ERROR, "glfs_open(%s) failed[%s]", metafile,
+                               strerror(errno));
+    goto out;
+  }
+
+  while ((ret = glfs_read (tgmfd, line, sizeof(line), 0)) > 0) {
+    /* clip till current line */
+    h = line;
+    sep = strchr(h, '\n');
+    *sep = '\0';
+
+    count += strlen(h) + 1;
+
+    /* Part before ':' */
+    sep = strchr(h, ':');
+    *sep = '\0';
+
+    switch (blockMetaKeyEnumParse(h)) {
+    case GB_META_VOLUME:
+    case GB_META_GBID:
+    case GB_META_SIZE:
+    case GB_META_HA:
+    case GB_META_ENTRYCREATE:
+    case GB_META_PASSWD:
+      break;
+    default:
+      if (skiphost && !strcmp(h, skiphost)) {
+        break; /* switch case */
+      }
+      /* Part after ':' and before '\n' */
+      s = sep + 1;
+      while(*s == ' ') {
+        s++;
+      }
+
+      if (!list) {
+        if (blockhostIsValid(s)) {
+          if (GB_ALLOC(list) < 0)
+            goto out;
+          if (GB_ALLOC(list->hosts) < 0)
+            goto out;
+          if (GB_STRDUP(list->hosts[0], h) < 0)
+            goto out;
+
+          list->nhosts = 1;
+        }
+      } else {
+        match = false;
+        for (i = 0; i < list->nhosts; i++) {
+          if (!strcmp(list->hosts[i], h)) {
+            match = true;
+            break; /* for loop */
+          }
+        }
+        if (!match && blockhostIsValid(s)){
+          if(GB_REALLOC_N(list->hosts, list->nhosts+1) < 0)
+            goto out;
+          if (GB_STRDUP(list->hosts[list->nhosts], h) < 0)
+            goto out;
+
+          list->nhosts++;
+        }
+      }
+      break; /* switch case */
+    }
+
+    glfs_lseek(tgmfd, count, SEEK_SET);
+  }
+
+  if (ret < 0 && errCode) { /*Failure from glfs_read*/
+    *errCode = errno;
+    goto out;
+  }
+
+  *savelist = list;
+  list = NULL;
+  ret = 0;
+
+ out:
+  if (tgmfd && glfs_close(tgmfd) != 0) {
+    LOG("gfapi", GB_LOG_ERROR, "glfs_close(%s): failed[%s]",
+        metafile, strerror(errno));
+  }
+  blockServerDefFree(list);
+
+  return ret;
+}
+
+
+int
 blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info,
                  int *errCode)
 {

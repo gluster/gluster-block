@@ -157,3 +157,43 @@ convertStringToTrillianParse(const char *opt)
 
   return -1;
 }
+
+
+void
+blockServerDefFree(blockServerDefPtr blkServers)
+{
+  size_t i;
+
+
+  if (!blkServers) {
+    return;
+  }
+
+  for (i = 0; i < blkServers->nhosts; i++) {
+     GB_FREE(blkServers->hosts[i]);
+  }
+  GB_FREE(blkServers->hosts);
+  GB_FREE(blkServers);
+}
+
+
+bool
+blockhostIsValid(char *status)
+{
+  switch (blockMetaStatusEnumParse(status)) {
+  case GB_CONFIG_SUCCESS:
+  case GB_CLEANUP_INPROGRESS:
+  case GB_AUTH_ENFORCEING:
+  case GB_AUTH_ENFORCED:
+  case GB_AUTH_ENFORCE_FAIL:
+  case GB_AUTH_CLEAR_ENFORCED:
+  case GB_AUTH_CLEAR_ENFORCEING:
+  case GB_AUTH_CLEAR_ENFORCE_FAIL:
+  case GB_RP_SUCCESS:
+  case GB_RP_FAIL:
+  case GB_RP_INPROGRESS:
+    return TRUE;
+  }
+
+  return FALSE;
+}

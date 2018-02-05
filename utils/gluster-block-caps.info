@@ -96,3 +96,15 @@ modify_auth: true
 # Since: 0.2
 ##
 json: true
+
+
+##
+# Nature: cli command
+#
+# Label: 'replace'
+#
+# Description: capability to replace node for a given block
+#
+# Since: 0.4
+##
+replace: true

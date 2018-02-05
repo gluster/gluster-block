@@ -85,6 +85,10 @@
 # define  FAILED_DELETING_FILE      "failed while deleting block file from gluster volume"
 # define  FAILED_DELETING_META      "failed while deleting block meta file from volume"
 
+/* Target Replace */
+# define  FAILED_REPLACE            "failed in replace"
+# define  FAILED_REMOTE_REPLACE     "failed in remote replace portal"
+
 # define  FAILED_DEPENDENCY         "failed dependency, check if you have targetcli and tcmu-runner installed"
 
 # define FMT_WARN(fmt...) do { if (0) printf (fmt); } while (0)
@@ -328,18 +332,19 @@ extern struct gbConf gbConf;
 
 
 typedef enum gbCliCmdlineOption {
-  GB_CLI_UNKNOWN        = 0,
-  GB_CLI_CREATE         = 1,
-  GB_CLI_LIST           = 2,
-  GB_CLI_INFO           = 3,
-  GB_CLI_DELETE         = 4,
-  GB_CLI_MODIFY         = 5,
-  GB_CLI_HELP           = 6,
-  GB_CLI_HYPHEN_HELP    = 7,
-  GB_CLI_VERSION        = 8,
-  GB_CLI_HYPHEN_VERSION = 9,
-  GB_CLI_USAGE          = 10,
-  GB_CLI_HYPHEN_USAGE   = 11,
+  GB_CLI_UNKNOWN = 0,
+  GB_CLI_CREATE,
+  GB_CLI_LIST,
+  GB_CLI_INFO,
+  GB_CLI_DELETE,
+  GB_CLI_MODIFY,
+  GB_CLI_REPLACE,
+  GB_CLI_HELP,
+  GB_CLI_HYPHEN_HELP,
+  GB_CLI_VERSION,
+  GB_CLI_HYPHEN_VERSION,
+  GB_CLI_USAGE,
+  GB_CLI_HYPHEN_USAGE,
 
   GB_CLI_OPT_MAX
 } gbCliCmdlineOption;
@@ -351,6 +356,7 @@ static const char *const gbCliCmdlineOptLookup[] = {
   [GB_CLI_INFO]           = "info",
   [GB_CLI_DELETE]         = "delete",
   [GB_CLI_MODIFY]         = "modify",
+  [GB_CLI_REPLACE]        = "replace",
   [GB_CLI_HELP]           = "help",
   [GB_CLI_HYPHEN_HELP]    = "--help",
   [GB_CLI_VERSION]        = "version",
@@ -442,6 +448,9 @@ typedef enum MetaStatus {
   GB_CLEANUP_SUCCESS          = 9,
   GB_CLEANUP_FAIL             = 10,
   GB_CLEANUP_INPROGRESS       = 11,
+  GB_RP_SUCCESS               = 12,
+  GB_RP_INPROGRESS            = 13,
+  GB_RP_FAIL                  = 14,
 
   GB_METASTATUS_MAX
 } MetaStatus;
@@ -459,6 +468,9 @@ static const char *const MetaStatusLookup[] = {
   [GB_CLEANUP_INPROGRESS]       = "CLEANUPINPROGRESS",
   [GB_CLEANUP_SUCCESS]          = "CLEANUPSUCCESS",
   [GB_CLEANUP_FAIL]             = "CLEANUPFAIL",
+  [GB_RP_SUCCESS]               = "RPSUCCESS",
+  [GB_RP_INPROGRESS]            = "RPINPROGRESS",
+  [GB_RP_FAIL]                  = "RPFAIL",
 
   [GB_METASTATUS_MAX]           = NULL,
 };

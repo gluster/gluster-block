@@ -16,6 +16,13 @@
 # include "block.h"
 
 
+typedef struct blockServerDef {
+  size_t nhosts;
+  char   **hosts;
+} blockServerDef;
+typedef blockServerDef *blockServerDefPtr;
+
+
 static const char *const JsonResponseFormatLookup[] = {
   [GB_JSON_NONE]            = "",
 
@@ -81,5 +88,9 @@ ssize_t glusterBlockParseSize(const char *dom, char *value);
 char* glusterBlockFormatSize(const char *dom, size_t bytes);
 
 int convertStringToTrillianParse(const char *opt);
+
+void blockServerDefFree(blockServerDefPtr blkServers);
+
+bool blockhostIsValid(char *status);
 
 # endif /* _COMMON_H */

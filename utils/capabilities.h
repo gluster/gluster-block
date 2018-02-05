@@ -37,6 +37,8 @@ enum gbCapabilities {
   GB_MODIFY_CAP,
   GB_MODIFY_AUTH_CAP,
 
+  GB_REPLACE_CAP,
+
   GB_JSON_CAP,
 
   GB_CAP_MAX
@@ -54,6 +56,8 @@ static const char *const gbCapabilitiesLookup[] = {
 
   [GB_MODIFY_CAP]              = "modify",
   [GB_MODIFY_AUTH_CAP]         = "modify_auth",
+
+  [GB_REPLACE_CAP]             = "replace",
 
   [GB_JSON_CAP]                = "json",
 

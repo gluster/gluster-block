@@ -14,14 +14,16 @@
 # include  "config.h"
 
 
-# define  GB_CREATE_HELP_STR  "gluster-block create <volname/blockname> "\
-                                "[ha <count>] [auth <enable|disable>] "\
-                                "[prealloc <full|no>] <HOST1[,HOST2,...]> "\
+# define  GB_CREATE_HELP_STR  "gluster-block create <volname/blockname> "      \
+                                "[ha <count>] [auth <enable|disable>] "        \
+                                "[prealloc <full|no>] <HOST1[,HOST2,...]> "    \
                                 "<size> [--json*]"
 
 # define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> [force] [--json*]"
-# define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "\
+# define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "      \
                                "<auth enable|disable> [--json*]"
+# define  GB_REPLACE_HELP_STR "gluster-block replace <volname/blockname> "   \
+                               "<old-node> <new-node> [force] [--json*]"
 # define  GB_INFO_HELP_STR    "gluster-block info <volname/blockname> [--json*]"
 # define  GB_LIST_HELP_STR    "gluster-block list <volname> [--json*]"
 
@@ -43,7 +45,8 @@ typedef enum clioperations {
   LIST_CLI   = 2,
   INFO_CLI   = 3,
   DELETE_CLI = 4,
-  MODIFY_CLI = 5
+  MODIFY_CLI = 5,
+  REPLACE_CLI = 6
 } clioperations;
 
 
@@ -59,6 +62,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   blockInfoCli *info_obj;
   blockListCli *list_obj;
   blockModifyCli *modify_obj;
+  blockReplaceCli *replace_obj;
   blockResponse reply = {0,};
   char          errMsg[2048] = {0};
 
@@ -145,6 +149,15 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
       goto out;
     }
     break;
+  case REPLACE_CLI:
+    replace_obj = cobj;
+    if (block_replace_cli_1(replace_obj, &reply, clnt) != RPC_SUCCESS) {
+      LOG("cli", GB_LOG_ERROR, "%sblock %s replace on volume %s failed",
+          clnt_sperror(clnt, "block_replace_cli_1"), replace_obj->block_name,
+          replace_obj->volume);
+      goto out;
+    }
+    break;
   }
 
  out:
@@ -204,6 +217,9 @@ glusterBlockHelp(void)
       "  modify  <volname/blockname> <auth enable|disable>\n"
       "        modify block device.\n"
       "\n"
+      "  replace <volname/blockname> <old-node> <new-node> [force]\n"
+      "        replace operations.\n"
+      "\n"
       "  help\n"
       "        show this message and exit.\n"
       "\n"
@@ -216,13 +232,26 @@ glusterBlockHelp(void)
 }
 
 static bool
-glusterBlockIsNameAcceptable (char *name)
+glusterBlockIsNameAcceptable(char *name)
 {
   int i = 0;
-  if (!name || strlen(name) == 0)
+  if (!name || strlen(name) == 0 || strlen(name) > 255)
     return FALSE;
   for (i = 0; i < strlen(name); i++) {
-    if (!isalnum (name[i]) && (name[i] != '_') && (name[i] != '-'))
+    if (!isalnum(name[i]) && (name[i] != '_') && (name[i] != '-'))
+      return FALSE;
+  }
+  return TRUE;
+}
+
+static bool
+glusterBlockIsAddrAcceptable(char *addr)
+{
+  int i = 0;
+  if (!addr || strlen(addr) == 0 || strlen(addr) > 255)
+    return FALSE;
+  for (i = 0; i < strlen(addr); i++) {
+    if (!isdigit(addr[i]) && (addr[i] != '.'))
       return FALSE;
   }
   return TRUE;
@@ -235,9 +264,14 @@ glusterBlockParseVolumeBlock(char *volumeblock, char *volume, char *block,
   int ret = -1;
   size_t len = 0;
   char *sep = NULL;
+  char *tmp = NULL;
 
+
+  if (GB_STRDUP(tmp, volumeblock) < 0) {
+    goto out;
+  }
   /* part before '/' is the volume name */
-  sep = strchr(volumeblock, '/');
+  sep = strchr(tmp, '/');
   if (!sep) {
     MSG("argument '<volname/blockname>'(%s) is incorrect\n",
         volumeblock);
@@ -245,29 +279,25 @@ glusterBlockParseVolumeBlock(char *volumeblock, char *volume, char *block,
     LOG("cli", GB_LOG_ERROR, "%s failed while parsing <volname/blockname>", op);
     goto out;
   }
-  len = sep - volumeblock;
-  if (len >= 255 || strlen(sep+1) >= 255) {
-    MSG("%s\n", "Both volname and blockname should be less than 255 "
-        "characters long");
-    MSG("%s\n", helpstr);
-    LOG("cli", GB_LOG_ERROR, "%s failed while parsing <volname/blockname>", op);
+  *sep = '\0';
+
+  if (!glusterBlockIsNameAcceptable(tmp)) {
+    MSG("volume name(%s) should contain only aplhanumeric,'-', '_' characters "
+        "and should be less than 255 characters long\n", volume);
     goto out;
   }
-  strncpy(volume, volumeblock, len);
   /* part after / is blockname */
+  if (!glusterBlockIsNameAcceptable(sep+1)) {
+    MSG("block name(%s) should contain only aplhanumeric,'-', '_' characters "
+        "and should be less than 255 characters long\n", block);
+    goto out;
+  }
+  strncpy(volume, tmp, strlen(tmp));
   strncpy(block, sep+1, strlen(sep+1));
-  if (!glusterBlockIsNameAcceptable (volume)) {
-    MSG("volume name(%s) should contain only aplhanumeric,'-' "
-        "and '_' characters\n", volume);
-    goto out;
-  }
-  if (!glusterBlockIsNameAcceptable (block)) {
-    MSG("block name(%s) should contain only aplhanumeric,'-' "
-        "and '_' characters\n", block);
-    goto out;
-  }
   ret = 0;
+
  out:
+  GB_FREE(tmp);
   return ret;
 }
 
@@ -523,6 +553,68 @@ glusterBlockInfo(int argcount, char **options, int json)
 
 
 static int
+glusterBlockReplace(int argcount, char **options, int json)
+{
+  blockReplaceCli robj = {0};
+  int ret = -1;
+  bool singleBlock = false;
+  char helpMsg[256] = {0, };
+
+
+  if (argcount < 5 || argcount > 6) {
+    MSG("Inadequate arguments for replace:\n%s\n", GB_REPLACE_HELP_STR);
+    return -1;
+  }
+
+  if (glusterBlockParseVolumeBlock(options[2], robj.volume, robj.block_name,
+        helpMsg, "replace")) {
+    goto out;
+  }
+
+  if (!glusterBlockIsAddrAcceptable(options[3])) {
+      MSG("host addr (%s) should be a valid ip address\n%s\n",
+          options[3], GB_REPLACE_HELP_STR);
+      goto out;
+  }
+  strcpy(robj.old_node, options[3]);
+
+  if (!glusterBlockIsAddrAcceptable(options[4])) {
+      MSG("host addr (%s) should be a valid ip address\n%s\n",
+          options[4], GB_REPLACE_HELP_STR);
+      goto out;
+  }
+  strcpy(robj.new_node, options[4]);
+
+  if (!strncmp(robj.old_node, robj.new_node, 255)) {
+      MSG("<old-node> (%s) and <new-node> (%s) cannot be same\n%s\n",
+          robj.old_node, robj.new_node, GB_REPLACE_HELP_STR);
+      goto out;
+  }
+
+  robj.json_resp = json;
+
+  if (argcount == 6) {
+    if (strcmp(options[5], "force")) {
+      MSG("unknown option '%s' for replace:\n%s\n", options[5], GB_REPLACE_HELP_STR);
+      return -1;
+    } else {
+      robj.force = true;
+    }
+  }
+
+  ret = glusterBlockCliRPC_1(&robj, REPLACE_CLI);
+  if (ret) {
+    LOG("cli", GB_LOG_ERROR, "failed replace on volume %s",
+        robj.volume);
+  }
+
+ out:
+
+  return ret;
+}
+
+
+static int
 glusterBlockParseArgs(int count, char **options)
 {
   int ret = 0;
@@ -574,6 +666,13 @@ glusterBlockParseArgs(int count, char **options)
       ret = glusterBlockModify(count, options, json);
       if (ret) {
         LOG("cli", GB_LOG_ERROR, "%s", FAILED_MODIFY);
+      }
+      goto out;
+
+    case GB_CLI_REPLACE:
+      ret = glusterBlockReplace(count, options, json);
+      if (ret) {
+        LOG("cli", GB_LOG_ERROR, "%s", FAILED_REPLACE);
       }
       goto out;
 

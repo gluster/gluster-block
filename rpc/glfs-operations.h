@@ -64,4 +64,8 @@ blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info,
 void
 blockFreeMetaInfo(MetaInfo *info);
 
+int
+blockParseValidServers(struct glfs* glfs, char *metafile, int *errCode,
+                       blockServerDefPtr *savelist, char *skiphost);
+
 #endif /* _GLFS_OPERATIONS_H */
