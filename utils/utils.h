@@ -374,6 +374,26 @@ static const char *const gbCliCmdlineOptLookup[] = {
   [GB_CLI_OPT_MAX]        = NULL,
 };
 
+typedef enum gbCliCreateOptions {
+  GB_CLI_CREATE_UNKNOWN   = 0,
+  GB_CLI_CREATE_HA        = 1,
+  GB_CLI_CREATE_AUTH      = 2,
+  GB_CLI_CREATE_PREALLOC  = 3,
+  GB_CLI_CREATE_STORAGE   = 4,
+
+  GB_CLI_CREATE_OPT_MAX
+} gbCliCreateOptions;
+
+static const char *const gbCliCreateOptLookup[] = {
+  [GB_CLI_CREATE_UNKNOWN]  = "NONE",
+  [GB_CLI_CREATE_HA]       = "ha",
+  [GB_CLI_CREATE_AUTH]     = "auth",
+  [GB_CLI_CREATE_PREALLOC] = "prealloc",
+  [GB_CLI_CREATE_STORAGE]  = "storage",
+
+  [GB_CLI_CREATE_OPT_MAX]  = NULL,
+};
+
 typedef enum gbDaemonCmdlineOption {
   GB_DAEMON_UNKNOWN        = 0,
   GB_DAEMON_HELP           = 1,
@@ -508,6 +528,8 @@ static const char *const RemoteCreateRespLookup[] = {
 
 
 int glusterBlockCLIOptEnumParse(const char *opt);
+
+int glusterBlockCLICreateOptEnumParse(const char *opt);
 
 int glusterBlockDaemonOptEnumParse(const char *opt);
 

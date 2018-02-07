@@ -3009,9 +3009,9 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
 
   GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
                         errCode, errMsg, exist,
-                        "VOLUME: %s\nGBID: %s\nSIZE: %zu\n"
+                        "VOLUME: %s\nGBID: %s\n"
                         "HA: %d\nENTRYCREATE: INPROGRESS\n",
-                        blk->volume, gbid, blk->size, blk->mpath);
+                        blk->volume, gbid, blk->mpath);
 
   if (glusterBlockCreateEntry(glfs, blk, gbid, &errCode, &errMsg)) {
     LOG("mgmt", GB_LOG_ERROR, "%s volume: %s host: %s",
@@ -3020,7 +3020,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   }
 
   GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
-                        errCode, errMsg, exist, "ENTRYCREATE: SUCCESS\n");
+                        errCode, errMsg, exist, "SIZE: %zu\nENTRYCREATE: SUCCESS\n", blk->size);
 
   GB_STRCPYSTATIC(cobj.volume, blk->volume);
   GB_STRCPYSTATIC(cobj.block_name, blk->block_name);

@@ -50,6 +50,26 @@ glusterBlockCLIOptEnumParse(const char *opt)
 
 
 int
+glusterBlockCLICreateOptEnumParse(const char *opt)
+{
+  int i;
+
+
+  if (!opt) {
+    return GB_CLI_CREATE_OPT_MAX;
+  }
+
+  for (i = 0; i < GB_CLI_CREATE_OPT_MAX; i++) {
+    if (!strcmp(opt, gbCliCreateOptLookup[i])) {
+      return i;
+    }
+  }
+
+  return i;
+}
+
+
+int
 glusterBlockDaemonOptEnumParse(const char *opt)
 {
   int i;

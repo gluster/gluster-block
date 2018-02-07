@@ -91,6 +91,7 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
                         int *errCode, char **errMsg)
 {
   struct glfs_fd *tgfd;
+  struct stat st;
   char *tmp;
   int ret;
 
@@ -110,6 +111,56 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
         "glfs_chdir(%s) on volume %s for block %s failed[%s]",
         GB_STOREDIR, blk->volume, blk->block_name, strerror(errno));
     goto out;
+  }
+
+  if (strlen(blk->storage)) {
+    ret = glfs_stat(glfs, blk->storage, &st);
+    if (ret) {
+      *errCode = errno;
+      if (*errCode == ENOENT) {
+        LOG("mgmt", GB_LOG_ERROR,
+            "storage file '/block-store/%s' doesn't exist in volume %s",
+            blk->storage, blk->volume);
+        GB_ASPRINTF(errMsg,
+                    "storage file '/block-store/%s' doesn't exist in volume %s\n",
+                    blk->storage, blk->volume);
+      } else {
+        LOG("mgmt", GB_LOG_ERROR,
+            "glfs_stat failed on /block-store/%s in volume %s [%s]",
+            blk->storage, blk->volume, strerror(*errCode));
+        GB_ASPRINTF(errMsg,
+                    "glfs_stat failed on /block-store/%s in volume %s [%s]",
+                    blk->storage, blk->volume, strerror(*errCode));
+      }
+      goto out;
+    }
+    blk->size = st.st_size;
+
+    if (st.st_nlink == 1) {
+      ret = glfs_link(glfs, blk->storage, gbid);
+      if (ret) {
+        *errCode=errno;
+        LOG("mgmt", GB_LOG_ERROR,
+            "glfs_link(%s, %s) on volume %s for block %s failed [%s]",
+            blk->storage, gbid, blk->volume, blk->block_name, strerror(errno));
+        GB_ASPRINTF(errMsg,
+                    "glfs_link(%s, %s) on volume %s for block %s failed [%s]",
+                    blk->storage, gbid, strerror(errno));
+        goto out;
+      }
+    } else {
+      *errCode = EBUSY;
+      LOG("mgmt", GB_LOG_ERROR,
+          "storage file /block-store/%s is already in use in volume %s [%s]",
+          blk->storage, blk->volume, strerror(*errCode));
+      GB_ASPRINTF(errMsg,
+                  "storage file /block-store/%s is already in use in volume %s [%s]\n"
+                  "hint: delete the hardlink file, make sure file is not in use\n",
+                  blk->storage, blk->volume, strerror(*errCode));
+      ret = -1;
+      goto out;
+    }
+    return 0;
   }
 
   tgfd = glfs_creat(glfs, gbid,
@@ -163,8 +214,10 @@ unlink:
 
  out:
   if (ret) {
-    GB_ASPRINTF (errMsg, "Not able to create storage for %s/%s [%s]",
-                 blk->volume, blk->block_name, strerror(*errCode));
+    if (!errMsg) {
+      GB_ASPRINTF (errMsg, "Not able to create storage for %s/%s [%s]",
+                   blk->volume, blk->block_name, strerror(*errCode));
+    }
 
     GB_ASPRINTF(&tmp, "%s/%s", GB_METADIR, blk->block_name);
 

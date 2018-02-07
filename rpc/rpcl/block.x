@@ -47,6 +47,7 @@ struct blockCreateCli {
   u_int     mpath;                /* HA request count */
   bool      auth_mode;
   bool      prealloc;
+  char      storage[255];
   char      block_name[255];
   string    block_hosts<>;
   enum JsonResponseFormat     json_resp;

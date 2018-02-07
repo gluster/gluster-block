@@ -16,13 +16,13 @@
 
 # define  GB_CREATE_HELP_STR  "gluster-block create <volname/blockname> "      \
                                 "[ha <count>] [auth <enable|disable>] "        \
-                                "[prealloc <full|no>] <HOST1[,HOST2,...]> "    \
-                                "<size> [--json*]"
-
-# define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> [force] [--json*]"
+                                "[prealloc <full|no>] [storage <filename>] "   \
+                                "<HOST1[,HOST2,...]> <size> [--json*]"
+# define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> "      \
+                              "[force] [--json*]"
 # define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "      \
                                "<auth enable|disable> [--json*]"
-# define  GB_REPLACE_HELP_STR "gluster-block replace <volname/blockname> "   \
+# define  GB_REPLACE_HELP_STR "gluster-block replace <volname/blockname> "     \
                                "<old-node> <new-node> [force] [--json*]"
 # define  GB_INFO_HELP_STR    "gluster-block info <volname/blockname> [--json*]"
 # define  GB_LIST_HELP_STR    "gluster-block list <volname> [--json*]"
@@ -202,6 +202,7 @@ glusterBlockHelp(void)
       "  create  <volname/blockname> [ha <count>]\n"
       "                              [auth <enable|disable>]\n"
       "                              [prealloc <full|no>]\n"
+      "                              [storage <filename>]\n"
       "                              <host1[,host2,...]> <size>\n"
       "        create block device [defaults: ha 1, auth disable, prealloc no, size in bytes]\n"
       "\n"
@@ -356,6 +357,8 @@ glusterBlockCreate(int argcount, char **options, int json)
   int ret = -1;
   ssize_t sparse_ret;
   blockCreateCli cobj = {0, };
+  bool TAKE_SIZE=true;
+  bool PREALLOC_OPT=false;
 
 
   if (argcount <= optind) {
@@ -373,18 +376,12 @@ glusterBlockCreate(int argcount, char **options, int json)
     goto out;
   }
 
-  if (argcount - optind >= 2) {  /* atleast 2 needed */
-    /* if ha given then collect count which is next by 'ha' arg */
-    if (!strcmp(options[optind], "ha")) {
-      optind++;
+  while (argcount - optind > 2) {
+    switch (glusterBlockCLICreateOptEnumParse(options[optind++])) {
+    case GB_CLI_CREATE_HA:
       sscanf(options[optind++], "%u", &cobj.mpath);
-    }
-  }
-
-  if (argcount - optind >= 2) {  /* atleast 2 needed */
-    /* if auth given then collect boolean which is next by 'auth' arg */
-    if (!strcmp(options[optind], "auth")) {
-      optind++;
+      break;
+    case GB_CLI_CREATE_AUTH:
       ret = convertStringToTrillianParse(options[optind++]);
       if(ret >= 0) {
         cobj.auth_mode = ret;
@@ -396,16 +393,12 @@ glusterBlockCreate(int argcount, char **options, int json)
                                  cobj.volume, cobj.block_name);
         goto out;
       }
-    }
-  }
-
-  if (argcount - optind >= 2) {  /* atleast 2 needed */
-    /* if prealloc given then collect boolean which is next by 'prealloc' arg */
-    if (!strcmp(options[optind], "prealloc")) {
-      optind++;
+      break;
+    case GB_CLI_CREATE_PREALLOC:
       ret = convertStringToTrillianParse(options[optind++]);
       if(ret >= 0) {
         cobj.prealloc = ret;
+        PREALLOC_OPT=true;
       } else {
         MSG("%s\n", "'prealloc' option is incorrect");
         MSG("%s\n", GB_CREATE_HELP_STR);
@@ -414,39 +407,64 @@ glusterBlockCreate(int argcount, char **options, int json)
                                  cobj.volume, cobj.block_name);
         goto out;
       }
+      break;
+    case GB_CLI_CREATE_STORAGE:
+      GB_STRCPYSTATIC(cobj.storage, options[optind++]);
+      TAKE_SIZE=false;
+      break;
     }
   }
 
-  if (argcount - optind < 2) {  /* left with servers and size so 2 */
-    MSG("Inadequate arguments for create:\n%s\n", GB_CREATE_HELP_STR);
-    LOG("cli", GB_LOG_ERROR,
-        "failed creating block %s on volume %s with hosts %s",
-        cobj.block_name, cobj.volume, cobj.block_hosts);
-    goto out;
+  if (TAKE_SIZE) {
+    if (argcount - optind != 2) {
+      MSG("Inadequate arguments for create:\n%s\n", GB_CREATE_HELP_STR);
+      LOG("cli", GB_LOG_ERROR,
+          "failed with Inadequate args for create block %s on volume %s with hosts %s",
+          cobj.block_name, cobj.volume, cobj.block_hosts);
+      goto out;
+    }
+  } else {
+    if (PREALLOC_OPT) {
+      MSG("Inadequate arguments for create:\n%s\n", GB_CREATE_HELP_STR);
+      MSG("%s\n", "Hint: do not use [prealloc <full|no>] in combination with [storage <filename>] option");
+      LOG("cli", GB_LOG_ERROR,
+          "failed with Inadequate args for create block %s on volume %s with hosts %s",
+          cobj.block_name, cobj.volume, cobj.block_hosts);
+      goto out;
+    }
+
+    if (argcount - optind != 1) {
+      MSG("Inadequate arguments for create:\n%s\n", GB_CREATE_HELP_STR);
+      MSG("%s\n", "Hint: do not use <size> in combination with [storage <filename>] option");
+      LOG("cli", GB_LOG_ERROR,
+          "failed with Inadequate args for create block %s on volume %s with hosts %s",
+          cobj.block_name, cobj.volume, cobj.block_hosts);
+      goto out;
+    }
   }
 
-  /* next arg to 'ha count' will be servers */
   if (GB_STRDUP(cobj.block_hosts, options[optind++]) < 0) {
     LOG("cli", GB_LOG_ERROR, "failed while parsing servers for block <%s/%s>",
         cobj.volume, cobj.block_name);
     goto out;
   }
 
-  /* last arg will be size */
-  sparse_ret = glusterBlockParseSize("cli", options[optind]);
-  if (sparse_ret < 0) {
-    MSG("%s\n", "'<size>' is incorrect");
-    MSG("%s\n", GB_CREATE_HELP_STR);
-    LOG("cli", GB_LOG_ERROR, "failed while parsing size for block <%s/%s>",
-        cobj.volume, cobj.block_name);
-    goto out;
-  } else if (sparse_ret < GB_DEFAULT_SECTOR_SIZE) {
-    MSG("minimum acceptable block size is %d bytes\n", GB_DEFAULT_SECTOR_SIZE);
-    LOG("cli", GB_LOG_ERROR, "minimum acceptable block size is %d bytes <%s/%s>",
-        GB_DEFAULT_SECTOR_SIZE, cobj.volume, cobj.block_name);
-    goto out;
+  if (TAKE_SIZE) {
+    sparse_ret = glusterBlockParseSize("cli", options[optind]);
+    if (sparse_ret < 0) {
+      MSG("%s\n", "'<size>' is incorrect");
+      MSG("%s\n", GB_CREATE_HELP_STR);
+      LOG("cli", GB_LOG_ERROR, "failed while parsing size for block <%s/%s>",
+          cobj.volume, cobj.block_name);
+      goto out;
+    } else if (sparse_ret < GB_DEFAULT_SECTOR_SIZE) {
+      MSG("minimum acceptable block size is %d bytes\n", GB_DEFAULT_SECTOR_SIZE);
+      LOG("cli", GB_LOG_ERROR, "minimum acceptable block size is %d bytes <%s/%s>",
+          GB_DEFAULT_SECTOR_SIZE, cobj.volume, cobj.block_name);
+      goto out;
+    }
+    cobj.size = sparse_ret;  /* size is unsigned long long */
   }
-  cobj.size = sparse_ret;  /* size is unsigned long long */
 
   ret = glusterBlockCliRPC_1(&cobj, CREATE_CLI);
   if (ret) {
