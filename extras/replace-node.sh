@@ -32,32 +32,32 @@ function schedule_terminate () {
 
 function getAvailableFd() {
 
-         for i in {1..65536}; do
-             if [ ! -e /proc/$$/fd/${i} ]; then
-                 echo ${i};
-                 return 0;
-             fi
-         done
+    for i in {1..65536}; do
+        if [ ! -e /proc/$$/fd/${i} ]; then
+            echo ${i};
+            return 0;
+        fi
+    done
 
-         return 1;
+    return 1;
 }
 
 
 function fdOpen() {
-         local fd=${1}
-         local path=${2}
+    local fd=${1}
+    local path=${2}
 
 
-         # open in read mode
-         eval "exec ${fd}<${path}"
+    # open in read mode
+    eval "exec ${fd}<${path}"
 }
 
 
 function fdClose() {
-         local fd=${1}
+    local fd=${1}
 
 
-         eval "exec ${fd}>&-"
+    eval "exec ${fd}>&-"
 }
 
 
@@ -142,12 +142,13 @@ function runCreate() {
     local gbid=${metadata["GBID"]}
     local hosts=( $(getValidHosts "$(declare -p metadata)") )
 
+    local subcmd1="\$(targetcli /backstores/user:glfs ls | grep ' ${block_name} ' -c)"
 
-    local cmd="targetcli <<EOF\n
-               / set global auto_add_default_portal=false auto_enable_tpgt=false loglevel_file=info logfile=${LOGFILE}\n
-               /backstores/user:glfs create ${block_name} ${metadata["SIZE"]} ${metadata["VOLUME"]}@${new_node}/block-store/${gbid} ${gbid}\n
-               /backstores/user:glfs/${block_name} set attribute cmd_time_out=0\n
-               /iscsi create ${iqn_prefix}:${gbid}\n"
+    local subcmd2="targetcli set global auto_add_default_portal=false auto_enable_tpgt=false loglevel_file=info logfile=${LOGFILE}\n
+                   targetcli /backstores/user:glfs create ${block_name} ${metadata["SIZE"]} ${metadata["VOLUME"]}@${new_node}/block-store/${gbid} ${gbid}\n
+                   targetcli /backstores/user:glfs/${block_name} set attribute cmd_time_out=0\n
+                   targetcli /iscsi create ${iqn_prefix}:${gbid}\n"
+
 
     for index in ${!hosts[@]}; do
         NODE=${hosts[$index]}
@@ -158,26 +159,29 @@ function runCreate() {
         no=$(expr ${index} + 1)
 
         if [[ ${no} -ne 1 ]]; then
-            cmd+="/iscsi/${iqn_prefix}:${metadata["GBID"]} create tpg${no}\n"
+            subcmd2+="targetcli /iscsi/${iqn_prefix}:${metadata["GBID"]} create tpg${no}\n"
         fi
 
         if [[ "${NODE}" == "${new_node}" ]]; then
-            cmd+="/iscsi/${iqn_prefix}:${gbid}/tpg${no}/luns create /backstores/user:glfs/${block_name}\n
-                  /iscsi/${iqn_prefix}:${gbid}/tpg${no}/portals create ${NODE}\n
-                  /iscsi/${iqn_prefix}:${gbid}/tpg${no} enable\n
-                  /iscsi/${iqn_prefix}:${gbid}/tpg${no} set attribute generate_node_acls=1 demo_mode_write_protect=0\n"
+            subcmd2+="targetcli /iscsi/${iqn_prefix}:${gbid}/tpg${no}/luns create /backstores/user:glfs/${block_name}\n
+                      targetcli /iscsi/${iqn_prefix}:${gbid}/tpg${no}/portals create ${NODE}\n
+                      targetcli /iscsi/${iqn_prefix}:${gbid}/tpg${no} enable\n
+                      targetcli /iscsi/${iqn_prefix}:${gbid}/tpg${no} set attribute generate_node_acls=1 demo_mode_write_protect=0\n"
         else
-            cmd+="/iscsi/${iqn_prefix}:${gbid}/tpg${no}/luns create /backstores/user:glfs/${block_name}\n
-                  /iscsi/${iqn_prefix}:${gbid}/tpg${no}/portals create ${NODE}\n
-                  /iscsi/${iqn_prefix}:${gbid}/tpg${no} set attribute tpg_enabled_sendtargets=0 generate_node_acls=1 demo_mode_write_protect=0\n"
+            subcmd2+="targetcli /iscsi/${iqn_prefix}:${gbid}/tpg${no}/luns create /backstores/user:glfs/${block_name}\n
+                      targetcli /iscsi/${iqn_prefix}:${gbid}/tpg${no}/portals create ${NODE}\n
+                      targetcli /iscsi/${iqn_prefix}:${gbid}/tpg${no} set attribute tpg_enabled_sendtargets=0 generate_node_acls=1 demo_mode_write_protect=0\n"
         fi
 
         if [[ "x${metadata["PASSWORD"]}" != "x" ]]; then
-            cmd+="/iscsi/${iqn_prefix}:${gbid}/tpg${no} set auth userid=${gbid} password=${metadata["PASSWORD"]}\n"
+            subcmd2+="targetcli /iscsi/${iqn_prefix}:${gbid}/tpg${no} set auth userid=${gbid} password=${metadata["PASSWORD"]}\n"
         fi
     done
 
-    cmd+="/ saveconfig\nEOF"
+    subcmd2+="targetcli / saveconfig"
+
+
+    cmd="if [[ ${subcmd1} -eq 0 ]]; then ${subcmd2}; else echo "skipped"; fi"
 
     unset metadata
 
@@ -193,14 +197,14 @@ function runReplace() {
 
     local iqn_prefix="iqn.2016-12.org.gluster-block"
     local gbid=${metadata["GBID"]}
-    local tpgno=$(targetcli /iscsi/${iqn_prefix}:${gbid} ls | grep -e tpg -e ${old_node} | grep -B1 ${old_node} | grep -o 'tpg[0-9]*')
+    local tpgno=$(targetcli /iscsi/${iqn_prefix}:${gbid} ls | grep -e tpg -e " ${old_node}:" | grep -B1 " ${old_node}:" | grep -o "tpg[0-9]*")
+
+    local subcmd="targetcli /iscsi/${iqn_prefix}:${gbid}/${tpgno}/portals create ${new_node};
+                  targetcli /iscsi/${iqn_prefix}:${gbid}/${tpgno}/portals delete ip_address=${old_node} ip_port=3260;
+                  targetcli / saveconfig"
 
 
-    local cmd="targetcli <<EOF\n
-               /iscsi/${iqn_prefix}:${gbid}/${tpgno}/portals create ${new_node}\n
-               /iscsi/${iqn_prefix}:${gbid}/${tpgno}/portals delete ip_address=${old_node} ip_port=3260\n
-               / saveconfig\nEOF"
-
+    cmd="if [[ "x" != "${tpgno}x" ]]; then ${subcmd}; else echo "skipped"; fi"
     unset metadata
 
     IFS=' '
@@ -215,12 +219,14 @@ function runDelete() {
     local iqn_prefix="iqn.2016-12.org.gluster-block"
     local gbid=${metadata["GBID"]}
 
+    local subcmd1="\$(targetcli /backstores/user:glfs ls | grep ' ${block_name} ' | grep '/${gbid} ' -c)"
 
-    local cmd="targetcli <<EOF\n
-               /backstores/user:glfs delete ${block_name}\n
-               /iscsi delete ${iqn_prefix}:${gbid}\n
-               / saveconfig\nEOF"
+    local subcmd2="targetcli /backstores/user:glfs delete ${block_name};
+                   targetcli /iscsi delete ${iqn_prefix}:${gbid};
+                   targetcli / saveconfig"
 
+
+    cmd="if [[ ${subcmd1} -gt 0 ]]; then ${subcmd2}; else echo "skipped"; fi"
     unset metadata
 
     IFS=' '
@@ -235,6 +241,12 @@ function parseCreateOutput() {
 
     local output=()
 
+
+    output="$(cat /tmp/gb_create)"
+    if [[ "${output}" == "skipped" ]]; then
+        printLog "WARNING: create: creating ${block_name} on ${new_node} skipped"
+        return 1;
+    fi
 
     output=("$(cat /tmp/gb_create | awk '/Created user-backed storage/{flag=1} /Created TPG 1/{flag=0} flag')")
 
@@ -319,19 +331,24 @@ function parseReplaceOutput() {
     local new_node=${4}
 
 
+    if [[ "${output}" == "skipped" ]]; then
+        printLog "WARNING: replace: replacing network portal ${old_node}:3260 for ${block_name} skipped"
+        return 1;
+    fi
+
     if [[ ${output} != *"Deleted network portal ${old_node}:3260"* ]]; then
         printLog "ERROR: replace: deleting network portal ${old_node}:3260 for ${block_name} failed"
-        return 1;
+        return -1;
     fi
 
     if [[ ${output} != *"Using default IP port 3260"* ]]; then
         printLog "ERROR: replace: using default portal for ${block_name} failed"
-        return 1;
+        return -1;
     fi
 
     if [[ ${output} != *"Created network portal ${new_node}:3260."* ]]; then
         printLog "ERROR: replace: creation of portal ${new_node} for ${block_name} failed"
-        return 1;
+        return -1;
     fi
 
     return 0;
@@ -346,14 +363,19 @@ function parseDeleteOutput() {
     local iqn_prefix="iqn.2016-12.org.gluster-block"
 
 
+    if [[ "${output}" == "skipped" ]]; then
+        printLog "WARNING: delete: deleting storage object ${block_name} skipped"
+        return 1;
+    fi
+
     if [[ ${output} != *"Deleted storage object ${block_name}."* ]]; then
         printLog "ERROR: delete: deleting storage object ${block_name} failed"
-        return 1;
+        return -1;
     fi
 
     if [[ ${output} != *"Deleted Target ${iqn_prefix}:${gbid}."* ]]; then
         printLog "ERROR: delete: deleting target ${iqn_prefix}:${gbid} of ${block_name} failed"
-        return 1;
+        return -1;
     fi
 
     return 0;
@@ -461,18 +483,13 @@ for BLOCKNAME in $(ls ${DIR}); do
 
     echo "blockname: ${BLOCKNAME}"
 
-    # skip if block is already config on ${NEWNODE}
     skip=0;
-    for NODE in ${HOSTS[@]}; do
-        if [[ "${NODE}" == "${NEWNODE}" ]]; then
-            echo "${NEWNODE} was already configured."
-            echo "Hint: please check if the replacement was already made for this block"
-            echo "-------------------------------------"
-            printLog "INFO: create of ${BLOCKNAME} on ${NODE} exist, skipping replace..."
-            skip=1;
-            break;
-        fi
-    done
+    if [[ $(echo "${!METADATA[@]} " | grep -c " ${OLDNODE} ") -eq 0 ]]; then
+        echo "${OLDNODE} not configured for this block."
+        echo "-------------------------------------"
+        printLog "INFO: ${BLOCKNAME} not configured on ${OLDNODE}, skipping replace..."
+        skip=1;
+    fi
     if [[ skip -eq 1 ]]; then
         # unset variables
         unset HOSTS
@@ -482,16 +499,20 @@ for BLOCKNAME in $(ls ${DIR}); do
         continue;
     fi
 
-    # TODO: get rid of printing to file
     ssh root@${NEWNODE} "LOGFILE=${LOGDIR}/gluster-block-configshell.log; $(declare -f isStrPartOfArray isStatusValid getValidHosts runCreate); runCreate '$(declare -p METADATA)' ${BLOCKNAME} ${OLDNODE} ${NEWNODE}" > /tmp/gb_create
 
-    parseCreateOutput "$(declare -p METADATA)" ${BLOCKNAME} ${NEWNODE} &&
-            echo "${OLDNODE}: CLEANUPSUCCESS" >> "${DIR}/${BLOCKNAME}" &&
-            echo "${NEWNODE}: CONFIGSUCCESS" >> "${DIR}/${BLOCKNAME}"
+    parseCreateOutput "$(declare -p METADATA)" ${BLOCKNAME} ${NEWNODE}
     ret=$?
+    echo "" > /tmp/gb_create  # clear
     if [[ ${ret} -eq 0 ]]; then
+        echo "${OLDNODE}: CLEANUPSUCCESS" >> "${DIR}/${BLOCKNAME}"
+        echo "${NEWNODE}: CONFIGSUCCESS" >> "${DIR}/${BLOCKNAME}"
+
         echo "create on '${NEWNODE}' success"
         printLog "INFO: create of ${BLOCKNAME} on ${NEWNODE} success"
+    elif [[ ${ret} -eq 1 ]]; then
+        echo "create on '${NEWNODE}' skipped"
+        printLog "WARNING: create of ${BLOCKNAME} on ${NEWNODE} skipped"
     else
         echo "create on '${NEWNODE}' failed"
         printLog "ERROR: create of ${BLOCKNAME} on ${NEWNODE} failed"
@@ -508,14 +529,16 @@ for BLOCKNAME in $(ls ${DIR}); do
     fi
 
     for NODE in ${HOSTS[@]}; do
-        if [[ "${NODE}" != "${OLDNODE}" ]]; then
+        if [[ "${NODE}" != "${OLDNODE}" && "${NODE}" != "${NEWNODE}" ]]; then
             REPLACEOUT=$(ssh root@${NODE} "$(declare -f runReplace); runReplace '$(declare -p METADATA)' ${OLDNODE} ${NEWNODE}")
             parseReplaceOutput "${REPLACEOUT}" ${BLOCKNAME} ${OLDNODE} ${NEWNODE}
             ret=$?
             if [[ ${ret} -eq 0 ]]; then
                 echo "replace on '${NODE}' success"
                 printLog "INFO: replace of ${BLOCKNAME} on ${NODE} success"
-                # TODO: update metadata once we have a relevant meta status flag
+            elif [[ ${ret} -eq 1 ]]; then
+                echo "replace on '${NODE}' skipped"
+                printLog "WARNING: replace of ${BLOCKNAME} on ${NODE} skipped"
             else
                 echo "replace on '${NODE}' failed"
                 printLog "ERROR: replace of ${BLOCKNAME} on ${NODE} failed"
@@ -530,6 +553,9 @@ for BLOCKNAME in $(ls ${DIR}); do
     if [[ ${ret} -eq 0 ]]; then
         echo "delete on '${OLDNODE}' success"
         printLog "INFO: delete of ${BLOCKNAME} on ${OLDNODE} success"
+    elif [[ ${ret} -eq 1 ]]; then
+        echo "delete on '${OLDNODE}' skipped"
+        printLog "WARNING: delete of ${BLOCKNAME} on ${OLDNODE} skipped"
     else
         echo "delete on '${OLDNODE}' failed"
         printLog "ERROR: delete of ${BLOCKNAME} on ${OLDNODE} failed"
