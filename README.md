@@ -175,6 +175,8 @@ EXPORTED NODE(S): 192.168.1.11 192.168.1.12 192.168.1.13
 ##### On the Initiator machine
 <pre>
 # dnf install iscsi-initiator-utils device-mapper-multipath
+# systemctl start iscsid.service
+# systemctl enable iscsid.service
 # lsblk (note the available devices)
 
 You can skip configuring multipath, if you choose not to enable mpath.
@@ -198,6 +200,7 @@ devices {
 }
 Ctrl^C
 # systemctl restart multipathd
+# systemctl enable multipathd
 
 Discovery ...
 # iscsiadm -m discovery -t st -p 192.168.1.11
