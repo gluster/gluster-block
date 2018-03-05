@@ -3999,12 +3999,15 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
                            char *errMsg, MetaInfo *info,
                            struct blockResponse *reply)
 {
-  json_object  *json_obj   = NULL;
-  json_object  *json_array = NULL;
-  char         *tmp        = NULL;
-  char         *out        = NULL;
-  int          i           = 0;
-  char         *hr_size    = NULL;           /* Human Readable size */
+  json_object  *json_obj    = NULL;
+  json_object  *json_array1 = NULL;
+  json_object  *json_array2 = NULL;
+  char         *tmp         = NULL;
+  char         *tmp2        = NULL;
+  char         *tmp3        = NULL;
+  char         *out         = NULL;
+  int          i            = 0;
+  char         *hr_size     = NULL;           /* Human Readable size */
 
   if (!reply) {
     return;
@@ -4040,42 +4043,67 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     json_object_object_add(json_obj, "HA", json_object_new_int(info->mpath));
     json_object_object_add(json_obj, "PASSWORD", GB_JSON_OBJ_TO_STR(info->passwd));
 
-    json_array = json_object_new_array();
+    json_array1 = json_object_new_array();
+    json_array2 = json_object_new_array();
 
     for (i = 0; i < info->nhosts; i++) {
       if (blockhostIsValid (info->list[i]->status)) {
-        json_object_array_add(json_array, GB_JSON_OBJ_TO_STR(info->list[i]->addr));
+        json_object_array_add(json_array1, GB_JSON_OBJ_TO_STR(info->list[i]->addr));
+      } else {
+        switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+        case GB_CONFIG_FAIL:
+        case GB_CLEANUP_FAIL:
+          json_object_array_add(json_array2, GB_JSON_OBJ_TO_STR(info->list[i]->addr));
+          break;
+        }
       }
     }
 
-    json_object_object_add(json_obj, "EXPORTED NODE(S)", json_array);
+    json_object_object_add(json_obj, "EXPORTED ON", json_array1);
+    json_object_object_add(json_obj, "ENCOUNTERED FAILURES ON", json_array2);
 
     GB_ASPRINTF(&reply->out, "%s\n",
                 json_object_to_json_string_ext(json_obj,
                                 mapJsonFlagToJsonCstring(blk->json_resp)));
-    json_object_put(json_array);
+    json_object_put(json_array1);
+    json_object_put(json_array2);
     json_object_put(json_obj);
   } else {
     if (GB_ASPRINTF(&tmp, "NAME: %s\nVOLUME: %s\nGBID: %s\nSIZE: %s\n"
-                    "HA: %zu\nPASSWORD: %s\nEXPORTED NODE(S):",
+                    "HA: %zu\nPASSWORD: %s\nEXPORTED ON:",
                     blk->block_name, info->volume, info->gbid, hr_size,
                     info->mpath, info->passwd) == -1) {
       goto out;
     }
     for (i = 0; i < info->nhosts; i++) {
-        if (blockhostIsValid (info->list[i]->status)) {
-          if (GB_ASPRINTF(&out, "%s %s", tmp, info->list[i]->addr) == -1) {
-            GB_FREE (tmp);
+      if (blockhostIsValid (info->list[i]->status)) {
+        if (GB_ASPRINTF(&out, "%s %s", tmp, info->list[i]->addr) == -1) {
+          GB_FREE (tmp);
+          goto out;
+        }
+        GB_FREE (tmp);
+        tmp = out;
+      } else {
+        switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+        case GB_CONFIG_FAIL:
+        case GB_CLEANUP_FAIL:
+          if (GB_ASPRINTF(&tmp2, "%s %s", tmp3?tmp3:"", info->list[i]->addr) == -1) {
+            GB_FREE (tmp3);
             goto out;
           }
-          tmp = out;
+          GB_FREE (tmp3);
+          tmp3 = tmp2;
+          break;
+        }
       }
     }
-    if (GB_ASPRINTF(&reply->out, "%s\n", tmp) == -1) {
+    if (GB_ASPRINTF(&reply->out, "%s\nENCOUNTERED FAILURES ON:%s\n", tmp, tmp2?tmp2:"") == -1) {
       GB_FREE (tmp);
+      GB_FREE (tmp2);
       goto out;
     }
     GB_FREE (tmp);
+    GB_FREE (tmp2);
   }
  out:
   /*catch all*/
