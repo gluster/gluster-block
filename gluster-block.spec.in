@@ -80,8 +80,12 @@ rm -rf ${RPM_BUILD_ROOT}
 %attr(755, root, root) %{_initddir}/gluster-blockd
 %endif
 %config(noreplace) %{_sysconfdir}/sysconfig/gluster-blockd
+%{_sysconfdir}/sysconfig/gluster-block-caps.info
 
 %changelog
+* Tue Mar 06 2018 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
+- update about gluster-block-caps.info
+
 * Mon Sep 25 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - Fix Unclosed %if block in the spec file
 

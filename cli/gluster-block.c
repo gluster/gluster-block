@@ -264,7 +264,6 @@ glusterBlockParseVolumeBlock(char *volumeblock, char *volume, char *block,
                              char *helpstr, char *op)
 {
   int ret = -1;
-  size_t len = 0;
   char *sep = NULL;
   char *tmp = NULL;
 
@@ -600,7 +599,6 @@ glusterBlockReplace(int argcount, char **options, int json)
 {
   blockReplaceCli robj = {0};
   int ret = -1;
-  bool singleBlock = false;
   char helpMsg[256] = {0, };
 
 

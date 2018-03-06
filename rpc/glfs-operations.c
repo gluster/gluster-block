@@ -145,7 +145,7 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
             blk->storage, gbid, blk->volume, blk->block_name, strerror(errno));
         GB_ASPRINTF(errMsg,
                     "glfs_link(%s, %s) on volume %s for block %s failed [%s]",
-                    blk->storage, gbid, strerror(errno));
+                    blk->storage, gbid, blk->volume, blk->block_name, strerror(errno));
         goto out;
       }
     } else {

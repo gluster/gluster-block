@@ -517,6 +517,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   case MODIFY_TPGC_SRV:
   case LIST_SRV:
   case INFO_SRV:
+  case REPLACE_GET_PORTAL_TPG_SRV:
       goto out;
   case REPLACE_SRV:
       *rpc_sent = TRUE;
@@ -1456,6 +1457,12 @@ glusterBlockBuildMinCaps(void *data, operations opt)
     if (rblk->json_resp) {
       minCaps[GB_JSON_CAP] = true;
     }
+    break;
+  case MODIFY_TPGC_SRV:
+  case REPLACE_GET_PORTAL_TPG_SRV:
+  case LIST_SRV:
+  case INFO_SRV:
+  case VERSION_SRV:
     break;
   }
 
@@ -2603,7 +2610,6 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
   int errCode = 0;
   char *errMsg = NULL;
   blockServerDefPtr list = NULL;
-  size_t i;
 
 
   LOG("mgmt", GB_LOG_DEBUG,
@@ -2730,10 +2736,16 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
           "for block %s on volume %s",  blk->auth_mode, ret, FAILED_REMOTE_AYNC_MODIFY,
           blk->block_name, info->volume);
       /* do nothing ? */
+      errCode = ret;
+      goto out;
     }
   }
 
-  ret = 0;
+  errCode = 0;
+
+  LOG("mgmt", GB_LOG_DEBUG,
+      "modify auth cli success, volume=%s blockname=%s auth=%d",
+      blk->volume, blk->block_name, blk->auth_mode);
 
  out:
   GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
@@ -3717,7 +3729,6 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
 blockResponse *
 block_version_1_svc_st(void *data, struct svc_req *rqstp)
 {
-  int ret = -1;
   blockResponse *reply = NULL;
 
   if (GB_ALLOC(reply) < 0) {
