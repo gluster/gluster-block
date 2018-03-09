@@ -3312,7 +3312,10 @@ block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
   char *backstore_attr = NULL;
   char *iqn = NULL;
   char *tpg = NULL;
+  char *glfs_alua = NULL;
+  char *glfs_alua_type = NULL;
   char *lun = NULL;
+  char *lun0 = NULL;
   char *portal = NULL;
   char *attr = NULL;
   char *authcred = NULL;
@@ -3340,6 +3343,18 @@ block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
 
   if (GB_ASPRINTF(&backstore_attr,
                   "%s/%s set attribute cmd_time_out=0",
+                  GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
+    goto out;
+  }
+
+  if (GB_ASPRINTF(&glfs_alua,
+                  "%s/%s/alua create name=glfs_tg_pt_gp tag=1",
+                  GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
+    goto out;
+  }
+
+  if (GB_ASPRINTF(&glfs_alua_type,
+                  "%s/%s/alua/glfs_tg_pt_gp set alua alua_access_type=0",
                   GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
     goto out;
   }
@@ -3377,6 +3392,11 @@ block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
       goto out;
     }
 
+    if (GB_ASPRINTF(&lun0, "%s/%s%s/tpg%zu/luns/lun0 set alua alua_tg_pt_gp_name=glfs_tg_pt_gp",
+                 GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i) == -1) {
+      goto out;
+    }
+
     if (!strcmp(blk->ipaddr, list->hosts[i-1])) {
       if (GB_ASPRINTF(&attr, "%s/%s%s/tpg%zu enable\n%s/%s%s/tpg%zu set attribute %s %s",
                    GB_TGCLI_ISCSI_PATH, GB_TGCLI_IQN_PREFIX, blk->gbid, i,
@@ -3409,15 +3429,15 @@ block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
       goto out;
     }
     if (!tmp) {
-      if (GB_ASPRINTF(&exec, "%s\n%s\n%s\n%s %s\n%s\n%s %s",
-          backstore, backstore_attr, iqn, tpg?tpg:"", lun,
-          portal, attr, blk->auth_mode?authcred:"") == -1) {
+      if (GB_ASPRINTF(&exec, "%s\n%s\n%s\n%s\n%s\n%s %s\n%s\n%s\n%s %s",
+          backstore, backstore_attr, glfs_alua, glfs_alua_type, iqn,
+          tpg?tpg:"", lun, lun0, portal, attr, blk->auth_mode?authcred:"") == -1) {
         goto out;
       }
       tmp = exec;
     } else {
-      if (GB_ASPRINTF(&exec, "%s\n%s\n%s\n%s\n%s",
-          tmp, lun, portal, attr,
+      if (GB_ASPRINTF(&exec, "%s\n%s\n%s\n%s\n%s\n%s",
+          tmp, lun, lun0, portal, attr,
           blk->auth_mode?authcred:"") == -1) {
         goto out;
       }
@@ -3429,6 +3449,7 @@ block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
     GB_FREE(attr);
     GB_FREE(portal);
     GB_FREE(lun);
+    GB_FREE(lun0);
   }
 
   if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, GB_TGCLI_SAVE) == -1) {
@@ -3455,6 +3476,8 @@ block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
   GB_FREE(tpg);
   GB_FREE(iqn);
   GB_FREE(backstore);
+  GB_FREE(glfs_alua);
+  GB_FREE(glfs_alua_type);
   GB_FREE(backstore_attr);
   blockServerDefFree(list);
 
