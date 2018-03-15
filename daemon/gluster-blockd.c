@@ -13,6 +13,7 @@
 # include  <dirent.h>
 # include  <sys/stat.h>
 # include  <pthread.h>
+# include  <rpc/rpc.h>
 # include  <rpc/pmap_clnt.h>
 # include  <signal.h>
 

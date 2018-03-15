@@ -22,6 +22,7 @@ Source0:          @PACKAGE_NAME@-@PACKAGE_VERSION@.tar.gz
 
 BuildRequires:    pkgconfig(glusterfs-api)
 BuildRequires:    pkgconfig(json-c)
+BuildRequires:    pkgconfig(libtirpc)
 BuildRequires:    help2man >= 1.36
 %if ( 0%{?_with_systemd:1} )
 %{?systemd_requires}
@@ -86,6 +87,9 @@ rm -rf ${RPM_BUILD_ROOT}
      %attr(0644,-,-) %{_sharedstatedir}/gluster-block/gluster-block-caps.info
 
 %changelog
+* Fri Aug 10 2018 Niels de Vos <ndevos@redhat.com>
+- use the modern libtirpc package, will be removed from glibc
+
 * Tue Jul 17 2018 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - change install path for gluster-block-caps.info
 - add install details for wait-for-bricks.sh
