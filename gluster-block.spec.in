@@ -24,6 +24,9 @@ BuildRequires:    pkgconfig(glusterfs-api)
 BuildRequires:    pkgconfig(json-c)
 BuildRequires:    pkgconfig(libtirpc)
 BuildRequires:    help2man >= 1.36
+%if ( 0%{?fedora} && 0%{?fedora} >= 28 )
+BuildRequires:    rpcgen
+%endif
 %if ( 0%{?_with_systemd:1} )
 %{?systemd_requires}
 BuildRequires:    systemd
@@ -93,6 +96,7 @@ rm -rf ${RPM_BUILD_ROOT}
 %changelog
 * Fri Aug 10 2018 Niels de Vos <ndevos@redhat.com>
 - use the modern libtirpc package, will be removed from glibc
+- new Fedora releases require rpcgen (unbundled from glibc)
 
 * Sun Apr 3 2019 Xiubo Li <xiubli@redhat.com>
 - Add logrotate support
