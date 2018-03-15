@@ -4,11 +4,12 @@ libgb_la_SOURCES = common.c utils.c lru.c capabilities.c dyn-config.c
 
 noinst_HEADERS = common.h utils.h lru.h list.h capabilities.h
 
-libgb_la_CFLAGS = $(GFAPI_CFLAGS) -DDATADIR=\"$(localstatedir)\"               \
+libgb_la_CFLAGS = $(GFAPI_CFLAGS) $(TIRPC_CFLAGS)                              \
+                  -DDATADIR=\"$(localstatedir)\"                               \
                   -DCONFDIR=\"$(GLUSTER_BLOCKD_WORKDIR)\"                      \
                   -I$(top_builddir)/ -I$(top_builddir)/rpc/rpcl
 
-libgb_la_LIBADD = $(GFAPI_LIBS)
+libgb_la_LIBADD = $(GFAPI_LIBS) $(TIRPC_LIBS)
 
 libgb_la_LDFLAGS = -lpthread
 
