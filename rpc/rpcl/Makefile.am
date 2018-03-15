@@ -1,4 +1,6 @@
 libgbrpcxdr_la_SOURCES = block_clnt.c block_xdr.c block_svc.c
+libgbrpcxdr_la_CFLAGS = $(TIRPC_CFLAGS)
+libgbrpcxdr_la_LDFLAGS = $(TIRPC_LIBS)
 
 noinst_LTLIBRARIES = libgbrpcxdr.la
 noinst_HEADERS = block.h block_svc.h rpc-pragmas.h
