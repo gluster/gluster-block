@@ -23,6 +23,7 @@ struct blockCreate {
   char      block_name[255];
   string    block_hosts<>;               /* for multiple tpg's creation */
   bool      auth_mode;
+  u_int     type;
 };
 
 struct blockModify {
@@ -31,6 +32,7 @@ struct blockModify {
   char      gbid[127];
   char      passwd[127];
   bool      auth_mode;
+  u_int     type;
 };
 
 struct blockReplace {
@@ -45,6 +47,7 @@ struct blockCreateCli {
   char      volume[255];
   u_quad_t  size;
   u_int     mpath;                /* HA request count */
+  u_int     type;
   bool      auth_mode;
   bool      prealloc;
   char      storage[255];
@@ -64,6 +67,7 @@ struct blockDeleteCli {
 struct blockDelete {
   char      block_name[255];
   char      gbid[127];
+  u_int     type;
 };
 
 struct blockInfoCli {

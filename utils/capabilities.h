@@ -41,6 +41,8 @@ enum gbCapabilities {
 
   GB_JSON_CAP,
 
+  GB_CREATE_TYPE_CAP,
+
   GB_CAP_MAX
 };
 
@@ -60,6 +62,8 @@ static const char *const gbCapabilitiesLookup[] = {
   [GB_REPLACE_CAP]             = "replace",
 
   [GB_JSON_CAP]                = "json",
+
+  [GB_CREATE_TYPE_CAP]         = "create_type",
 
   [GB_CAP_MAX]                 = NULL
 };

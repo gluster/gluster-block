@@ -371,6 +371,9 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
   case GB_META_PASSWD:
     GB_STRCPYSTATIC(info->passwd, strchr(line, ' ') + 1);
     break;
+  case GB_META_TYPE:
+    info->type = glusterBlockCLICreateTypeOptEnumParse(strchr(line, ' ') + 1);
+    break;
 
   default:
     if(!info->list) {

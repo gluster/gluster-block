@@ -15,9 +15,10 @@
 
 
 # define  GB_CREATE_HELP_STR  "gluster-block create <volname/blockname> "      \
-                                "[ha <count>] [auth <enable|disable>] "        \
-                                "[prealloc <full|no>] [storage <filename>] "   \
-                                "<HOST1[,HOST2,...]> <size> [--json*]"
+                                "[ha <count>] [type <glfs|fuse>] "             \
+                                "[auth <enable|disable>] [prealloc <full|no>] "\
+                                "[storage <filename>] <HOST1[,HOST2,...]> "    \
+                                "<size> [--json*]"
 # define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> "      \
                                 "[unlink-storage <yes|no>] [force] [--json*]"
 # define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "      \
@@ -200,11 +201,12 @@ glusterBlockHelp(void)
       "\n"
       "commands:\n"
       "  create  <volname/blockname> [ha <count>]\n"
+      "                              [type <glfs|fuse>\n"
       "                              [auth <enable|disable>]\n"
       "                              [prealloc <full|no>]\n"
       "                              [storage <filename>]\n"
       "                              <host1[,host2,...]> <size>\n"
-      "        create block device [defaults: ha 1, auth disable, prealloc no, size in bytes]\n"
+      "        create block device [defaults: ha 1, type glfs, auth disable, prealloc no, size in bytes]\n"
       "\n"
       "  list    <volname>\n"
       "        list available block devices.\n"
@@ -379,6 +381,20 @@ glusterBlockCreate(int argcount, char **options, int json)
     switch (glusterBlockCLICreateOptEnumParse(options[optind++])) {
     case GB_CLI_CREATE_HA:
       sscanf(options[optind++], "%u", &cobj.mpath);
+      break;
+    case GB_CLI_CREATE_TYPE:
+      ret = glusterBlockCLICreateTypeOptEnumParse(options[optind++]);
+      if (ret != GB_CLI_CREATE_TYPE_OPT_MAX) {
+        cobj.type = ret;
+        ret = 0;
+      } else {
+        MSG("%s\n", "'type' option is incorrect");
+        MSG("%s\n", GB_CREATE_HELP_STR);
+        LOG("cli", GB_LOG_ERROR, "Create failed while parsing argument "
+                                 "to type for <%s/%s>",
+                                 cobj.volume, cobj.block_name);
+        goto out;
+      }
       break;
     case GB_CLI_CREATE_AUTH:
       ret = convertStringToTrillianParse(options[optind++]);

@@ -27,8 +27,8 @@
 # define   GB_MSERVER_DELIMITER ","
 
 # define   GB_TGCLI_GLFS_PATH   "/backstores/user:glfs"
-# define   GB_TGCLI_GLFS        "targetcli " GB_TGCLI_GLFS_PATH
-# define   GB_TGCLI_CHECK       GB_TGCLI_GLFS " ls | grep ' %s ' | grep '/%s ' > " DEVNULLPATH
+# define   GB_TGCLI_FILEIO_PATH "/backstores/fileio"
+# define   GB_TGCLI_CHECK       "targetcli %s ls | grep ' %s ' | grep '/%s ' > " DEVNULLPATH
 # define   GB_TGCLI_ISCSI_PATH  "/iscsi"
 # define   GB_TGCLI_SAVE        "/ saveconfig"
 # define   GB_TGCLI_ATTRIBUTES  "generate_node_acls=1 demo_mode_write_protect=0"
@@ -1418,6 +1418,9 @@ glusterBlockBuildMinCaps(void *data, operations opt)
     if (cblk->mpath > 1) {
       minCaps[GB_CREATE_HA_CAP] = true;
     }
+    if (cblk->type) {
+      minCaps[GB_CREATE_TYPE_CAP] = true;
+    }
     if (cblk->prealloc) {
       minCaps[GB_CREATE_PREALLOC_CAP] = true;
     }
@@ -1695,6 +1698,7 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
   GB_STRCPYSTATIC(cobj->volume, info->volume);
   GB_STRCPYSTATIC(cobj->gbid, info->gbid);
   cobj->size = info->size;
+  cobj->type = info->type;
   GB_STRCPYSTATIC(cobj->passwd, info->passwd);
   GB_STRCPYSTATIC(cobj->block_name, block);
 
@@ -1706,6 +1710,7 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
 
   GB_STRCPYSTATIC(dobj->block_name, block);
   GB_STRCPYSTATIC(dobj->gbid, info->gbid);
+  dobj->type = info->type;
 
   /* Fill args[] */
   if (GB_ALLOC_N(args, info->mpath + 1) < 0) {
@@ -2300,6 +2305,7 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
 
   GB_STRCPYSTATIC(dobj.block_name, blockname);
   GB_STRCPYSTATIC(dobj.gbid, info->gbid);
+  dobj.type = info->type;
 
   count = glusterBlockDeleteFillArgs(info, deleteall, NULL, NULL, NULL);
   asyncret = glusterBlockDeleteRemoteAsync(info, glfs, &dobj, count,
@@ -2680,6 +2686,7 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
   GB_STRCPYSTATIC(mobj.block_name, blk->block_name);
   GB_STRCPYSTATIC(mobj.volume, blk->volume);
   GB_STRCPYSTATIC(mobj.gbid, info->gbid);
+  mobj.type = info->type;
 
   if (blk->auth_mode) {
     if(info->passwd[0] == '\0') {
@@ -3019,8 +3026,9 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
                         errCode, errMsg, exist,
                         "VOLUME: %s\nGBID: %s\n"
-                        "HA: %d\nENTRYCREATE: INPROGRESS\n",
-                        blk->volume, gbid, blk->mpath);
+                        "HA: %d\nTYPE: %s\nENTRYCREATE: INPROGRESS\n",
+                        blk->volume, gbid, blk->mpath,
+                        gbCliCreateTypeOptLookup[blk->type]);
 
   if (glusterBlockCreateEntry(glfs, blk, gbid, &errCode, &errMsg)) {
     LOG("mgmt", GB_LOG_ERROR, "%s volume: %s host: %s",
@@ -3033,6 +3041,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
 
   GB_STRCPYSTATIC(cobj.volume, blk->volume);
   GB_STRCPYSTATIC(cobj.block_name, blk->block_name);
+  cobj.type = blk->type;
   cobj.size = blk->size;
   GB_STRCPYSTATIC(cobj.gbid, gbid);
   if (GB_STRDUP(cobj.block_hosts,  blk->block_hosts) < 0) {
@@ -3104,10 +3113,17 @@ blockValidateCommandOutput(const char *out, int opt, void *data)
   switch (opt) {
   case CREATE_SRV:
     /* backend create validation */
-    GB_OUT_VALIDATE_OR_GOTO(out, out, "backend creation failed for: %s", cblk,
-                    cblk->volume,
-                    "Created user-backed storage object %s size %zu.",
-                    cblk->block_name, cblk->size);
+    if (cblk->type == GB_CLI_CREATE_TYPE_GLFS) {
+      GB_OUT_VALIDATE_OR_GOTO(out, out, "backend creation failed for: %s", cblk,
+                              cblk->volume,
+                              "Created user-backed storage object %s size %zu.",
+                              cblk->block_name, cblk->size);
+    } else if (cblk->type == GB_CLI_CREATE_TYPE_FUSE) {
+      GB_OUT_VALIDATE_OR_GOTO(out, out, "backend creation failed for: %s", cblk,
+                              cblk->volume,
+                              "Created fileio %s with size %zu",
+                              cblk->block_name, cblk->size);
+    }
 
     /* target iqn create validation */
     GB_OUT_VALIDATE_OR_GOTO(out, out, "target iqn creation failed for: %s",
@@ -3320,6 +3336,7 @@ block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
   blockResponse *reply = NULL;
   blockServerDefPtr list = NULL;
   size_t i;
+  char *soPath = NULL;
 
 
   LOG("mgmt", GB_LOG_INFO,
@@ -3332,15 +3349,25 @@ block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  if (GB_ASPRINTF(&backstore, "%s %s %s %zu %s@%s%s/%s %s", GB_TGCLI_GLFS_PATH,
-                  GB_CREATE, blk->block_name, blk->size, blk->volume,
-                  blk->ipaddr, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
-    goto out;
+  if (blk->type ==  GB_CLI_CREATE_TYPE_GLFS) {
+    if (GB_ASPRINTF(&backstore, "%s %s %s %zu %s@%s%s/%s %s", GB_TGCLI_GLFS_PATH,
+                    GB_CREATE, blk->block_name, blk->size, blk->volume,
+                    blk->ipaddr, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
+      goto out;
+    }
+    soPath = GB_TGCLI_GLFS_PATH;
+  } else if (blk->type == GB_CLI_CREATE_TYPE_FUSE) {
+    if (GB_ASPRINTF(&backstore, "%s %s name=%s size=%zu file_or_dev=%s/%s%s/%s wwn=%s",
+                    GB_TGCLI_FILEIO_PATH, GB_CREATE, blk->block_name, blk->size,
+                    GB_FUSEDIR, blk->volume, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
+      goto out;
+    }
+    soPath = GB_TGCLI_FILEIO_PATH;
   }
 
   if (GB_ASPRINTF(&backstore_attr,
                   "%s/%s set attribute cmd_time_out=0",
-                  GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
+                  soPath, blk->block_name) == -1) {
     goto out;
   }
 
@@ -3373,7 +3400,7 @@ block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
   for (i = 1; i <= list->nhosts; i++) {
     if (GB_ASPRINTF(&lun, "%s/%s%s/tpg%zu/luns %s %s/%s",  GB_TGCLI_ISCSI_PATH,
                  GB_TGCLI_IQN_PREFIX, blk->gbid, i, GB_CREATE,
-                 GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
+                 soPath, blk->block_name) == -1) {
       goto out;
     }
 
@@ -3664,6 +3691,7 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
   char *backstore = NULL;
   char *exec = NULL;
   blockResponse *reply = NULL;
+  char *soPath = NULL;
 
 
   LOG("mgmt", GB_LOG_INFO,
@@ -3674,7 +3702,13 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name, blk->gbid) == -1) {
+  if (blk->type ==  GB_CLI_CREATE_TYPE_GLFS) {
+    soPath = GB_TGCLI_GLFS_PATH;
+  } else if (blk->type ==  GB_CLI_CREATE_TYPE_FUSE) {
+    soPath = GB_TGCLI_FILEIO_PATH;
+  }
+
+  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, soPath, blk->block_name, blk->gbid) == -1) {
     LOG("mgmt", GB_LOG_WARNING,
         "block backend with name '%s' doesn't exist with matching gbid %s",
         blk->block_name, blk->gbid);
@@ -3698,7 +3732,7 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  if (GB_ASPRINTF(&backstore, "%s %s %s", GB_TGCLI_GLFS_PATH,
+  if (GB_ASPRINTF(&backstore, "%s %s %s", soPath,
                   GB_DELETE, blk->block_name) == -1) {
     goto out;
   }
@@ -3753,6 +3787,7 @@ block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
   size_t tpgs = 0;
   size_t i;
   char *tmp = NULL;
+  char *soPath = NULL;
 
 
   LOG("mgmt", GB_LOG_INFO,
@@ -3765,7 +3800,14 @@ block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name, blk->gbid) == -1) {
+
+  if (blk->type ==  GB_CLI_CREATE_TYPE_GLFS) {
+    soPath = GB_TGCLI_GLFS_PATH;
+  } else if (blk->type ==  GB_CLI_CREATE_TYPE_FUSE) {
+    soPath = GB_TGCLI_FILEIO_PATH;
+  }
+
+  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, soPath, blk->block_name, blk->gbid) == -1) {
     LOG("mgmt", GB_LOG_WARNING,
         "block backend with name '%s' doesn't exist with matching gbid %s, volume '%s'",
         blk->block_name, blk->gbid, blk->volume);

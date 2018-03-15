@@ -28,6 +28,7 @@
 
 # define  GB_LOGDIR              DATADIR "/log/gluster-block"
 # define  GB_INFODIR             DATADIR "/run"
+# define  GB_FUSEDIR             GB_INFODIR "/gluster-block"
 
 # define  GB_LOCK_FILE           GB_INFODIR "/gluster-blockd.lock"
 # define  GB_UNIX_ADDRESS        GB_INFODIR "/gluster-blockd.socket"
@@ -380,6 +381,7 @@ typedef enum gbCliCreateOptions {
   GB_CLI_CREATE_AUTH      = 2,
   GB_CLI_CREATE_PREALLOC  = 3,
   GB_CLI_CREATE_STORAGE   = 4,
+  GB_CLI_CREATE_TYPE      = 5,
 
   GB_CLI_CREATE_OPT_MAX
 } gbCliCreateOptions;
@@ -390,8 +392,24 @@ static const char *const gbCliCreateOptLookup[] = {
   [GB_CLI_CREATE_AUTH]     = "auth",
   [GB_CLI_CREATE_PREALLOC] = "prealloc",
   [GB_CLI_CREATE_STORAGE]  = "storage",
+  [GB_CLI_CREATE_TYPE]     = "type",
 
   [GB_CLI_CREATE_OPT_MAX]  = NULL,
+};
+
+typedef enum gbCliCreateTypeOptions {
+  GB_CLI_CREATE_TYPE_GLFS   = 0,
+  GB_CLI_CREATE_TYPE_FUSE   = 1,
+
+  GB_CLI_CREATE_TYPE_OPT_MAX
+} gbCliCreateTypeOptions;
+
+
+static const char *const gbCliCreateTypeOptLookup[] = {
+  [GB_CLI_CREATE_TYPE_GLFS] = "glfs",
+  [GB_CLI_CREATE_TYPE_FUSE] = "fuse",
+
+  [GB_CLI_CREATE_TYPE_OPT_MAX]  = NULL,
 };
 
 typedef enum gbDaemonCmdlineOption {
@@ -446,6 +464,7 @@ typedef enum Metakey {
   GB_META_ENTRYCREATE = 4,
   GB_META_ENTRYDELETE = 5,
   GB_META_PASSWD      = 6,
+  GB_META_TYPE        = 7,
 
   GB_METAKEY_MAX
 } Metakey;
@@ -458,6 +477,7 @@ static const char *const MetakeyLookup[] = {
   [GB_META_ENTRYCREATE] = "ENTRYCREATE",
   [GB_META_ENTRYDELETE] = "ENTRYDELETE",
   [GB_META_PASSWD]      = "PASSWORD",
+  [GB_META_TYPE]        = "TYPE",
 
   [GB_METAKEY_MAX]      = NULL
 };
@@ -530,6 +550,8 @@ static const char *const RemoteCreateRespLookup[] = {
 int glusterBlockCLIOptEnumParse(const char *opt);
 
 int glusterBlockCLICreateOptEnumParse(const char *opt);
+
+int glusterBlockCLICreateTypeOptEnumParse(const char *opt);
 
 int glusterBlockDaemonOptEnumParse(const char *opt);
 

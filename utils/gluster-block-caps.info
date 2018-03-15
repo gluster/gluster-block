@@ -108,3 +108,15 @@ json: true
 # Since: 0.4
 ##
 replace: true
+
+
+##
+# Nature: cli sub command
+#
+# Label: 'type'
+#
+# Description: capability to create blocks from user handler and fileio
+#
+# Since: 0.4
+##
+create_type: true
