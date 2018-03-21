@@ -21,7 +21,8 @@
 # define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> "      \
                                 "[unlink-storage <yes|no>] [force] [--json*]"
 # define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "      \
-                                "<auth enable|disable> [--json*]"
+                                "[auth <enable|disable>] [size <size>] "       \
+                                "[force] [--json*]"
 # define  GB_REPLACE_HELP_STR "gluster-block replace <volname/blockname> "     \
                                 "<old-node> <new-node> [force] [--json*]"
 # define  GB_INFO_HELP_STR    "gluster-block info <volname/blockname> [--json*]"
@@ -46,7 +47,8 @@ typedef enum clioperations {
   INFO_CLI   = 3,
   DELETE_CLI = 4,
   MODIFY_CLI = 5,
-  REPLACE_CLI = 6
+  MODIFY_SIZE_CLI = 6,
+  REPLACE_CLI = 7
 } clioperations;
 
 
@@ -62,6 +64,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   blockInfoCli *info_obj;
   blockListCli *list_obj;
   blockModifyCli *modify_obj;
+  blockModifySizeCli *modify_size_obj;
   blockReplaceCli *replace_obj;
   blockResponse reply = {0,};
   char          errMsg[2048] = {0};
@@ -144,8 +147,16 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   case MODIFY_CLI:
     modify_obj = cobj;
     if (block_modify_cli_1(modify_obj, &reply, clnt) != RPC_SUCCESS) {
-      LOG("cli", GB_LOG_ERROR, "%sblock modify on volume %s failed",
+      LOG("cli", GB_LOG_ERROR, "%sblock modify auth on volume %s failed",
           clnt_sperror(clnt, "block_modify_cli_1"), modify_obj->volume);
+      goto out;
+    }
+    break;
+  case MODIFY_SIZE_CLI:
+    modify_size_obj = cobj;
+    if (block_modify_size_cli_1(modify_size_obj, &reply, clnt) != RPC_SUCCESS) {
+      LOG("cli", GB_LOG_ERROR, "%sblock modify size on volume %s failed",
+          clnt_sperror(clnt, "block_modify_size_cli_1"), modify_size_obj->volume);
       goto out;
     }
     break;
@@ -215,7 +226,7 @@ glusterBlockHelp(void)
       "  delete  <volname/blockname> [unlink-storage <yes|no>] [force]\n"
       "        delete block device.\n"
       "\n"
-      "  modify  <volname/blockname> <auth enable|disable>\n"
+      "  modify  <volname/blockname> [auth <enable|disable>] [size <size>] [force]\n"
       "        modify block device.\n"
       "\n"
       "  replace <volname/blockname> <old-node> <new-node> [force]\n"
@@ -307,17 +318,21 @@ glusterBlockModify(int argcount, char **options, int json)
 {
   size_t optind = 2;
   blockModifyCli mobj = {0, };
+  blockModifySizeCli msobj = {0, };
+  char volume[255] = {0};
+  char block[255] = {0};
+  ssize_t sparse_ret;
   int ret = -1;
 
 
-  GB_ARGCHECK_OR_RETURN(argcount, 5, "modify", GB_MODIFY_HELP_STR);
+  if (argcount < 5 || argcount > 6) {
+    MSG("Inadequate arguments for modify:\n%s\n", GB_MODIFY_HELP_STR);
+    return -1;
+  }
 
-  mobj.json_resp = json;
-
-  if (glusterBlockParseVolumeBlock (options[optind++], mobj.volume,
-                                    mobj.block_name, sizeof(mobj.volume),
-                                    sizeof(mobj.block_name), GB_MODIFY_HELP_STR,
-                                    "modify")) {
+  if (glusterBlockParseVolumeBlock(options[optind++], volume, block,
+                                   sizeof(volume), sizeof(block),
+                                   GB_MODIFY_HELP_STR, "modify")) {
     goto out;
   }
 
@@ -335,13 +350,63 @@ glusterBlockModify(int argcount, char **options, int json)
                                mobj.volume, mobj.block_name);
       goto out;
     }
-  }
+    mobj.json_resp = json;
 
-  ret = glusterBlockCliRPC_1(&mobj, MODIFY_CLI);
-  if (ret) {
-    LOG("cli", GB_LOG_ERROR,
-        "failed getting info of block %s on volume %s",
-        mobj.block_name, mobj.volume);
+    if ((argcount - optind)) {
+      MSG("unknown/unsupported option '%s' for modify auth:\n%s\n",
+           options[optind], GB_MODIFY_HELP_STR);
+      ret = -1;
+      goto out;
+    }
+
+    ret = glusterBlockCliRPC_1(&mobj, MODIFY_CLI);
+    if (ret) {
+      LOG("cli", GB_LOG_ERROR,
+          "failed modifying auth of block %s on volume %s",
+          mobj.block_name, mobj.volume);
+    }
+  } else if (!strcmp(options[optind], "size")) {
+    optind++;
+    sparse_ret = glusterBlockParseSize("cli", options[optind++]);
+    if (sparse_ret < 0) {
+      MSG("%s\n", "'<size>' is incorrect");
+      MSG("%s\n", GB_MODIFY_HELP_STR);
+      LOG("cli", GB_LOG_ERROR, "Modify failed while parsing size for block <%s/%s>",
+          volume, block);
+      goto out;
+    } else if (sparse_ret < GB_DEFAULT_SECTOR_SIZE) {
+      MSG("minimum acceptable block size is %d bytes\n", GB_DEFAULT_SECTOR_SIZE);
+      LOG("cli", GB_LOG_ERROR, "minimum acceptable block size is %d bytes <%s/%s>",
+          GB_DEFAULT_SECTOR_SIZE, volume, block);
+      goto out;
+    }
+
+    if ((argcount - optind) && !strcmp(options[optind], "force")) {
+      optind++;
+      msobj.force = true;
+    }
+
+    if ((argcount - optind)) {
+      MSG("unknown option '%s' for modify size:\n%s\n",
+          options[optind], GB_MODIFY_HELP_STR);
+      ret = -1;
+      goto out;
+    }
+
+    GB_STRCPYSTATIC(msobj.volume, volume);
+    GB_STRCPYSTATIC(msobj.block_name, block);
+    msobj.size = sparse_ret;  /* size is unsigned long long */
+    msobj.json_resp = json;
+
+    ret = glusterBlockCliRPC_1(&msobj, MODIFY_SIZE_CLI);
+    if (ret) {
+      LOG("cli", GB_LOG_ERROR,
+          "failed modifying size of block %s on volume %s",
+          msobj.block_name, msobj.volume);
+    }
+  } else {
+    MSG("unknown option '%s' for modify:\n%s\n", options[optind], GB_MODIFY_HELP_STR);
+    ret = -1;
   }
 
  out:

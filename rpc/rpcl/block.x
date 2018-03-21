@@ -33,6 +33,13 @@ struct blockModify {
   bool      auth_mode;
 };
 
+struct blockModifySize {
+  char      volume[255];
+  char      block_name[255];
+  char      gbid[127];
+  u_quad_t  size;
+};
+
 struct blockReplace {
   char      volume[255];
   char      block_name[255];
@@ -85,6 +92,14 @@ struct blockModifyCli {
   enum JsonResponseFormat     json_resp;
 };
 
+struct blockModifySizeCli {
+  char      block_name[255];
+  char      volume[255];
+  u_quad_t  size;
+  bool      force;
+  enum JsonResponseFormat     json_resp;
+};
+
 struct blockReplaceCli {
   char      volume[255];
   char      block_name[255];
@@ -108,6 +123,7 @@ program GLUSTER_BLOCK {
     blockResponse BLOCK_MODIFY(blockModify) = 3;
     blockResponse BLOCK_VERSION() = 4;
     blockResponse BLOCK_REPLACE(blockReplace) = 5;
+    blockResponse BLOCK_MODIFY_SIZE(blockModifySize) = 6;
   } = 1;
 } = 21215311; /* B2 L12 O15 C3 K11 */
 
@@ -119,5 +135,6 @@ program GLUSTER_BLOCK_CLI {
     blockResponse BLOCK_DELETE_CLI(blockDeleteCli) = 4;
     blockResponse BLOCK_MODIFY_CLI(blockModifyCli) = 5;
     blockResponse BLOCK_REPLACE_CLI(blockReplaceCli) = 6;
+    blockResponse BLOCK_MODIFY_SIZE_CLI(blockModifySizeCli) = 7;
   } = 1;
 } = 212153113; /* B2 L12 O15 C3 K11 C3 */

@@ -97,7 +97,6 @@ modify_auth: true
 ##
 json: true
 
-
 ##
 # Nature: cli command
 #
@@ -108,3 +107,14 @@ json: true
 # Since: 0.4
 ##
 replace: true
+
+##
+# Nature: cli sub-command
+#
+# Label: 'size'
+#
+# Description: capability to resize existing block
+#
+# Since: 0.4
+##
+modify_size: true

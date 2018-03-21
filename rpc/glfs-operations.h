@@ -25,6 +25,7 @@
 typedef struct NodeInfo {
   char addr[255];
   char status[32];
+  ssize_t size;
 } NodeInfo;
 
 typedef struct MetaInfo {
@@ -46,6 +47,10 @@ glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg);
 int
 glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
                         int *errCode, char **errMsg);
+
+int
+glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk, int *errCode,
+                        char **errMsg);
 
 int
 glusterBlockDeleteEntry(struct glfs *glfs, char *volume, char *gbid);

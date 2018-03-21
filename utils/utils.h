@@ -75,8 +75,10 @@
 
 /* Target Modify */
 # define  FAILED_MODIFY             "failed in modify"
+# define  FAILED_MODIFY_SIZE        "failed while modifying block file size in gluster volume"
 # define  FAILED_REMOTE_MODIFY      "failed in remote modify"
 # define  FAILED_REMOTE_AYNC_MODIFY "failed in remote async modify"
+# define  FAILED_REMOTE_MODIFY_SIZE "failed in remote modify block size"
 
 /* Target Delete */
 # define  FAILED_DELETE             "failed in delete"
@@ -478,6 +480,9 @@ typedef enum MetaStatus {
   GB_RP_SUCCESS               = 12,
   GB_RP_INPROGRESS            = 13,
   GB_RP_FAIL                  = 14,
+  GB_RS_SUCCESS               = 15,
+  GB_RS_INPROGRESS            = 16,
+  GB_RS_FAIL                  = 17,
 
   GB_METASTATUS_MAX
 } MetaStatus;
@@ -498,6 +503,9 @@ static const char *const MetaStatusLookup[] = {
   [GB_RP_SUCCESS]               = "RPSUCCESS",
   [GB_RP_INPROGRESS]            = "RPINPROGRESS",
   [GB_RP_FAIL]                  = "RPFAIL",
+  [GB_RS_SUCCESS]               = "RSSUCCESS",
+  [GB_RS_INPROGRESS]            = "RSINPROGRESS",
+  [GB_RS_FAIL]                  = "RSFAIL",
 
   [GB_METASTATUS_MAX]           = NULL,
 };

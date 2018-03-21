@@ -192,6 +192,9 @@ blockhostIsValid(char *status)
   case GB_RP_SUCCESS:
   case GB_RP_FAIL:
   case GB_RP_INPROGRESS:
+  case GB_RS_SUCCESS:
+  case GB_RS_FAIL:
+  case GB_RS_INPROGRESS:
     return TRUE;
   }
 
