@@ -55,6 +55,7 @@ typedef enum operations {
   DELETE_SRV,
   MODIFY_SRV,
   MODIFY_TPGC_SRV,
+  MODIFY_SIZE_SRV,
   REPLACE_SRV,
   REPLACE_GET_PORTAL_TPG_SRV,
   LIST_SRV,
@@ -511,6 +512,14 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     if (block_modify_1((blockModify *)cobj, &reply, clnt) != RPC_SUCCESS) {
       LOG("mgmt", GB_LOG_ERROR, "%son host %s",
           clnt_sperror(clnt, "block remote modify failed"), host);
+      goto out;
+    }
+    break;
+  case MODIFY_SIZE_SRV:
+    *rpc_sent = TRUE;
+    if (block_modify_size_1((blockModifySize *)cobj, &reply, clnt) != RPC_SUCCESS) {
+      LOG("mgmt", GB_LOG_ERROR, "%son host %s",
+          clnt_sperror(clnt, "block remote modify size failed"), host);
       goto out;
     }
     break;
@@ -1003,6 +1012,9 @@ glusterBlockDeleteFillArgs(MetaInfo *info, bool deleteall, blockRemoteObj *args,
     case GB_RP_SUCCESS:
     case GB_RP_FAIL:
     case GB_RP_INPROGRESS:
+    case GB_RS_INPROGRESS:
+    case GB_RS_SUCCESS:
+    case GB_RS_FAIL:
       if (!deleteall)
         break;
  /* case GB_CONFIG_INPROGRESS: untouched may be due to connect failed */
@@ -1283,6 +1295,65 @@ glusterBlockModifyRemote(void *data)
   return NULL;
 }
 
+
+void *
+glusterBlockModifySizeRemote(void *data)
+{
+  int ret;
+  int saveret;
+  blockRemoteObj *args = (blockRemoteObj *)data;
+  blockModifySize mobj = *(blockModifySize *)args->obj;
+  char *errMsg = NULL;
+  bool rpc_sent = FALSE;
+
+
+  GB_METAUPDATE_OR_GOTO(lock, args->glfs, mobj.block_name, mobj.volume,
+                        ret, errMsg, out, "%s: RSINPROGRESS-%zu\n",
+                        args->addr, mobj.size);
+
+  ret = glusterBlockCallRPC_1(args->addr, &mobj, MODIFY_SIZE_SRV, &rpc_sent,
+                              &args->reply);
+  if (ret) {
+    saveret = ret;
+    if (!rpc_sent) {
+      GB_ASPRINTF(&errMsg, ": %s", strerror(errno));
+      LOG("mgmt", GB_LOG_ERROR,
+          "%s hence %s for block %s on volume %s for size %zu on host %s",
+          strerror(errno), FAILED_REMOTE_MODIFY_SIZE,
+          mobj.block_name, mobj.volume, mobj.size, args->addr);
+      goto out;
+    } else if (args->reply) {
+      errMsg = args->reply;
+      args->reply = NULL;
+    }
+    GB_METAUPDATE_OR_GOTO(lock, args->glfs, mobj.block_name, mobj.volume,
+                          ret, errMsg, out, "%s: RSFAIL-%zu\n", args->addr, mobj.size);
+
+    LOG("mgmt", GB_LOG_ERROR, "%s for block %s on volume %s for size %zu on host %s",
+        FAILED_REMOTE_MODIFY, mobj.block_name, mobj.volume, mobj.size, args->addr);
+
+    ret = saveret;
+    goto out;
+  }
+
+  GB_METAUPDATE_OR_GOTO(lock, args->glfs, mobj.block_name, mobj.volume,
+                        ret, errMsg, out, "%s: RSSUCCESS-%zu\n",
+                        args->addr, mobj.size);
+
+ out:
+  if (!args->reply) {
+    if (GB_ASPRINTF(&args->reply, "failed to modify size on %s %s",
+                    args->addr, errMsg?errMsg:"") == -1) {
+      ret = ret?ret:-1;
+    }
+  }
+  GB_FREE(errMsg);
+  args->exit = ret;
+
+  return NULL;
+}
+
+
 static size_t
 glusterBlockModifyArgsFill(blockModify *mobj, MetaInfo *info,
                            blockRemoteObj *args, struct glfs *glfs)
@@ -1294,11 +1365,15 @@ glusterBlockModifyArgsFill(blockModify *mobj, MetaInfo *info,
   for (i = 0, count = 0; i < info->nhosts; i++) {
     switch (blockMetaStatusEnumParse(info->list[i]->status)) {
       case GB_CONFIG_SUCCESS:
+      case GB_CLEANUP_INPROGRESS:
       case GB_AUTH_ENFORCE_FAIL:
       case GB_AUTH_CLEAR_ENFORCED:
       case GB_RP_SUCCESS:
       case GB_RP_FAIL:
       case GB_RP_INPROGRESS:
+      case GB_RS_SUCCESS:
+      case GB_RS_FAIL:
+      case GB_RS_INPROGRESS:
         if (mobj->auth_mode) {
           fill = TRUE;
         }
@@ -1396,12 +1471,99 @@ glusterBlockModifyRemoteAsync(MetaInfo *info,
 }
 
 
+static size_t
+glusterBlockModifySizeArgsFill(blockModifySize *mobj, MetaInfo *info,
+                               blockRemoteObj *args, struct glfs *glfs,
+                               char **skipped)
+{
+  int i = 0;
+  size_t count = 0;
+  char *saveptr = NULL;
+
+  for (i = 0, count = 0; i < info->nhosts; i++) {
+    if (skipped && (info->size == mobj->size) &&
+        (blockMetaStatusEnumParse(info->list[i]->status) == GB_RS_SUCCESS)) {
+      saveptr = *skipped;
+      GB_ASPRINTF(skipped, "%s %s", (saveptr?saveptr:""), info->list[i]->addr);
+      GB_FREE(saveptr);
+    } else if (blockhostIsValid(info->list[i]->status)) {
+      if (args) {
+        args[count].glfs = glfs;
+        args[count].obj = (void *)mobj;
+        args[count].addr = info->list[i]->addr;
+      }
+      count++;
+    }
+  }
+
+  return count;
+}
+
+
+static int
+glusterBlockModifySizeRemoteAsync(MetaInfo *info,
+                                  struct glfs *glfs,
+                                  blockModifySize *mobj,
+                                  blockRemoteResp **savereply)
+{
+  pthread_t  *tid = NULL;
+  blockRemoteResp *local = *savereply;
+  blockRemoteObj *args = NULL;
+  int ret = -1;
+  size_t i;
+  size_t count = 0;
+
+
+  count = glusterBlockModifySizeArgsFill(mobj, info, NULL, glfs, NULL);
+
+  if (GB_ALLOC_N(tid, count) < 0) {
+    goto out;
+  }
+
+  if (GB_ALLOC_N(args, count) < 0) {
+    goto out;
+  }
+
+  count = glusterBlockModifySizeArgsFill(mobj, info, args, glfs, &local->skipped);
+
+  for (i = 0; i < count; i++) {
+    pthread_create(&tid[i], NULL, glusterBlockModifySizeRemote, &args[i]);
+  }
+
+  for (i = 0; i < count; i++) {
+    /* collect exit code */
+    pthread_join(tid[i], NULL);
+  }
+
+  /* collect return */
+  ret = glusterBlockCollectAttemptSuccess(args, count, &local->attempt,
+                                          &local->success);
+  if (ret)
+    goto out;
+
+  for (i = 0; i < count; i++) {
+    if (args[i].exit) {
+      ret = -1;
+      break;
+    }
+  }
+
+  *savereply = local;
+
+ out:
+  GB_FREE(args);
+  GB_FREE(tid);
+
+  return ret;
+}
+
 bool *
 glusterBlockBuildMinCaps(void *data, operations opt)
 {
   blockCreateCli *cblk = NULL;
   blockDeleteCli *dblk = NULL;
   blockModifyCli *mblk = NULL;
+  blockModifySizeCli *msblk = NULL;
   blockReplaceCli *rblk = NULL;
   bool *minCaps = NULL;
 
@@ -1447,6 +1609,13 @@ glusterBlockBuildMinCaps(void *data, operations opt)
       minCaps[GB_MODIFY_AUTH_CAP] = true;
     }
     if (mblk->json_resp) {
+      minCaps[GB_JSON_CAP] = true;
+    }
+    break;
+  case MODIFY_SIZE_SRV:
+    msblk = (blockModifySizeCli *)data;
+    minCaps[GB_MODIFY_SIZE_CAP] = true;
+    if (msblk->json_resp) {
       minCaps[GB_JSON_CAP] = true;
     }
     break;
@@ -2774,6 +2943,270 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
   return reply;
 }
 
+
+static void
+blockModifySizeCliFormatResponse(blockModifySizeCli *blk, struct blockModifySize *mobj,
+                                 int errCode, char *errMsg,
+                                 blockRemoteResp *savereply,
+                                 MetaInfo *info, struct blockResponse *reply)
+{
+  json_object *json_obj = NULL;
+  json_object *json_array[3] = {0};
+  char        *tmp = NULL;
+  char        *tmp2 = NULL;
+  char        *tmp3 = NULL;
+  int          i = 0;
+  char         *hr_size    = NULL;           /* Human Readable size */
+
+  if (!reply) {
+    return;
+  }
+
+  if (errCode < 0) {
+    errCode = GB_DEFAULT_ERRCODE;
+  }
+
+  if (errMsg) {
+    blockFormatErrorResponse(MODIFY_SIZE_SRV, blk->json_resp, errCode,
+                             errMsg, reply);
+    return;
+  }
+
+  hr_size = glusterBlockFormatSize("mgmt", mobj->size);
+  if (!hr_size) {
+    GB_ASPRINTF (&errMsg, "%s", "failed in glusterBlockFormatSize");
+    blockFormatErrorResponse(MODIFY_SIZE_SRV, blk->json_resp, ENOMEM,
+                             errMsg, reply);
+    GB_FREE(errMsg);
+    return;
+  }
+
+  if (blk->json_resp) {
+    json_obj = json_object_new_object();
+
+    GB_ASPRINTF(&tmp, "%s%s", GB_TGCLI_IQN_PREFIX, info->gbid);
+    json_object_object_add(json_obj, "IQN", GB_JSON_OBJ_TO_STR(tmp?tmp:""));
+    if (!errCode) {
+      json_object_object_add(json_obj, "SIZE", GB_JSON_OBJ_TO_STR(hr_size));
+    }
+
+    if (savereply->attempt) {
+      blockStr2arrayAddToJsonObj(json_obj, savereply->attempt,
+                                 "FAILED ON", &json_array[0]);
+    }
+
+    if (savereply->success) {
+      blockStr2arrayAddToJsonObj(json_obj, savereply->success,
+                                 "SUCCESSFUL ON", &json_array[1]);
+    }
+
+    if (savereply->skipped) {
+      blockStr2arrayAddToJsonObj(json_obj, savereply->skipped,
+                                 "SKIPPED ON", &json_array[2]);
+    }
+
+    json_object_object_add(json_obj, "RESULT",
+      errCode?GB_JSON_OBJ_TO_STR("FAIL"):GB_JSON_OBJ_TO_STR("SUCCESS"));
+
+    GB_ASPRINTF(&reply->out, "%s\n", json_object_to_json_string_ext(json_obj,
+                mapJsonFlagToJsonCstring(blk->json_resp)));
+
+    for (i = 0; i < 3; i++) {
+      if (json_array[i]) {
+        json_object_put(json_array[i]);
+      }
+    }
+    json_object_put(json_obj);
+  } else {
+    /* save 'failed on'*/
+    if (savereply->attempt) {
+      GB_ASPRINTF(&tmp, "FAILED ON: %s\n", savereply->attempt);
+    }
+
+    if (savereply->success) {
+      GB_ASPRINTF(&tmp2, "SUCCESSFUL ON: %s\n", savereply->success);
+    }
+
+    if (!errCode) {
+      GB_ASPRINTF(&tmp3, "IQN: %s%s\nSIZE: %s\n%s%s",
+                  GB_TGCLI_IQN_PREFIX, info->gbid,
+                  hr_size, tmp?tmp:"", tmp2?tmp2:"");
+    } else {
+      GB_ASPRINTF(&tmp3, "IQN: %s%s\n%s%s",
+                  GB_TGCLI_IQN_PREFIX, info->gbid,
+                  tmp?tmp:"", tmp2?tmp2:"");
+    }
+
+    if (savereply->skipped) {
+      GB_FREE(tmp);
+      tmp = tmp3;
+      GB_ASPRINTF(&tmp3, "%s\nSKIPPED ON:%s",tmp, savereply->skipped);
+    }
+
+    GB_ASPRINTF(&reply->out, "%sRESULT: %s\n", tmp3, errCode?"FAIL":"SUCCESS");
+  }
+  GB_FREE(tmp);
+  GB_FREE(tmp2);
+  GB_FREE(tmp3);
+
+  /*catch all*/
+  if (!reply->out) {
+    blockFormatErrorResponse(MODIFY_SIZE_SRV, blk->json_resp, errCode,
+                             GB_DEFAULT_ERRMSG, reply);
+  }
+
+  GB_FREE(hr_size);
+}
+
+
+blockResponse *
+block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
+{
+  int ret = -1;
+  static blockModifySize mobj = {0};
+  static blockRemoteResp *savereply = NULL;
+  static blockResponse *reply = NULL;
+  struct glfs *glfs;
+  struct glfs_fd *lkfd = NULL;
+  MetaInfo *info = NULL;
+  int asyncret = 0;
+  int errCode = 0;
+  char *errMsg = NULL;
+  char *cSize = NULL;
+  char *rSize = NULL;
+  blockServerDefPtr list = NULL;
+
+
+  LOG("mgmt", GB_LOG_DEBUG,
+      "modify size cli request, volume=%s blockname=%s size=%zu",
+      blk->volume, blk->block_name, blk->size);
+
+  if ((GB_ALLOC(reply) < 0) || (GB_ALLOC(savereply) < 0) ||
+      (GB_ALLOC (info) < 0)) {
+    GB_FREE (reply);
+    GB_FREE (savereply);
+    GB_FREE (info);
+    return NULL;
+  }
+
+  glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
+  if (!glfs) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "glusterBlockVolumeInit(%s) for block %s failed [%s]",
+        blk->volume, blk->block_name, strerror(errno));
+    goto initfail;
+  }
+
+  lkfd = glusterBlockCreateMetaLockFile(glfs, blk->volume, &errCode, &errMsg);
+  if (!lkfd) {
+    LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s",
+        FAILED_CREATING_META, blk->volume, blk->block_name);
+    goto nolock;
+  }
+
+  GB_METALOCK_OR_GOTO(lkfd, blk->volume, ret, errMsg, nolock);
+
+  if (glfs_access(glfs, blk->block_name, F_OK)) {
+    errCode = errno;
+    if (errCode == ENOENT) {
+      GB_ASPRINTF(&errMsg, "block %s/%s doesn't exist",
+                  blk->volume, blk->block_name);
+      LOG("mgmt", GB_LOG_ERROR,
+          "block with name %s doesn't exist in the volume %s",
+          blk->block_name, blk->volume);
+    } else {
+      GB_ASPRINTF(&errMsg, "block %s/%s is not accessible (%s)",
+                  blk->volume, blk->block_name, strerror(errCode));
+      LOG("mgmt", GB_LOG_ERROR, "block %s/%s is not accessible (%s)",
+          blk->volume, blk->block_name, strerror(errCode));
+    }
+    goto out;
+  }
+
+  ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
+  if (ret) {
+    goto out;
+  }
+
+  if ((info->size > blk->size && !blk->force) || info->size == blk->size) {
+    cSize = glusterBlockFormatSize("mgmt", info->size);
+    rSize = glusterBlockFormatSize("mgmt", blk->size);
+    if (info->size == blk->size) {
+      GB_ASPRINTF(&errMsg, "request size (%s) is same as current size (%s) ]",
+                  cSize, rSize);
+    } else {
+      GB_ASPRINTF(&errMsg, "Shrink size ?\nuse 'force' option [current size %s, request size %s]",
+                  cSize, rSize);
+    }
+    GB_FREE(cSize);
+    GB_FREE(rSize);
+    errCode = -1;
+    goto out;
+  }
+
+  list = glusterBlockGetListFromInfo(info);
+  if (!list) {
+    errCode = ENOMEM;
+    goto out;
+  }
+
+  errCode = glusterBlockCheckCapabilities((void *)blk, MODIFY_SIZE_SRV, list, &errMsg);
+  if (errCode) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "glusterBlockCheckCapabilities() for block %s on volume %s failed",
+        blk->block_name, blk->volume);
+    goto out;
+  }
+
+  GB_STRCPYSTATIC(mobj.block_name, blk->block_name);
+  GB_STRCPYSTATIC(mobj.volume, blk->volume);
+  GB_STRCPYSTATIC(mobj.gbid, info->gbid);
+  mobj.size = blk->size;
+
+  ret = glusterBlockResizeEntry(glfs, &mobj, &errCode, &errMsg);
+  if (ret) {
+    LOG("mgmt", GB_LOG_ERROR, "%s block: %s volume: %s file: %s size: %zu",
+        FAILED_MODIFY_SIZE, mobj.block_name, mobj.volume, mobj.gbid, mobj.size);
+    ret = errCode;
+    goto out;
+  }
+
+  asyncret = glusterBlockModifySizeRemoteAsync(info, glfs, &mobj, &savereply);
+  if (asyncret) {   /* asyncret decides result is success/fail */
+    errCode = asyncret;
+    LOG("mgmt", GB_LOG_WARNING,
+        "glusterBlockModifySizeRemoteAsync(size=%zu): return %d %s for block %s on volume %s",
+        blk->size, asyncret, FAILED_REMOTE_AYNC_MODIFY, blk->block_name, info->volume);
+    goto out;
+  } else {
+    GB_METAUPDATE_OR_GOTO(lock, glfs, mobj.block_name, mobj.volume,
+                          ret, errMsg, out, "SIZE: %zu\n",  mobj.size);
+  }
+
+  ret = 0;
+
+ out:
+  GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
+  blockServerDefFree(list);
+
+ nolock:
+  if (lkfd && glfs_close(lkfd) != 0) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "glfs_close(%s): for block %s on volume %s failed[%s]",
+        GB_TXLOCKFILE, blk->block_name, blk->volume, strerror(errno));
+  }
+
+ initfail:
+  blockModifySizeCliFormatResponse(blk, &mobj, asyncret?asyncret:errCode,
+                                   errMsg, savereply, info, reply);
+  blockFreeMetaInfo(info);
+
+  blockRemoteRespFree(savereply);
+
+  return reply;
+}
+
+
 void
 blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
                              struct blockCreate *cobj, int errCode,
@@ -3097,6 +3530,7 @@ blockValidateCommandOutput(const char *out, int opt, void *data)
   blockCreate *cblk = data;
   blockDelete *dblk = data;
   blockModify *mblk = data;
+  blockModifySize *msblk = data;
   blockReplace *rblk = data;
   int ret = -1;
 
@@ -3195,6 +3629,14 @@ blockValidateCommandOutput(const char *out, int opt, void *data)
     ret = 0;
     break;
 
+  case MODIFY_SIZE_SRV:
+    /* dev_size set validation */
+    GB_OUT_VALIDATE_OR_GOTO(out, out, "dev_size set failed for block: %s", msblk,
+                            msblk->block_name,
+                            "Parameter dev_size is now '%zu'.", msblk->size);
+
+    ret = 0;
+    break;
   case MODIFY_TPGC_SRV:
     /* iscsi iqn status validation */
     GB_OUT_VALIDATE_OR_GOTO(out, out, "iscsi status check failed for: %s",
@@ -3871,6 +4313,70 @@ block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
 
 
 blockResponse *
+block_modify_size_1_svc_st(blockModifySize *blk, struct svc_req *rqstp)
+{
+  int ret;
+  char *exec = NULL;
+  blockResponse *reply = NULL;
+  char *tmp = NULL;
+
+
+  LOG("mgmt", GB_LOG_INFO,
+      "modify size request, volume=%s blockname=%s filename=%s size=%zu",
+      blk->volume, blk->block_name, blk->gbid, blk->size);
+
+  if (GB_ALLOC(reply) < 0) {
+    return NULL;
+  }
+  reply->exit = -1;
+
+  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name, blk->gbid) == -1) {
+    LOG("mgmt", GB_LOG_WARNING,
+        "block backend with name '%s' doesn't exist with matching gbid %s, volume '%s'",
+        blk->block_name, blk->gbid, blk->volume);
+    goto out;
+  }
+
+  /* Check if block exist on this node ? */
+  ret = gbRunner(exec);
+  if (ret == -1) {
+    GB_ASPRINTF(&reply->out, "command exit abnormally for %s", blk->block_name);
+    goto out;
+  } else if (ret == 1) {
+    reply->exit = 0;
+    GB_ASPRINTF(&reply->out, "No %s.", blk->block_name);
+    goto out;
+  }
+  GB_FREE(exec);
+
+  if (GB_ASPRINTF(&tmp, "%s/%s set attribute dev_size=%zu", GB_TGCLI_GLFS_PATH,
+                  blk->block_name, blk->size) == -1) {
+    goto out;
+  }
+
+  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, GB_TGCLI_SAVE) == -1) {
+    goto out;
+  }
+
+  if (GB_ALLOC_N(reply->out, 8192) < 0) {
+    GB_FREE(reply);
+    goto out;
+  }
+
+  GB_CMD_EXEC_AND_VALIDATE(exec, reply, blk, blk->volume, MODIFY_SIZE_SRV);
+  if (reply->exit) {
+    snprintf(reply->out, 8192, "modify size failed");
+  }
+
+ out:
+  GB_FREE(tmp);
+  GB_FREE(exec);
+
+  return reply;
+}
+
+
+blockResponse *
 block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
 {
   blockResponse *reply;
@@ -4036,13 +4542,26 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
   if (!info)
     goto out;
 
-  hr_size = glusterBlockFormatSize("mgmt", info->size);
+  for (i = 0; i < info->nhosts; i++) {
+    switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+    case GB_RS_INPROGRESS:
+    case GB_RS_FAIL:
+      GB_STRDUP(hr_size, "-");
+      break;
+    }
+    if (hr_size) {
+      break;
+    }
+  }
   if (!hr_size) {
-    GB_ASPRINTF (&errMsg, "%s", "failed in glusterBlockFormatSize");
-    blockFormatErrorResponse(INFO_SRV, blk->json_resp, ENOMEM,
-                             errMsg, reply);
-    GB_FREE(errMsg);
-    goto out;
+    hr_size = glusterBlockFormatSize("mgmt", info->size);
+    if (!hr_size) {
+      GB_ASPRINTF (&errMsg, "%s", "failed in glusterBlockFormatSize");
+      blockFormatErrorResponse(INFO_SRV, blk->json_resp, ENOMEM,
+                               errMsg, reply);
+      GB_FREE(errMsg);
+      goto out;
+    }
   }
 
   if (blk->json_resp) {
@@ -4055,7 +4574,6 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     json_object_object_add(json_obj, "PASSWORD", GB_JSON_OBJ_TO_STR(info->passwd));
 
     json_array1 = json_object_new_array();
-    json_array2 = json_object_new_array();
 
     for (i = 0; i < info->nhosts; i++) {
       if (blockhostIsValid (info->list[i]->status)) {
@@ -4064,6 +4582,9 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
         switch (blockMetaStatusEnumParse(info->list[i]->status)) {
         case GB_CONFIG_FAIL:
         case GB_CLEANUP_FAIL:
+          if (!json_array2) {
+            json_array2 = json_object_new_array();
+          }
           json_object_array_add(json_array2, GB_JSON_OBJ_TO_STR(info->list[i]->addr));
           break;
         }
@@ -4071,13 +4592,17 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     }
 
     json_object_object_add(json_obj, "EXPORTED ON", json_array1);
-    json_object_object_add(json_obj, "ENCOUNTERED FAILURES ON", json_array2);
+    if (json_array2) {
+      json_object_object_add(json_obj, "ENCOUNTERED FAILURES ON", json_array2);
+    }
 
     GB_ASPRINTF(&reply->out, "%s\n",
                 json_object_to_json_string_ext(json_obj,
                                 mapJsonFlagToJsonCstring(blk->json_resp)));
     json_object_put(json_array1);
-    json_object_put(json_array2);
+    if (json_array2) {
+      json_object_put(json_array2);
+    }
     json_object_put(json_obj);
   } else {
     if (GB_ASPRINTF(&tmp, "NAME: %s\nVOLUME: %s\nGBID: %s\nSIZE: %s\n"
@@ -4108,13 +4633,17 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
         }
       }
     }
-    if (GB_ASPRINTF(&reply->out, "%s\nENCOUNTERED FAILURES ON:%s\n", tmp, tmp2?tmp2:"") == -1) {
-      GB_FREE (tmp);
-      GB_FREE (tmp2);
+
+    if (tmp2) {
+      tmp3 = tmp;
+      if (GB_ASPRINTF(&tmp, "%s\nENCOUNTERED FAILURES ON:%s\n", tmp3, tmp2) == -1) {
+        goto out;
+      }
+    }
+
+    if (GB_ASPRINTF(&reply->out, "%s\n", tmp) == -1) {
       goto out;
     }
-    GB_FREE (tmp);
-    GB_FREE (tmp2);
   }
  out:
   /*catch all*/
@@ -4123,6 +4652,9 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
                              GB_DEFAULT_ERRMSG, reply);
   }
   GB_FREE(hr_size);
+  GB_FREE (tmp);
+  GB_FREE (tmp2);
+  GB_FREE (tmp3);
   return;
 }
 
@@ -4229,6 +4761,16 @@ block_modify_1_svc(blockModify *blk, blockResponse *reply, struct svc_req *rqstp
 
 
 bool_t
+block_modify_size_1_svc(blockModifySize *blk, blockResponse *reply,
+                        struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(modify_size, blk, reply, rqstp, ret);
+  return ret;
+}
+
+bool_t
 block_version_1_svc(void *data, blockResponse *reply, struct svc_req *rqstp)
 {
   int ret;
@@ -4266,6 +4808,17 @@ block_modify_cli_1_svc(blockModifyCli *blk, blockResponse *reply,
   int ret;
 
   GB_RPC_CALL(modify_cli, blk, reply, rqstp, ret);
+  return ret;
+}
+
+
+bool_t
+block_modify_size_cli_1_svc(blockModifySizeCli *blk, blockResponse *reply,
+                            struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(modify_size_cli, blk, reply, rqstp, ret);
   return ret;
 }
 
