@@ -2149,7 +2149,6 @@ blockReplaceNodeCliFormatResponse(blockReplaceCli *blk, int errCode, char *errMs
   json_object *json_obj = NULL;
   char *tmp = NULL;
   char *entry = NULL;
-  int i;
 
   if (!reply) {
     return;
@@ -2680,7 +2679,6 @@ blockModifyCliFormatResponse (blockModifyCli *blk, struct blockModify *mobj,
   char        *tmp2 = NULL;
   char        *tmp3 = NULL;
   char        *tmp = NULL;
-  int          i = 0;
 
   if (!reply) {
     return;
@@ -2976,7 +2974,6 @@ blockModifySizeCliFormatResponse(blockModifySizeCli *blk, struct blockModifySize
   char        *tmp = NULL;
   char        *tmp2 = NULL;
   char        *tmp3 = NULL;
-  int          i = 0;
   char         *hr_size    = NULL;           /* Human Readable size */
 
   if (!reply) {
@@ -3180,7 +3177,7 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
   if (ret) {
     LOG("mgmt", GB_LOG_ERROR, "%s block: %s volume: %s file: %s size: %zu",
         FAILED_MODIFY_SIZE, mobj.block_name, mobj.volume, mobj.gbid, mobj.size);
-    ret = errCode;
+    errCode = ret;
     goto out;
   }
 
@@ -3196,7 +3193,7 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
                           ret, errMsg, out, "SIZE: %zu\n",  mobj.size);
   }
 
-  ret = 0;
+  errCode = 0;
 
  out:
   GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
@@ -4039,7 +4036,6 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
   int errCode = 0;
   int ret;
   blockServerDefPtr list = NULL;
-  size_t i;
 
 
   LOG("mgmt", GB_LOG_INFO, "delete cli request, volume=%s blockname=%s",

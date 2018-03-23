@@ -432,7 +432,7 @@ blockParseRSstatus(MetaInfo *info)
 
 
   for (i = 0; i < info->nhosts; i++) {
-    if (s = strchr(info->list[i]->status, '-')) {
+    if ( (s = strchr(info->list[i]->status, '-')) ) {
       *s = '\0';
       s++;
       sscanf(s, "%zu", &info->list[i]->size);
