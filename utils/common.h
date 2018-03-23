@@ -89,6 +89,8 @@ char* glusterBlockFormatSize(const char *dom, size_t bytes);
 
 int convertStringToTrillianParse(const char *opt);
 
+bool isNumber(char number[]);
+
 void blockServerDefFree(blockServerDefPtr blkServers);
 
 bool blockhostIsValid(char *status);

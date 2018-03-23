@@ -450,6 +450,27 @@ out:
 }
 
 
+void
+convertTypeCreate2ToCreate(blockCreate2 *blk_v2, blockCreate *blk_v1)
+{
+
+  if (!blk_v2) {
+    return;
+  }
+
+  GB_STRCPYSTATIC(blk_v1->ipaddr, blk_v2->ipaddr);
+  GB_STRCPYSTATIC(blk_v1->volume, blk_v2->volume);
+  GB_STRCPYSTATIC(blk_v1->gbid, blk_v2->gbid);
+  GB_STRCPYSTATIC(blk_v1->passwd, blk_v2->passwd);
+  GB_STRCPYSTATIC(blk_v1->block_name, blk_v2->block_name);
+  blk_v1->block_hosts = blk_v2->block_hosts;
+  blk_v1->size = blk_v2->size;
+  blk_v1->auth_mode = blk_v2->auth_mode;
+
+  return;
+}
+
+
 int
 glusterBlockCallRPC_1(char *host, void *cobj,
                       operations opt, bool *rpc_sent, char **out)
@@ -462,6 +483,8 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   blockResponse reply = {0,};
   struct addrinfo *res = NULL;
   gbCapResp *obj = NULL;
+  struct blockCreate cblk_v1 = {0,};
+  struct blockCreate2 *cblk_v2 = NULL;
 
 
   *rpc_sent = FALSE;
@@ -479,13 +502,24 @@ glusterBlockCallRPC_1(char *host, void *cobj,
 
   switch(opt) {
   case CREATE_SRV:
-    GB_STRCPYSTATIC(((blockCreate *)cobj)->ipaddr, host);
-    *rpc_sent = TRUE;
+    cblk_v2 = (blockCreate2 *)cobj;
+    GB_STRCPYSTATIC(cblk_v2->ipaddr, host);
 
-    if (block_create_1((blockCreate *)cobj, &reply, clnt) != RPC_SUCCESS) {
-      LOG("mgmt", GB_LOG_ERROR, "%son host %s",
-          clnt_sperror(clnt, "block remote create failed"), host);
-      goto out;
+    if (cblk_v2->rb_size) {
+      *rpc_sent = TRUE;
+      if (block_create_v2_1(cblk_v2, &reply, clnt) != RPC_SUCCESS) {
+        LOG("mgmt", GB_LOG_ERROR, "%son host %s",
+            clnt_sperror(clnt, "block remote create failed"), host);
+        goto out;
+      }
+    } else {
+      convertTypeCreate2ToCreate(cblk_v2, &cblk_v1);
+      *rpc_sent = TRUE;
+      if (block_create_1(&cblk_v1, &reply, clnt) != RPC_SUCCESS) {
+        LOG("mgmt", GB_LOG_ERROR, "%son host %s",
+            clnt_sperror(clnt, "block remote create failed"), host);
+        goto out;
+      }
     }
     break;
   case VERSION_SRV:
@@ -823,7 +857,7 @@ glusterBlockCreateRemote(void *data)
   int ret;
   int saveret;
   blockRemoteObj *args = (blockRemoteObj *)data;
-  blockCreate cobj = *(blockCreate *)args->obj;
+  blockCreate2 cobj = *(blockCreate2 *)args->obj;
   char *errMsg = NULL;
   bool rpc_sent = FALSE;
 
@@ -880,7 +914,7 @@ static int
 glusterBlockCreateRemoteAsync(blockServerDefPtr list,
                             size_t listindex, size_t mpath,
                             struct glfs *glfs,
-                            blockCreate *cobj,
+                            blockCreate2 *cobj,
                             blockRemoteCreateResp **savereply)
 {
   pthread_t  *tid = NULL;
@@ -1584,6 +1618,9 @@ glusterBlockBuildMinCaps(void *data, operations opt)
     if (cblk->auth_mode) {
       minCaps[GB_CREATE_AUTH_CAP] = true;
     }
+    if (cblk->rb_size) {
+      minCaps[GB_CREATE_RING_BUFFER_CAP] = true;
+    }
     if (cblk->json_resp) {
       minCaps[GB_JSON_CAP] = true;
     }
@@ -1824,7 +1861,7 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
   pthread_t  *tid = NULL;
   blockRemoteObj *args = NULL;
   MetaInfo *info = NULL;
-  blockCreate *cobj = NULL;
+  blockCreate2 *cobj = NULL;
   blockDelete *dobj = NULL;
   blockReplace *robj = NULL;
   bool Flag = false;
@@ -1862,6 +1899,7 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
   GB_STRCPYSTATIC(cobj->volume, info->volume);
   GB_STRCPYSTATIC(cobj->gbid, info->gbid);
   cobj->size = info->size;
+  cobj->rb_size = info->rb_size;
   GB_STRCPYSTATIC(cobj->passwd, info->passwd);
   GB_STRCPYSTATIC(cobj->block_name, block);
 
@@ -2531,7 +2569,7 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
 static int
 glusterBlockAuditRequest(struct glfs *glfs,
                          blockCreateCli *blk,
-                         blockCreate *cobj,
+                         blockCreate2 *cobj,
                          blockServerDefPtr list,
                          blockRemoteCreateResp **reply)
 {
@@ -3184,7 +3222,7 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
 
 void
 blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
-                             struct blockCreate *cobj, int errCode,
+                             struct blockCreate2 *cobj, int errCode,
                              char *errMsg, blockRemoteCreateResp *savereply,
                              struct blockResponse *reply)
 {
@@ -3345,18 +3383,18 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   blockRemoteCreateResp *savereply = NULL;
   char gbid[UUID_BUF_SIZE];
   char passwd[UUID_BUF_SIZE];
-  struct blockCreate cobj = {0};
   struct blockResponse *reply;
   struct glfs *glfs = NULL;
   struct glfs_fd *lkfd = NULL;
   blockServerDefPtr list = NULL;
   char *errMsg = NULL;
+  struct blockCreate2  cobj = {0, };
 
 
   LOG("mgmt", GB_LOG_INFO,
       "create cli request, volume=%s blockname=%s mpath=%d blockhosts=%s "
-      "authmode=%d size=%lu", blk->volume, blk->block_name, blk->mpath,
-      blk->block_hosts, blk->auth_mode, blk->size);
+      "authmode=%d size=%lu, rbsize=%d", blk->volume, blk->block_name, blk->mpath,
+      blk->block_hosts, blk->auth_mode, blk->size, blk->rb_size);
 
   if (GB_ALLOC(reply) < 0) {
     return NULL;
@@ -3432,11 +3470,14 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   }
 
   GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
-                        errCode, errMsg, exist, "SIZE: %zu\nENTRYCREATE: SUCCESS\n", blk->size);
+                        errCode, errMsg, exist,
+                        "SIZE: %zu\nRINGBUFFER: %d\nENTRYCREATE: SUCCESS\n",
+                        blk->size, blk->rb_size);
 
   GB_STRCPYSTATIC(cobj.volume, blk->volume);
   GB_STRCPYSTATIC(cobj.block_name, blk->block_name);
   cobj.size = blk->size;
+  cobj.rb_size = blk->rb_size;
   GB_STRCPYSTATIC(cobj.gbid, gbid);
   if (GB_STRDUP(cobj.block_hosts,  blk->block_hosts) < 0) {
     errCode = ENOMEM;
@@ -3717,7 +3758,7 @@ out:
 
 
 blockResponse *
-block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
+block_create_common(blockCreate *blk, char *rbsize)
 {
   char *tmp = NULL;
   char *backstore = NULL;
@@ -3747,9 +3788,10 @@ block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  if (GB_ASPRINTF(&backstore, "%s %s %s %zu %s@%s%s/%s %s", GB_TGCLI_GLFS_PATH,
-                  GB_CREATE, blk->block_name, blk->size, blk->volume,
-                  blk->ipaddr, GB_STOREDIR, blk->gbid, blk->gbid) == -1) {
+  if (GB_ASPRINTF(&backstore, "%s %s name=%s size=%zu cfgstring=%s@%s%s/%s%s wwn=%s",
+                  GB_TGCLI_GLFS_PATH, GB_CREATE, blk->block_name, blk->size,
+                  blk->volume, blk->ipaddr, GB_STOREDIR, blk->gbid,
+                  rbsize ? rbsize: "", blk->gbid) == -1) {
     goto out;
   }
 
@@ -3890,11 +3932,37 @@ block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
   GB_FREE(backstore);
   GB_FREE(glfs_alua);
   GB_FREE(glfs_alua_type);
+  GB_FREE(rbsize);
   GB_FREE(backstore_attr);
   blockServerDefFree(list);
 
   return reply;
 }
+
+
+blockResponse *
+block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
+{
+  return block_create_common(blk, NULL);
+}
+
+
+blockResponse *
+block_create_v2_1_svc_st(blockCreate2 *blk, struct svc_req *rqstp)
+{
+  char *rbsize= NULL;
+  blockCreate blk_v1 = {0, };
+
+
+  if (blk->rb_size) {
+    GB_ASPRINTF(&rbsize, ",max_data_area_mb=%d", blk->rb_size);
+  }
+
+  convertTypeCreate2ToCreate(blk, &blk_v1);
+
+  return block_create_common(&blk_v1, rbsize);
+}
+
 
 void
 blockDeleteCliFormatResponse(blockDeleteCli *blk, int errCode, char *errMsg,
@@ -4715,6 +4783,14 @@ block_create_1_svc(blockCreate *blk, blockResponse *reply, struct svc_req *rqstp
   return ret;
 }
 
+bool_t
+block_create_v2_1_svc(blockCreate2 *blk, blockResponse *reply, struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(create_v2, blk, reply, rqstp, ret);
+  return ret;
+}
 
 bool_t
 block_delete_1_svc(blockDelete *blk, blockResponse *reply, struct svc_req *rqstp)

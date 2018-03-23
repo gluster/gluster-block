@@ -25,6 +25,19 @@ struct blockCreate {
   bool      auth_mode;
 };
 
+struct blockCreate2 {
+  char      ipaddr[255];
+  char      volume[255];
+  char      gbid[127];                   /* uuid */
+  char      passwd[127];                 /* uuid */
+  u_quad_t  size;
+  char      block_name[255];
+  string    block_hosts<>;               /* for multiple tpg's creation */
+  bool      auth_mode;
+  u_int     rb_size;                     /* TCMU Ring Buffer size in kernel */
+  opaque    xdata<>;                     /* future reserve */
+};
+
 struct blockModify {
   char      volume[255];
   char      block_name[255];
@@ -51,6 +64,7 @@ struct blockReplace {
 struct blockCreateCli {
   char      volume[255];
   u_quad_t  size;
+  u_int     rb_size;              /* TCMU Ring Buffer size in kernel */
   u_int     mpath;                /* HA request count */
   bool      auth_mode;
   bool      prealloc;
@@ -124,6 +138,8 @@ program GLUSTER_BLOCK {
     blockResponse BLOCK_VERSION() = 4;
     blockResponse BLOCK_REPLACE(blockReplace) = 5;
     blockResponse BLOCK_MODIFY_SIZE(blockModifySize) = 6;
+
+    blockResponse BLOCK_CREATE_V2(blockCreate2) = 7;
   } = 1;
 } = 21215311; /* B2 L12 O15 C3 K11 */
 
