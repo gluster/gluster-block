@@ -461,6 +461,9 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
   case GB_META_SIZE:
     sscanf(strchr(line, ' '), "%zu", &info->size);
     break;
+  case GB_META_RINGBUFFER:
+    sscanf(strchr(line, ' '), "%zu", &info->rb_size);
+    break;
   case GB_META_HA:
     sscanf(strchr(line, ' '), "%zu", &info->mpath);
     break;

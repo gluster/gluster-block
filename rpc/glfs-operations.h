@@ -32,6 +32,7 @@ typedef struct MetaInfo {
   char   volume[255];
   char   gbid[38];
   size_t size;
+  size_t rb_size;
   size_t mpath;
   char   entry[16];  /* possible strings for ENTRYCREATE: INPROGRESS|SUCCESS|FAIL */
   char   passwd[38];

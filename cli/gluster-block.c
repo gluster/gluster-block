@@ -17,6 +17,7 @@
 # define  GB_CREATE_HELP_STR  "gluster-block create <volname/blockname> "      \
                                 "[ha <count>] [auth <enable|disable>] "        \
                                 "[prealloc <full|no>] [storage <filename>] "   \
+                                "[ring-buffer <size-in-MB-units>] "            \
                                 "<HOST1[,HOST2,...]> <size> [--json*]"
 # define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> "      \
                                 "[unlink-storage <yes|no>] [force] [--json*]"
@@ -214,8 +215,10 @@ glusterBlockHelp(void)
       "                              [auth <enable|disable>]\n"
       "                              [prealloc <full|no>]\n"
       "                              [storage <filename>]\n"
+      "                              [ring-buffer <size-in-MB-units>]\n"
       "                              <host1[,host2,...]> <size>\n"
-      "        create block device [defaults: ha 1, auth disable, prealloc no, size in bytes]\n"
+      "        create block device [defaults: ha 1, auth disable, prealloc no, size in bytes,\n"
+      "                             ring-buffer default size dependends on kernel]\n"
       "\n"
       "  list    <volname>\n"
       "        list available block devices.\n"
@@ -443,7 +446,15 @@ glusterBlockCreate(int argcount, char **options, int json)
   while (argcount - optind > 2) {
     switch (glusterBlockCLICreateOptEnumParse(options[optind++])) {
     case GB_CLI_CREATE_HA:
-      sscanf(options[optind++], "%u", &cobj.mpath);
+      if (isNumber(options[optind])) {
+        sscanf(options[optind++], "%u", &cobj.mpath);
+      } else {
+        MSG("%s\n", "'ha' option is incorrect");
+        MSG("%s\n", GB_CREATE_HELP_STR);
+        LOG("cli", GB_LOG_ERROR, "failed while parsing ha for block <%s/%s>",
+            cobj.volume, cobj.block_name);
+        goto out;
+      }
       break;
     case GB_CLI_CREATE_AUTH:
       ret = convertStringToTrillianParse(options[optind++]);
@@ -475,6 +486,25 @@ glusterBlockCreate(int argcount, char **options, int json)
     case GB_CLI_CREATE_STORAGE:
       GB_STRCPYSTATIC(cobj.storage, options[optind++]);
       TAKE_SIZE=false;
+      break;
+    case GB_CLI_CREATE_RBSIZE:
+      if (isNumber(options[optind])) {
+        sscanf(options[optind++], "%u", &cobj.rb_size);
+        if (cobj.rb_size < 1 || cobj.rb_size > 64) {
+          MSG("%s\n", "'ring-buffer' should be in range [1MB - 64MB]");
+          MSG("%s\n", GB_CREATE_HELP_STR);
+          LOG("cli", GB_LOG_ERROR,
+              "failed while parsing ring-buffer range [1MB - 64MB] for block <%s/%s>",
+              cobj.volume, cobj.block_name);
+        goto out;
+        }
+      } else {
+        MSG("%s\n", "'ring-buffer' option is incorrect, hint: should be uint type");
+        MSG("%s\n", GB_CREATE_HELP_STR);
+        LOG("cli", GB_LOG_ERROR, "failed while parsing ring-buffer for block <%s/%s>",
+            cobj.volume, cobj.block_name);
+        goto out;
+      }
       break;
     }
   }

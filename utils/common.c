@@ -159,6 +159,26 @@ convertStringToTrillianParse(const char *opt)
 }
 
 
+bool
+isNumber(char number[])
+{
+  int i = 0;
+
+
+  // handle negative numbers
+  if (number[0] == '-')
+    i = 1;
+
+  for (; number[i] != 0; i++)
+  {
+    if (!isdigit(number[i]))
+      return false;
+  }
+
+  return true;
+}
+
+
 void
 blockServerDefFree(blockServerDefPtr blkServers)
 {

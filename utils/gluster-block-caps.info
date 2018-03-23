@@ -118,3 +118,14 @@ replace: true
 # Since: 0.4
 ##
 modify_size: true
+
+##
+# Nature: cli sub-command
+#
+# Label: 'ring-buffer'
+#
+# Description: capability to create block with given ring buffer size
+#
+# Since: 0.4
+##
+create_ring_buffer: true

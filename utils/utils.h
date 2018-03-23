@@ -382,6 +382,7 @@ typedef enum gbCliCreateOptions {
   GB_CLI_CREATE_AUTH      = 2,
   GB_CLI_CREATE_PREALLOC  = 3,
   GB_CLI_CREATE_STORAGE   = 4,
+  GB_CLI_CREATE_RBSIZE    = 5,
 
   GB_CLI_CREATE_OPT_MAX
 } gbCliCreateOptions;
@@ -392,6 +393,7 @@ static const char *const gbCliCreateOptLookup[] = {
   [GB_CLI_CREATE_AUTH]     = "auth",
   [GB_CLI_CREATE_PREALLOC] = "prealloc",
   [GB_CLI_CREATE_STORAGE]  = "storage",
+  [GB_CLI_CREATE_RBSIZE]   = "ring-buffer",
 
   [GB_CLI_CREATE_OPT_MAX]  = NULL,
 };
@@ -448,6 +450,7 @@ typedef enum Metakey {
   GB_META_ENTRYCREATE = 4,
   GB_META_ENTRYDELETE = 5,
   GB_META_PASSWD      = 6,
+  GB_META_RINGBUFFER  = 7,
 
   GB_METAKEY_MAX
 } Metakey;
@@ -460,6 +463,7 @@ static const char *const MetakeyLookup[] = {
   [GB_META_ENTRYCREATE] = "ENTRYCREATE",
   [GB_META_ENTRYDELETE] = "ENTRYDELETE",
   [GB_META_PASSWD]      = "PASSWORD",
+  [GB_META_RINGBUFFER]  = "RINGBUFFER",
 
   [GB_METAKEY_MAX]      = NULL
 };
