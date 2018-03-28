@@ -9,7 +9,7 @@ gluster-block - Gluster Block Storage Console Manager (command line utility)
 
 .SH SYNOPSIS
 .B gluster-block
-<\fBcreate|list|info|delete\fR>
+<\fBcreate|list|info|delete|modify|replace\fR>
 <\fBvolname\fR[\fB/blockname\fR]>
 [\fB<args>\fR]
 [\fB--json*\fR]
@@ -25,7 +25,7 @@ Note that the gluster-blockd daemon is responsible for block management, hence t
 
 .SH COMMANDS
 .SS
-\fBcreate\fR <VOLNAME/NEW-BLOCKNAME> [ha <COUNT>] [auth <enable|disable>] [prealloc <full|no>] <HOST1[,HOST2,..]> <BYTES>
+\fBcreate\fR <VOLNAME/NEW-BLOCKNAME> [ha <COUNT>] [auth <enable|disable>] [prealloc <full|no>] [storage <filename>] [ring-buffer <size-in-MB-units>] <HOST1[,HOST2,..]> <BYTES>
 create block device.
 .TP
 [ha <COUNT>]
@@ -35,10 +35,16 @@ multipath requirement for high availability (default: 1)
 authentication setting (default: disable)
 .TP
 [prealloc <full|no>]
-"full" mode preallocates space by writing zeros to storage. (default: no)
+"full" mode preallocates space by writing zeros to storage (default: no)
+.TP
+[storage <filename>]
+existing file(only name) in the gluster volume, that needs to be linked while creating block (default: creates a new file)
+.TP
+[ring-buffer <size-in-MB-units>]
+kernel ring buffer size for exchanging iSCSI commands, range [1MB - 64MB] (default: as per kernel)
 .TP
 <HOST1,[HOST2....]>
-servers in the pool where targets will be exported.
+servers in the pool where targets will be exported
 .TP
 <BYTES>
 size in B|KiB|MiB|GiB|TiB|PiB ... (default: bytes)
@@ -55,13 +61,27 @@ details about block device.
 .PP
 
 .SS
-\fBdelete\fR <VOLNAME/BLOCKNAME> [force]
+\fBdelete\fR <VOLNAME/BLOCKNAME> [unlink-storage <yes|no>] [force]
 delete block device.
+.TP
+[unlink-storage <yes|no>]
+unlink the backend file from gluster volume (default: yes)
 .PP
 
 .SS
-\fBmodify\fR <VOLNAME/BLOCKNAME> <auth enable|disable>
+\fBmodify\fR <VOLNAME/BLOCKNAME> [<auth enable|disable>] [size <size>] [force]
 modify block device.
+.TP
+[<auth enable|disable>]
+modify authentication on the device
+.TP
+[size <size>]
+modify size of the device
+.PP
+
+.SS
+\fBreplace\fR <VOLNAME/BLOCKNAME> <old-node> <new-node> [force]
+replace block device.
 .PP
 
 .SS
@@ -88,6 +108,12 @@ To create a block device of size 1GiB with auth enable
 To create a block device of size 1GiB, by preallocating storage with zero fill
 .B # gluster-block create blockVol/sampleBlock prealloc full ${HOST} 1GiB
 
+To create a block device with existing file in blockVol
+.B # gluster-block create blockVol/sampleBlock storage 3c242959-9238-4ce0-a1ed-19086aa23c7b ${HOST}
+
+To create a block device with ring buffer size 16MB
+.B # gluster-block create blockVol/sampleBlock ring-buffer 16 ${HOST} 1GiB
+
 To create a block device of size 1GiB with multi-path(replica) 3
 .B # gluster-block create blockVol/sampleBlock ha 3 ${HOST1},${HOST2},${HOST3} 1GiB
 
@@ -104,6 +130,9 @@ To disable auth on a block device
 To enable auth on a block device
 .B # gluster-block modify blockVol/sampleBlock auth enable
 
+To resize an existing block device sampleBlock of size 1GiB to new size 2GiB
+.B # gluster-block modify blockVol/sampleBlock size 2GiB
+
 To list available block devices
 .B # gluster-block list blockVol
 
@@ -112,6 +141,12 @@ To get details of a block device
 
 To delete a block device
 .B # gluster-block delete blockVol/sampleBlock
+
+To delete a block device, but let backend file persist in blockVol(for later use)
+.B # gluster-block delete blockVol/sampleBlock unlink-storage no
+
+To replace a block device from ${NODE1} to ${NODE2}
+.B # gluster-block replace blockVol/sampleBlock ${NODE1} ${NODE2}
 .fi
 .PP
 
