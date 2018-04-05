@@ -42,6 +42,9 @@
 # define   GB_CHECK_PORTAL      "targetcli /iscsi/" GB_TGCLI_IQN_PREFIX \
                                 "'%s' ls | grep '%s' > " DEVNULLPATH
 
+# define   GB_ALUA_AO_TPG_NAME          "glfs_tg_pt_gp_ao"
+# define   GB_ALUA_ANO_TPG_NAME         "glfs_tg_pt_gp_ano"
+
 # define   GB_OLD_CAP_MAX       9
 
 # define   GB_OP_SKIPPED        222
@@ -2554,6 +2557,15 @@ getTpgObj(char *block, MetaInfo *info, blockGenConfigCli *blk, char *portal, int
   snprintf(alias_10, 11, "%.10s", alias+24);
   json_object_object_add(tpg_lun_obj, "alias", GB_JSON_OBJ_TO_STR(alias_10));
   snprintf(lun_so, 256, "/backstores/user/%s", block);
+  if (info->prio_path[0]) {
+    if (!strcmp(info->prio_path, portal)) {
+      json_object_object_add(tpg_lun_obj, "alua_tg_pt_gp_name",
+                             GB_JSON_OBJ_TO_STR(GB_ALUA_AO_TPG_NAME));
+    } else {
+      json_object_object_add(tpg_lun_obj, "alua_tg_pt_gp_name",
+                             GB_JSON_OBJ_TO_STR(GB_ALUA_ANO_TPG_NAME));
+    }
+  }
   json_object_object_add(tpg_lun_obj, "storage_object", GB_JSON_OBJ_TO_STR(lun_so));
   json_object_object_add(tpg_lun_obj, "index", json_object_new_int(0));
   json_object_array_add(tpg_luns_arr, tpg_lun_obj);
@@ -2617,13 +2629,44 @@ getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
 {
   char cfgstr[1024] = {'\0', };
   struct json_object *so_obj = json_object_new_object();
+  struct json_object *so_obj_alua_ao_tpg;
+  struct json_object *so_obj_alua_ano_tpg;
+  struct json_object *so_obj_alua_tpgs_arr;
   struct json_object *so_obj_attr = json_object_new_object();
 
 
+  // "alua_tpgs": [
+  // {
+  if (info->prio_path[0]) {
+    so_obj_alua_ao_tpg = json_object_new_object();
+    so_obj_alua_ano_tpg = json_object_new_object();
+    so_obj_alua_tpgs_arr = json_object_new_array();
+
+    json_object_object_add(so_obj_alua_ao_tpg, "alua_access_type", json_object_new_int(1));
+    json_object_object_add(so_obj_alua_ao_tpg, "alua_access_state", json_object_new_int(0));
+    json_object_object_add(so_obj_alua_ao_tpg, "name", GB_JSON_OBJ_TO_STR(GB_ALUA_AO_TPG_NAME));
+    json_object_object_add(so_obj_alua_ao_tpg, "tg_pt_gp_id", json_object_new_int(1));
+
+    json_object_object_add(so_obj_alua_ano_tpg, "alua_access_type", json_object_new_int(1));
+    json_object_object_add(so_obj_alua_ano_tpg, "alua_access_state", json_object_new_int(1));
+    json_object_object_add(so_obj_alua_ano_tpg, "name", GB_JSON_OBJ_TO_STR(GB_ALUA_ANO_TPG_NAME));
+    json_object_object_add(so_obj_alua_ano_tpg, "tg_pt_gp_id", json_object_new_int(2));
+
+  // }
+
+    json_object_array_add(so_obj_alua_tpgs_arr, so_obj_alua_ao_tpg);
+    json_object_array_add(so_obj_alua_tpgs_arr, so_obj_alua_ano_tpg);
+
+    json_object_object_add(so_obj, "alua_tpgs", so_obj_alua_tpgs_arr);
+  }
+  // ]
+
+  // "attributes": {
   json_object_object_add(so_obj_attr, "cmd_time_out", json_object_new_int(0));
   json_object_object_add(so_obj_attr, "dev_size", json_object_new_int64(info->size));
 
   json_object_object_add(so_obj, "attributes", so_obj_attr);
+  // }
 
   snprintf(cfgstr, 1024, "glfs/%s@%s/block-store/%s", info->volume, blk->addr, info->gbid);
   json_object_object_add(so_obj, "config", GB_JSON_OBJ_TO_STR(cfgstr));
