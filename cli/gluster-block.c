@@ -26,6 +26,8 @@
                                 "[force] [--json*]"
 # define  GB_REPLACE_HELP_STR "gluster-block replace <volname/blockname> "     \
                                 "<old-node> <new-node> [force] [--json*]"
+# define  GB_GENCONF_HELP_STR "gluster-block genconfig <volname[,volume2,volume3,...]> "\
+                              "enable-tpg <host> [--json*]"
 # define  GB_INFO_HELP_STR    "gluster-block info <volname/blockname> [--json*]"
 # define  GB_LIST_HELP_STR    "gluster-block list <volname> [--json*]"
 
@@ -49,7 +51,8 @@ typedef enum clioperations {
   DELETE_CLI = 4,
   MODIFY_CLI = 5,
   MODIFY_SIZE_CLI = 6,
-  REPLACE_CLI = 7
+  REPLACE_CLI = 7,
+  GENCONF_CLI = 8
 } clioperations;
 
 
@@ -67,6 +70,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   blockModifyCli *modify_obj;
   blockModifySizeCli *modify_size_obj;
   blockReplaceCli *replace_obj;
+  blockGenConfigCli *genconfig_obj;
   blockResponse reply = {0,};
   char          errMsg[2048] = {0};
 
@@ -170,6 +174,14 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
       goto out;
     }
     break;
+  case GENCONF_CLI:
+    genconfig_obj = cobj;
+    if (block_gen_config_cli_1(genconfig_obj, &reply, clnt) != RPC_SUCCESS) {
+      LOG("cli", GB_LOG_ERROR, "%sgenconfig on volume %s failed",
+          clnt_sperror(clnt, "block_gen_config_cli_1"), genconfig_obj->volume);
+      goto out;
+    }
+    break;
   }
 
  out:
@@ -256,6 +268,30 @@ glusterBlockIsNameAcceptable(char *name)
     if (!isalnum(name[i]) && (name[i] != '_') && (name[i] != '-'))
       return FALSE;
   }
+  return TRUE;
+}
+
+static bool
+glusterBlockIsVolListAcceptable(char *name)
+{
+  char *tok, *tmp;
+  char delim[2] = {'\0', };
+
+
+  if (!name || GB_STRDUP(tmp, name) < 0)
+    return FALSE;
+
+  delim[0] = GB_VOLS_DELIMITER;
+  tok = strtok(tmp, delim);
+  while (tok != NULL) {
+    if (!glusterBlockIsNameAcceptable(tok)) {
+      GB_FREE(tmp);
+      return FALSE;
+    }
+    tok = strtok(NULL, delim);
+  }
+
+  GB_FREE(tmp);
   return TRUE;
 }
 
@@ -753,6 +789,48 @@ glusterBlockReplace(int argcount, char **options, int json)
 
 
 static int
+glusterBlockGenConfig(int argcount, char **options, int json)
+{
+  blockGenConfigCli robj = {0};
+  int ret = -1;
+  char helpMsg[256] = {0, };
+
+
+  GB_ARGCHECK_OR_RETURN(argcount, 5, "genconfig", GB_GENCONF_HELP_STR);
+
+  if (!glusterBlockIsVolListAcceptable(options[2])) {
+    MSG("volume list(%s) should be delimited by '%c' character only\n%s\n",
+        options[2], GB_VOLS_DELIMITER, GB_GENCONF_HELP_STR);
+    goto out;
+  }
+
+  GB_STRCPYSTATIC(robj.volume, options[2]);
+
+  if (!strcmp(options[3], "enable-tpg")) {
+    if (!glusterBlockIsAddrAcceptable(options[4])) {
+      MSG("host addr (%s) should be a valid ip address\n%s\n",
+          options[3], GB_REPLACE_HELP_STR);
+      goto out;
+    }
+    GB_STRCPYSTATIC(robj.addr, options[4]);
+  } else {
+      MSG("unknown option '%s' for genconfig:\n%s\n", options[3], GB_GENCONF_HELP_STR);
+      return -1;
+  }
+  robj.json_resp = json;
+
+  ret = glusterBlockCliRPC_1(&robj, GENCONF_CLI);
+  if (ret) {
+    LOG("cli", GB_LOG_ERROR, "failed genconfig on volume %s", robj.volume);
+  }
+
+ out:
+
+  return ret;
+}
+
+
+static int
 glusterBlockParseArgs(int count, char **options)
 {
   int ret = 0;
@@ -813,7 +891,12 @@ glusterBlockParseArgs(int count, char **options)
         LOG("cli", GB_LOG_ERROR, "%s", FAILED_REPLACE);
       }
       goto out;
-
+    case GB_CLI_GENCONFIG:
+      ret = glusterBlockGenConfig(count, options, json);
+      if (ret) {
+        LOG("cli", GB_LOG_ERROR, "%s", FAILED_GENCONFIG);
+      }
+      goto out;
     case GB_CLI_DELETE:
       ret = glusterBlockDelete(count, options, json);
       if (ret) {

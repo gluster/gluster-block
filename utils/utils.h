@@ -93,6 +93,9 @@
 # define  FAILED_REPLACE            "failed in replace"
 # define  FAILED_REMOTE_REPLACE     "failed in remote replace portal"
 
+/* Config generate */
+# define  FAILED_GENCONFIG          "failed in generation of config"
+
 # define  FAILED_DEPENDENCY         "failed dependency, check if you have targetcli and tcmu-runner installed"
 
 # define FMT_WARN(fmt...) do { if (0) printf (fmt); } while (0)
@@ -350,6 +353,7 @@ typedef enum gbCliCmdlineOption {
   GB_CLI_DELETE,
   GB_CLI_MODIFY,
   GB_CLI_REPLACE,
+  GB_CLI_GENCONFIG,
   GB_CLI_HELP,
   GB_CLI_HYPHEN_HELP,
   GB_CLI_VERSION,
@@ -368,6 +372,7 @@ static const char *const gbCliCmdlineOptLookup[] = {
   [GB_CLI_DELETE]         = "delete",
   [GB_CLI_MODIFY]         = "modify",
   [GB_CLI_REPLACE]        = "replace",
+  [GB_CLI_GENCONFIG]      = "genconfig",
   [GB_CLI_HELP]           = "help",
   [GB_CLI_HYPHEN_HELP]    = "--help",
   [GB_CLI_VERSION]        = "version",

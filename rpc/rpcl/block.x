@@ -124,6 +124,12 @@ struct blockReplaceCli {
   enum JsonResponseFormat     json_resp;
 };
 
+struct blockGenConfigCli {
+  char      volume[255];
+  char      addr[255];
+  enum JsonResponseFormat     json_resp;
+};
+
 struct blockResponse {
   int       exit;       /* exit code of the command */
   string    out<>;      /* output; TODO: return respective objects */
@@ -153,5 +159,6 @@ program GLUSTER_BLOCK_CLI {
     blockResponse BLOCK_MODIFY_CLI(blockModifyCli) = 5;
     blockResponse BLOCK_REPLACE_CLI(blockReplaceCli) = 6;
     blockResponse BLOCK_MODIFY_SIZE_CLI(blockModifySizeCli) = 7;
+    blockResponse BLOCK_GEN_CONFIG_CLI(blockGenConfigCli) = 8;
   } = 1;
 } = 212153113; /* B2 L12 O15 C3 K11 C3 */

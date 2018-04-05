@@ -197,6 +197,79 @@ blockServerDefFree(blockServerDefPtr blkServers)
 }
 
 
+void
+strToCharArrayDefFree(strToCharArrayDefPtr arr)
+{
+  size_t i;
+
+
+  if (!arr) {
+    return;
+  }
+
+  for (i = 0; i < arr->len; i++) {
+     GB_FREE(arr->data[i]);
+  }
+  GB_FREE(arr->data);
+  GB_FREE(arr);
+}
+
+
+strToCharArrayDefPtr
+getCharArrayFromDelimitedStr(char *str, char delim)
+{
+  strToCharArrayDefPtr arr;
+  char *tmp;
+  char *tok;
+  char *base;
+  size_t i = 0;
+
+  if (!str) {
+    return NULL;
+  }
+
+  if (GB_STRDUP(tmp, str) < 0) {
+    return NULL;
+  }
+  base = tmp;
+
+  if (GB_ALLOC(arr) < 0) {
+    goto out;
+  }
+
+  /* count number of Vols */
+  while (*tmp) {
+    if (*tmp == delim) {
+      arr->len++;
+    }
+    tmp++;
+  }
+  arr->len++;
+  tmp = base; /* reset vols */
+
+
+  if (GB_ALLOC_N(arr->data, arr->len) < 0) {
+    goto out;
+  }
+
+  tok = strtok(tmp, &delim);
+  for (i = 0; tok != NULL; i++) {
+    if (GB_STRDUP(arr->data[i], tok) < 0) {
+      goto out;
+    }
+    tok = strtok(NULL, &delim);
+  }
+
+  GB_FREE(base);
+  return arr;
+
+ out:
+  GB_FREE(base);
+  strToCharArrayDefFree(arr);
+  return NULL;
+}
+
+
 bool
 blockhostIsValid(char *status)
 {
