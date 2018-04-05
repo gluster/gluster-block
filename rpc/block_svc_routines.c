@@ -30,7 +30,7 @@
 # define   GB_TGCLI_GLFS        "targetcli " GB_TGCLI_GLFS_PATH
 # define   GB_TGCLI_CHECK       GB_TGCLI_GLFS " ls | grep ' %s ' | grep '/%s ' > " DEVNULLPATH
 # define   GB_TGCLI_ISCSI_PATH  "/iscsi"
-# define   GB_TGCLI_SAVE        "/ saveconfig"
+# define   GB_TGCLI_GLFS_SAVE   GB_TGCLI_GLFS_PATH "/%s saveconfig"
 # define   GB_TGCLI_ATTRIBUTES  "generate_node_acls=1 demo_mode_write_protect=0"
 # define   GB_TGCLI_IQN_PREFIX  "iqn.2016-12.org.gluster-block:"
 
@@ -3685,6 +3685,7 @@ block_replace_1_svc_st(blockReplace *blk, struct svc_req *rqstp)
 {
   blockResponse *reply = NULL;
   char *path = NULL;
+  char *save = NULL;
   char *exec = NULL;
   char *tpg;
 
@@ -3733,9 +3734,13 @@ block_replace_1_svc_st(blockReplace *blk, struct svc_req *rqstp)
     goto out;
   }
 
+  if (GB_ASPRINTF(&save, GB_TGCLI_GLFS_SAVE, blk->block_name) == -1) {
+    goto out;
+  }
+
   if (GB_ASPRINTF(&exec,
                   "targetcli <<EOF\n%s delete %s ip_port=3260\n%s create %s\n%s\nEOF",
-                  path, blk->ripaddr, path, blk->ipaddr, GB_TGCLI_SAVE) == -1) {
+                  path, blk->ripaddr, path, blk->ipaddr, save) == -1) {
     goto out;
   }
   GB_FREE(path);
@@ -3750,6 +3755,7 @@ block_replace_1_svc_st(blockReplace *blk, struct svc_req *rqstp)
 out:
   GB_FREE(path);
   GB_FREE(exec);
+  GB_FREE(save);
   return reply;
 }
 
@@ -3769,6 +3775,7 @@ block_create_common(blockCreate *blk, char *rbsize)
   char *portal = NULL;
   char *attr = NULL;
   char *authcred = NULL;
+  char *save = NULL;
   char *exec = NULL;
   blockResponse *reply = NULL;
   blockServerDefPtr list = NULL;
@@ -3903,7 +3910,11 @@ block_create_common(blockCreate *blk, char *rbsize)
     GB_FREE(lun0);
   }
 
-  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, GB_TGCLI_SAVE) == -1) {
+  if (GB_ASPRINTF(&save, GB_TGCLI_GLFS_SAVE, blk->block_name) == -1) {
+    goto out;
+  }
+
+  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, save) == -1) {
     goto out;
   }
   GB_FREE(tmp);
@@ -3920,6 +3931,7 @@ block_create_common(blockCreate *blk, char *rbsize)
 
  out:
   GB_FREE(exec);
+  GB_FREE(save);
   GB_FREE(authcred);
   GB_FREE(attr);
   GB_FREE(portal);
@@ -4153,6 +4165,7 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
   int ret;
   char *iqn = NULL;
   char *backstore = NULL;
+  char *save = NULL;
   char *exec = NULL;
   blockResponse *reply = NULL;
 
@@ -4194,8 +4207,12 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
     goto out;
   }
 
+  if (GB_ASPRINTF(&save, GB_TGCLI_GLFS_SAVE, blk->block_name) == -1) {
+    goto out;
+  }
+
   if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\n%s\nEOF", backstore, iqn,
-                  GB_TGCLI_SAVE) == -1) {
+                  save) == -1) {
     goto out;
   }
 
@@ -4211,6 +4228,7 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
 
  out:
   GB_FREE(exec);
+  GB_FREE(save);
   GB_FREE(backstore);
   GB_FREE(iqn);
 
@@ -4239,6 +4257,7 @@ block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
   int ret;
   char *authattr = NULL;
   char *authcred = NULL;
+  char *save = NULL;
   char *exec = NULL;
   blockResponse *reply = NULL;
   size_t tpgs = 0;
@@ -4342,7 +4361,11 @@ block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
     }
   }
 
-  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, GB_TGCLI_SAVE) == -1) {
+  if (GB_ASPRINTF(&save, GB_TGCLI_GLFS_SAVE, blk->block_name) == -1) {
+    goto out;
+  }
+
+  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, save) == -1) {
     goto out;
   }
 
@@ -4354,6 +4377,7 @@ block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
  out:
   GB_FREE(tmp);
   GB_FREE(exec);
+  GB_FREE(save);
   GB_FREE(authattr);
   GB_FREE(authcred);
 
@@ -4365,6 +4389,7 @@ blockResponse *
 block_modify_size_1_svc_st(blockModifySize *blk, struct svc_req *rqstp)
 {
   int ret;
+  char *save = NULL;
   char *exec = NULL;
   blockResponse *reply = NULL;
   char *tmp = NULL;
@@ -4403,7 +4428,11 @@ block_modify_size_1_svc_st(blockModifySize *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, GB_TGCLI_SAVE) == -1) {
+  if (GB_ASPRINTF(&save, GB_TGCLI_GLFS_SAVE, blk->block_name) == -1) {
+    goto out;
+  }
+
+  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, save) == -1) {
     goto out;
   }
 
@@ -4420,6 +4449,7 @@ block_modify_size_1_svc_st(blockModifySize *blk, struct svc_req *rqstp)
  out:
   GB_FREE(tmp);
   GB_FREE(exec);
+  GB_FREE(save);
 
   return reply;
 }
