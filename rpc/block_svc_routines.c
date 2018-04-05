@@ -60,7 +60,8 @@ typedef enum operations {
   REPLACE_GET_PORTAL_TPG_SRV,
   LIST_SRV,
   INFO_SRV,
-  VERSION_SRV
+  VERSION_SRV,
+  GENCONFIG_SRV
 } operations;
 
 
@@ -97,6 +98,12 @@ typedef struct blockRemoteModifyResp {
   char *rb_attempt;
   char *rb_success;
 } blockRemoteModifyResp;
+
+
+typedef struct soTgObj {
+   struct json_object *so_arr;
+   struct json_object *tg_arr;
+} soTgObj;
 
 
 typedef struct blockRemoteDeleteResp {
@@ -2488,6 +2495,335 @@ block_replace_cli_1_svc_st(blockReplaceCli *blk, struct svc_req *rqstp)
   blockRemoteReplaceRespFree(savereply);
 
 optfail:
+  if (lkfd && glfs_close(lkfd) != 0) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "glfs_close(%s): on volume %s for block %s failed[%s]",
+        GB_TXLOCKFILE, blk->volume, blk->block_name, strerror(errno));
+  }
+
+  return reply;
+}
+
+
+struct json_object *
+getTpgObj(char *block, MetaInfo *info, blockGenConfigCli *blk, char *portal, int tag)
+{
+  int auth = 0;
+  uuid_t uuid;
+  char alias[UUID_BUF_SIZE];
+  char alias_10[11] = {'\0', };
+  char lun_so[256] = {'\0', };
+
+  struct json_object *tpg_obj = json_object_new_object();
+  struct json_object *tpg_attr_obj = json_object_new_object();
+  struct json_object *tpg_luns_arr = json_object_new_array();
+  struct json_object *tpg_lun_obj = json_object_new_object();
+  struct json_object *tpg_portals_arr = json_object_new_array();
+  struct json_object *tpg_portal_obj = json_object_new_object();
+  struct json_object *tpg_params_obj = json_object_new_object();
+
+
+  // {  Tpg Object open
+  auth = 1;
+  if(info->passwd[0] == '\0') {
+    auth = 0;
+  }
+
+  json_object_object_add(tpg_attr_obj, "authentication", json_object_new_int(auth));
+  json_object_object_add(tpg_attr_obj, "cache_dynamic_acls", json_object_new_int(1));
+  json_object_object_add(tpg_attr_obj, "demo_mode_write_protect", json_object_new_int(0));
+  json_object_object_add(tpg_attr_obj, "generate_node_acls", json_object_new_int(1));
+  if (strcmp(blk->addr, portal)) {
+    json_object_object_add(tpg_attr_obj, "tpg_enabled_sendtargets", json_object_new_int(0));
+  }
+  json_object_object_add(tpg_obj, "attributes", tpg_attr_obj);
+  if (auth) {
+    json_object_object_add(tpg_obj, "chap_password", GB_JSON_OBJ_TO_STR(info->passwd));
+    json_object_object_add(tpg_obj, "chap_userid", GB_JSON_OBJ_TO_STR(info->gbid));
+  }
+
+  if (!strcmp(blk->addr, portal)) {
+    json_object_object_add(tpg_obj, "enable", json_object_new_boolean(TRUE));
+  } else {
+    json_object_object_add(tpg_obj, "enable", json_object_new_boolean(FALSE));
+  }
+
+  // "luns" : [
+  uuid_generate(uuid);
+  uuid_unparse(uuid, alias);
+  snprintf(alias_10, 11, "%.10s", alias+24);
+  json_object_object_add(tpg_lun_obj, "alias", GB_JSON_OBJ_TO_STR(alias_10));
+  snprintf(lun_so, 256, "/backstores/user/%s", block);
+  json_object_object_add(tpg_lun_obj, "storage_object", GB_JSON_OBJ_TO_STR(lun_so));
+  json_object_object_add(tpg_lun_obj, "index", json_object_new_int(0));
+  json_object_array_add(tpg_luns_arr, tpg_lun_obj);
+  json_object_object_add(tpg_obj, "luns", tpg_luns_arr);
+  // ]
+
+  if (auth) {
+    json_object_object_add(tpg_params_obj, "AuthMethod", GB_JSON_OBJ_TO_STR("CHAP"));
+  }
+  json_object_object_add(tpg_obj, "parameters", tpg_params_obj);
+
+  // "portals" : [
+  json_object_object_add(tpg_portal_obj, "ip_address", GB_JSON_OBJ_TO_STR(portal));
+  json_object_object_add(tpg_portal_obj, "port", json_object_new_int(3260));
+  json_object_array_add(tpg_portals_arr, tpg_portal_obj);
+  json_object_object_add(tpg_obj, "portals", tpg_portals_arr);
+  // ]
+
+  json_object_object_add(tpg_obj, "tag", json_object_new_int(tag));
+  // }  Tpg Object close
+
+  return tpg_obj;
+}
+
+
+struct json_object *
+getTgObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
+{
+  size_t i, tag = 1;
+  struct json_object *tg_obj = json_object_new_object();
+  struct json_object *tpgs_arr = json_object_new_array();
+  struct json_object *tpg_obj = NULL;
+  char iqn[128] = {'\0', };
+
+
+  json_object_object_add(tg_obj, "fabric", GB_JSON_OBJ_TO_STR("iscsi"));
+
+  // "tpgs:" : [
+  // {
+  for (i = 0; i < info->nhosts; i++) {
+    if (blockhostIsValid (info->list[i]->status)) {
+      tpg_obj = getTpgObj(block, info, blk, info->list[i]->addr, tag);
+      json_object_array_add(tpgs_arr, tpg_obj);
+      tag++;
+    }
+  }
+  // },
+  // ]
+
+  json_object_object_add(tg_obj, "tpgs", tpgs_arr);
+
+  snprintf(iqn, 128, "iqn.2016-12.org.gluster-block:%s", info->gbid);
+  json_object_object_add(tg_obj, "wwn", GB_JSON_OBJ_TO_STR(iqn));
+
+  return tg_obj;
+}
+
+
+struct json_object *
+getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
+{
+  char cfgstr[1024] = {'\0', };
+  struct json_object *so_obj = json_object_new_object();
+  struct json_object *so_obj_attr = json_object_new_object();
+
+
+  json_object_object_add(so_obj_attr, "cmd_time_out", json_object_new_int(0));
+  json_object_object_add(so_obj_attr, "dev_size", json_object_new_int64(info->size));
+
+  json_object_object_add(so_obj, "attributes", so_obj_attr);
+
+  snprintf(cfgstr, 1024, "glfs/%s@%s/block-store/%s", info->volume, blk->addr, info->gbid);
+  json_object_object_add(so_obj, "config", GB_JSON_OBJ_TO_STR(cfgstr));
+  json_object_object_add(so_obj, "name", GB_JSON_OBJ_TO_STR(block));
+  json_object_object_add(so_obj, "plugin", GB_JSON_OBJ_TO_STR("user"));
+  json_object_object_add(so_obj, "size", json_object_new_int64(info->size));
+  json_object_object_add(so_obj, "wwn", GB_JSON_OBJ_TO_STR(info->gbid));
+
+  return so_obj;
+}
+
+
+static int
+getSoTgArraysForAllVolume(struct soTgObj *obj, blockGenConfigCli *blk,
+                          char **errMsg, int *errCode)
+{
+  struct glfs *glfs;
+  struct glfs_fd *lkfd = NULL;
+  struct glfs_fd *tgmdfd = NULL;
+  struct dirent *entry;
+  MetaInfo *info = NULL;
+  strToCharArrayDefPtr vols;
+  size_t i, j;
+  int ret = -1;
+  bool partOfBlock;
+  struct json_object *so_obj = NULL;
+  struct json_object *tg_obj = NULL;
+
+
+  vols = getCharArrayFromDelimitedStr(blk->volume, GB_VOLS_DELIMITER);
+  if (!vols) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "getCharArrayFromDelimitedStr(%s) failed", blk->volume);
+    goto optfail;
+  }
+
+  for (i = 0; i < vols->len; i++) {
+    glfs = glusterBlockVolumeInit(vols->data[i], errCode, errMsg);
+    if (!glfs) {
+      LOG("mgmt", GB_LOG_ERROR,
+          "glusterBlockVolumeInit(%s) failed", vols->data[i]);
+      goto optfail;
+    }
+
+    lkfd = glusterBlockCreateMetaLockFile(glfs, vols->data[i], errCode, errMsg);
+    if (!lkfd) {
+      LOG("mgmt", GB_LOG_ERROR, "%s %s", FAILED_CREATING_META, vols->data[i]);
+      goto optfail;
+    }
+
+    GB_METALOCK_OR_GOTO(lkfd, vols->data[i], *errCode, *errMsg, out);
+
+    tgmdfd = glfs_opendir(glfs, GB_METADIR);
+    if (!tgmdfd) {
+      *errCode = errno;
+      GB_ASPRINTF(errMsg, "Not able to open metadata directory for volume "
+          "%s[%s]", vols->data[i], strerror(*errCode));
+      LOG("mgmt", GB_LOG_ERROR, "glfs_opendir(%s): on volume %s failed[%s]",
+          GB_METADIR, vols->data[i], strerror(errno));
+      ret = -1;
+      goto out;
+    }
+
+    while ((entry = glfs_readdir(tgmdfd))) {
+      if (strcmp(entry->d_name, ".") &&
+          strcmp(entry->d_name, "..") &&
+          strcmp(entry->d_name, GB_TXLOCKFILE) &&
+          strcmp(entry->d_name, GB_PRIO_FILENAME)) {
+
+        if (GB_ALLOC(info) < 0) {
+          ret = -1;
+          goto out;
+        }
+        ret = blockGetMetaInfo(glfs, entry->d_name, info, NULL);
+        if (ret) {
+          goto out;
+        }
+
+        partOfBlock = false;
+        for (j = 0; j < info->nhosts; j++) {
+          if (blockhostIsValid(info->list[j]->status) && !strcmp(info->list[j]->addr, blk->addr)) {
+            partOfBlock = true;
+          }
+        }
+        if (!partOfBlock) {
+          blockFreeMetaInfo(info);
+          continue;
+        }
+
+        /* storage_objects */
+        so_obj = getSoObj(entry->d_name, info, blk);
+        json_object_array_add(obj->so_arr, so_obj);
+
+        /* targets */
+        tg_obj = getTgObj(entry->d_name, info, blk);
+        json_object_array_add(obj->tg_arr, tg_obj);
+
+        blockFreeMetaInfo(info);
+      }
+    }
+
+    GB_METAUNLOCK(lkfd, vols->data[i], *errCode, *errMsg);
+    if (tgmdfd && glfs_closedir (tgmdfd) != 0) {
+      LOG("mgmt", GB_LOG_ERROR, "glfs_closedir(%s): on volume %s failed[%s]",
+          GB_METADIR, vols->data[i], strerror(errno));
+    }
+    if (lkfd && glfs_close(lkfd) != 0) {
+      LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
+          GB_TXLOCKFILE, vols->data[i], strerror(errno));
+    }
+  }
+
+  ret = 0;
+  goto free;
+
+ out:
+  GB_METAUNLOCK(lkfd, vols->data[i], *errCode, *errMsg);
+  if (tgmdfd && glfs_closedir (tgmdfd) != 0) {
+    LOG("mgmt", GB_LOG_ERROR, "glfs_closedir(%s): on volume %s failed[%s]",
+        GB_METADIR, vols->data[i], strerror(errno));
+  }
+  blockFreeMetaInfo(info);
+
+ optfail:
+  if (lkfd && glfs_close(lkfd) != 0) {
+    LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
+        GB_TXLOCKFILE, vols->data[i], strerror(errno));
+  }
+
+ free:
+  strToCharArrayDefFree(vols);
+
+  return ret;
+}
+
+
+static int
+glusterBlockGenConfigSvc(blockGenConfigCli *blk,
+                         blockResponse *reply, char **errMsg, int *errCode)
+{
+  struct soTgObj *obj = NULL;
+  struct json_object *jobj = json_object_new_object();
+
+
+  if (GB_ALLOC(obj) < 0) {
+    goto out;
+  }
+  obj->so_arr = json_object_new_array();
+  obj->tg_arr = json_object_new_array();
+
+  reply->exit = getSoTgArraysForAllVolume(obj, blk, errMsg, errCode);
+  if(reply->exit) {
+    LOG("mgmt", GB_LOG_ERROR, "getSoTgArraysPerVolume(): on volume[s] %s failed",
+        blk->volume);
+    goto out;
+  }
+
+  json_object_object_add(jobj, "storage_objects", obj->so_arr);
+  json_object_object_add(jobj, "targets", obj->tg_arr);
+
+ out:
+  if(reply->exit) {
+    blockFormatErrorResponse(GENCONFIG_SRV, blk->json_resp, *errCode,
+                             GB_DEFAULT_ERRMSG, reply);
+  } else {
+    GB_ASPRINTF(&reply->out, "%s\n", json_object_to_json_string_ext(jobj, JSON_C_TO_STRING_PRETTY));
+  }
+  json_object_put(jobj);
+  GB_FREE(obj);
+
+  return reply->exit;
+}
+
+
+blockResponse *
+block_gen_config_cli_1_svc_st(blockGenConfigCli *blk, struct svc_req *rqstp)
+{
+  blockResponse *reply = NULL;
+  int errCode = 0;
+  char *errMsg = NULL;
+
+
+  LOG("mgmt", GB_LOG_DEBUG,
+      "genconfig request, volume[s]=%s addr=%s", blk->volume, blk->addr);
+
+  if (GB_ALLOC(reply) < 0) {
+    return NULL;
+  }
+  reply->exit = -1;
+
+  errCode = glusterBlockGenConfigSvc(blk, reply, &errMsg, &errCode);
+  if (errCode) {
+    LOG("mgmt", GB_LOG_ERROR, "glusterBlockGenConfigSvc(): on volume[s] %s failed with %s",
+        blk->volume, errMsg?errMsg:"");
+    goto out;
+  }
+
+  LOG("mgmt", GB_LOG_DEBUG, "genconfig cli success, volume[s]=%s", blk->volume);
+
+ out:
   return reply;
 }
 
@@ -4994,6 +5330,15 @@ block_replace_cli_1_svc(blockReplaceCli *blk, blockResponse *reply,
   return ret;
 }
 
+bool_t
+block_gen_config_cli_1_svc(blockGenConfigCli *blk, blockResponse *reply,
+                      struct svc_req *rqstp)
+{
+  int ret;
+
+  GB_RPC_CALL(gen_config_cli, blk, reply, rqstp, ret);
+  return ret;
+}
 
 bool_t
 block_list_cli_1_svc(blockListCli *blk, blockResponse *reply,

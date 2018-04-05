@@ -15,12 +15,21 @@
 # include "utils.h"
 # include "block.h"
 
+# define   GB_VOLS_DELIMITER    ','
+
 
 typedef struct blockServerDef {
   size_t nhosts;
   char   **hosts;
 } blockServerDef;
 typedef blockServerDef *blockServerDefPtr;
+
+
+typedef struct strToCharArrayDef {
+  size_t len;
+  char   **data;
+} strToCharArrayDef;
+typedef strToCharArrayDef *strToCharArrayDefPtr;
 
 
 static const char *const JsonResponseFormatLookup[] = {
@@ -80,6 +89,10 @@ static const char *const ConvertStringToTrillianLookup[] = {
   [GB_BOOL_MAX]             = NULL,
 };
 
+
+strToCharArrayDefPtr getCharArrayFromDelimitedStr(char *str, char delim);
+
+void strToCharArrayDefFree(strToCharArrayDefPtr arr);
 
 enum JsonResponseFormat jsonResponseFormatParse(const char *opt);
 
