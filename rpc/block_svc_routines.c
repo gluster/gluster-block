@@ -44,6 +44,7 @@
 
 # define   GB_ALUA_AO_TPG_NAME          "glfs_tg_pt_gp_ao"
 # define   GB_ALUA_ANO_TPG_NAME         "glfs_tg_pt_gp_ano"
+# define   GB_RING_BUFFER_STR           "max_data_area_mb"
 
 # define   GB_OLD_CAP_MAX       9
 
@@ -2628,6 +2629,7 @@ struct json_object *
 getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
 {
   char cfgstr[1024] = {'\0', };
+  char control[1024] = {'\0', };
   struct json_object *so_obj = json_object_new_object();
   struct json_object *so_obj_alua_ao_tpg;
   struct json_object *so_obj_alua_ano_tpg;
@@ -2670,6 +2672,10 @@ getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
 
   snprintf(cfgstr, 1024, "glfs/%s@%s/block-store/%s", info->volume, blk->addr, info->gbid);
   json_object_object_add(so_obj, "config", GB_JSON_OBJ_TO_STR(cfgstr));
+  if (info->rb_size) {
+    snprintf(control, 1024, "%s=%zu", GB_RING_BUFFER_STR, info->rb_size);
+    json_object_object_add(so_obj, "control", GB_JSON_OBJ_TO_STR(control));
+  }
   json_object_object_add(so_obj, "name", GB_JSON_OBJ_TO_STR(block));
   json_object_object_add(so_obj, "plugin", GB_JSON_OBJ_TO_STR("user"));
   json_object_object_add(so_obj, "size", json_object_new_int64(info->size));
@@ -4423,7 +4429,7 @@ block_create_v2_1_svc_st(blockCreate2 *blk, struct svc_req *rqstp)
 
 
   if (blk->rb_size) {
-    GB_ASPRINTF(&rbsize, ",max_data_area_mb=%d", blk->rb_size);
+    GB_ASPRINTF(&rbsize, ",%s=%d", GB_RING_BUFFER_STR, blk->rb_size);
   }
 
   convertTypeCreate2ToCreate(blk, &blk_v1);
