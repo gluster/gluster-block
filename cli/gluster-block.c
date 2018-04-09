@@ -349,11 +349,9 @@ glusterBlockModify(int argcount, char **options, int json)
       MSG("%s\n", "'auth' option is incorrect");
       MSG("%s\n", GB_MODIFY_HELP_STR);
       LOG("cli", GB_LOG_ERROR, "Modify failed while parsing argument "
-                               "to auth  for <%s/%s>",
-                               mobj.volume, mobj.block_name);
+                               "to auth  for <%s/%s>", volume, block);
       goto out;
     }
-    mobj.json_resp = json;
 
     if ((argcount - optind)) {
       MSG("unknown/unsupported option '%s' for modify auth:\n%s\n",
@@ -362,11 +360,14 @@ glusterBlockModify(int argcount, char **options, int json)
       goto out;
     }
 
+    GB_STRCPYSTATIC(mobj.volume, volume);
+    GB_STRCPYSTATIC(mobj.block_name, block);
+    mobj.json_resp = json;
+
     ret = glusterBlockCliRPC_1(&mobj, MODIFY_CLI);
     if (ret) {
       LOG("cli", GB_LOG_ERROR,
-          "failed modifying auth of block %s on volume %s",
-          mobj.block_name, mobj.volume);
+          "failed modifying auth of block %s on volume %s", block, volume);
     }
   } else if (!strcmp(options[optind], "size")) {
     optind++;
