@@ -174,7 +174,7 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
     ret = -1;
     goto out;
   } else {
-    ret = glfs_ftruncate(tgfd, blk->size);
+    ret = glfs_ftruncate(tgfd, blk->size, NULL, NULL);
     if (ret) {
       *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
@@ -270,7 +270,7 @@ glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk,
       goto close;
     }
 
-    ret = glfs_ftruncate(tgfd, blk->size);
+    ret = glfs_ftruncate(tgfd, blk->size, NULL, NULL);
     if (ret) {
       *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
