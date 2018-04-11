@@ -8,7 +8,6 @@
   cases as published by the Free Software Foundation.
 */
 
-
 # include "common.h"
 # include "glfs-operations.h"
 
@@ -212,7 +211,12 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
     ret = -1;
     goto out;
   } else {
-    ret = glfs_ftruncate(tgfd, blk->size);
+#ifdef GLUSTERFS_NOT_NEW
+     ret = glfs_ftruncate(tgfd, blk->size);
+#else
+     ret = glfs_ftruncate(tgfd, blk->size, NULL, NULL);
+#endif
+
     if (ret) {
       *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
@@ -312,7 +316,11 @@ glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk,
       goto close;
     }
 
+#if GLUSTERFS_NOT_NEW
     ret = glfs_ftruncate(tgfd, blk->size);
+#else
+    ret = glfs_ftruncate(tgfd, blk->size, NULL, NULL);
+#endif
     if (ret) {
       *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
