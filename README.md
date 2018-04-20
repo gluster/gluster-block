@@ -183,7 +183,8 @@ You can skip configuring multipath, if you choose not to enable mpath.
 Below we set mapth in Active/Passive mode; Note currently Active/Active is not supported.
 # modprobe dm_multipath
 # mpathconf --enable
-# cat >> /etc/multipath.conf
+
+Please add the below configuration at the end of /etc/multipath.conf file.
 # LIO iSCSI
 devices {
         device {
@@ -198,7 +199,7 @@ devices {
                 rr_weight "uniform"
         }
 }
-Ctrl^C
+
 # systemctl restart multipathd
 # systemctl enable multipathd
 
