@@ -33,6 +33,7 @@ typedef struct MetaInfo {
   char   gbid[38];
   size_t size;
   size_t rb_size;
+  char   prio_path[255];
   size_t mpath;
   char   entry[16];  /* possible strings for ENTRYCREATE: INPROGRESS|SUCCESS|FAIL */
   char   passwd[38];
@@ -73,5 +74,15 @@ blockFreeMetaInfo(MetaInfo *info);
 int
 blockParseValidServers(struct glfs* glfs, char *metafile, int *errCode,
                        blockServerDefPtr *savelist, char *skiphost);
+
+void
+blockGetPrioPath(struct glfs* glfs, char *volume,
+                 blockServerDefPtr list, char *prio_path, size_t prio_len);
+
+void
+blockIncPrioAttr(struct glfs* glfs, char *volume, char *addr);
+
+void
+blockDecPrioAttr(struct glfs* glfs, char *volume, char *addr);
 
 #endif /* _GLFS_OPERATIONS_H */
