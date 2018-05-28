@@ -32,6 +32,7 @@ struct blockCreate2 {
   char      passwd[127];                 /* uuid */
   u_quad_t  size;
   char      block_name[255];
+  char      prio_path[255];
   string    block_hosts<>;               /* for multiple tpg's creation */
   bool      auth_mode;
   u_int     rb_size;                     /* TCMU Ring Buffer size in kernel */

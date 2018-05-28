@@ -44,6 +44,8 @@
 # define  GB_METADIR             "/block-meta"
 # define  GB_STOREDIR            "/block-store"
 # define  GB_TXLOCKFILE          "meta.lock"
+# define  GB_PRIO_FILENAME       "prio.info"
+# define  GB_PRIO_FILE           GB_METADIR "/" GB_PRIO_FILENAME
 
 # define  GB_MAX_LOGFILENAME     64  /* max strlen of file name */
 
@@ -451,6 +453,7 @@ typedef enum Metakey {
   GB_META_ENTRYDELETE = 5,
   GB_META_PASSWD      = 6,
   GB_META_RINGBUFFER  = 7,
+  GB_META_PRIOPATH    = 8,
 
   GB_METAKEY_MAX
 } Metakey;
@@ -464,6 +467,7 @@ static const char *const MetakeyLookup[] = {
   [GB_META_ENTRYDELETE] = "ENTRYDELETE",
   [GB_META_PASSWD]      = "PASSWORD",
   [GB_META_RINGBUFFER]  = "RINGBUFFER",
+  [GB_META_PRIOPATH]    = "PRIOPATH",
 
   [GB_METAKEY_MAX]      = NULL
 };

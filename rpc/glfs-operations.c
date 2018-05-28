@@ -12,6 +12,7 @@
 # include "common.h"
 # include "glfs-operations.h"
 
+# define  GB_LB_ATTR_PREFIX  "user.block"
 
 
 struct glfs *
@@ -473,6 +474,9 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
   case GB_META_PASSWD:
     GB_STRCPYSTATIC(info->passwd, strchr(line, ' ') + 1);
     break;
+  case GB_META_PRIOPATH:
+    GB_STRCPYSTATIC(info->prio_path, strchr(line, ' ') + 1);
+    break;
 
   default:
     if(!info->list) {
@@ -673,4 +677,143 @@ blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info,
   }
 
   return ret;
+}
+
+
+void
+blockGetPrioPath(struct glfs* glfs, char *volume, blockServerDefPtr list,
+                 char *prio_path, size_t prio_len)
+{
+  struct glfs_fd *pfd = NULL;
+  char attr[256];
+  char buf[1024];
+  int index = 0;
+  size_t count = 0;
+  size_t min = 0;
+  bool flag = true;
+  int i;
+  int ret = -1;
+
+
+  pfd = glfs_creat(glfs, GB_PRIO_FILE, O_RDONLY | O_CREAT | O_SYNC,
+                   S_IRUSR | S_IWUSR);
+  if (!pfd) {
+    LOG("gfapi", GB_LOG_ERROR, "glfs_creat(%s) on volume %s failed[%s]",
+        GB_PRIO_FILE, volume, strerror(errno));
+    return;
+  }
+
+  for (i = 0; i < list->nhosts; i++) {
+    memset(attr, '\0', sizeof(attr));
+    snprintf(attr, sizeof(attr), "%s.%s", GB_LB_ATTR_PREFIX, list->hosts[i]);
+
+    memset(buf, '\0', sizeof(buf));
+    if (glfs_fgetxattr(pfd, attr, buf, sizeof(buf)) < 0) {
+      if (errno != ENODATA) {
+        LOG("gfapi", GB_LOG_ERROR,
+            "glfs_fgetxattr(%s) on volume %s for prio file %s failed[%s]",
+            attr, volume, GB_PRIO_FILE, strerror(errno));
+        goto out;
+      } else {
+        index = i;
+        min = 0;
+        break;
+      }
+    }
+
+    sscanf(buf, "%zu", &count);
+    if (flag || min > count) {
+      min = count;
+      index = i;
+      flag = false;
+    }
+  }
+
+  ret = 0;
+
+ out:
+  if (pfd && glfs_close(pfd) != 0) {
+    LOG("gfapi", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
+        GB_PRIO_FILE, volume, strerror(errno));
+  }
+
+  if (!ret) {
+    if (strlen(list->hosts[index]) < sizeof(attr) - strlen(GB_LB_ATTR_PREFIX)) {
+      GB_STRCPY(prio_path, list->hosts[index], prio_len);
+    }
+  }
+
+  return;
+}
+
+
+void
+blockIncPrioAttr(struct glfs* glfs, char *volume, char *addr)
+{
+  size_t count;
+  char buf[1024] = {'\0', };
+  char attr[256] = {'\0', };
+
+
+  snprintf(attr, sizeof(attr), "%s.%s", GB_LB_ATTR_PREFIX, addr);
+  if (glfs_getxattr(glfs, GB_PRIO_FILE, attr, buf, sizeof(buf)) < 0) {
+    if (errno != ENODATA) {
+      LOG("gfapi", GB_LOG_ERROR,
+          "glfs_getxattr(%s) on volume %s for prio file %s failed[%s]",
+          attr, volume, GB_PRIO_FILE, strerror(errno));
+      return;
+    } else {
+      count = 0;
+    }
+  } else {
+    sscanf(buf, "%zu", &count);
+  }
+
+  memset(buf, '\0', sizeof(buf));
+  snprintf(buf, sizeof(buf), "%zu", count + 1);
+  if (glfs_setxattr(glfs, GB_PRIO_FILE, attr, buf, sizeof(buf), 0) < 0) {
+    LOG("gfapi", GB_LOG_ERROR,
+        "glfs_setxattr(%s) on volume %s for prio file %s failed[%s]",
+        attr, volume, GB_PRIO_FILE, strerror(errno));
+    return;
+  }
+
+  return;
+}
+
+
+void
+blockDecPrioAttr(struct glfs* glfs, char *volume, char *addr)
+{
+  size_t count;
+  char buf[1024] = {'\0', };
+  char attr[256] = {'\0', };
+
+
+  snprintf(attr, sizeof(attr), "%s.%s", GB_LB_ATTR_PREFIX, addr);
+  if (glfs_getxattr(glfs, GB_PRIO_FILE, attr, buf, sizeof(buf)) < 0) {
+    if (errno != ENODATA) {
+      LOG("gfapi", GB_LOG_ERROR,
+          "glfs_getxattr(%s) on volume %s for prio file %s failed[%s]",
+          attr, volume, GB_PRIO_FILE, strerror(errno));
+      return;
+    } else {
+      count = 0;
+    }
+  } else {
+    sscanf(buf, "%zu", &count);
+  }
+
+  if (count != 0) {
+    memset(buf, '\0', sizeof(buf));
+    snprintf(buf, sizeof(buf), "%zu", count - 1);
+    if (glfs_setxattr(glfs, GB_PRIO_FILE, attr, buf, sizeof(buf), 0) < 0) {
+      LOG("gfapi", GB_LOG_ERROR,
+          "glfs_setxattr(%s) on volume %s for prio file %s failed[%s]",
+          attr, volume, GB_PRIO_FILE, strerror(errno));
+      return;
+    }
+  }
+
+  return;
 }

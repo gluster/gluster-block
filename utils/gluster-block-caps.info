@@ -129,3 +129,12 @@ modify_size: true
 # Since: 0.4
 ##
 create_ring_buffer: true
+
+##
+# Nature: load-balancing feature (no changes at cli)
+#
+# Description: capability to load balance blocks on HA number of nodes
+#
+# Since: 0.4
+##
+create_load_balance: true
