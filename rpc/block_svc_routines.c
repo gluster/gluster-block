@@ -51,6 +51,7 @@
 # define   GB_OP_SKIPPED        222
 # define   GB_NODE_NOT_EXIST    223
 # define   GB_NODE_IN_USE       224
+# define   GB_BLOCK_NOT_LOADED  225
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -1106,6 +1107,8 @@ glusterBlockCollectAttemptSuccess(blockRemoteObj *args, size_t count,
       }
       GB_FREE(a_tmp);
       a_tmp = *attempt;
+      LOG("mgmt", GB_LOG_ERROR, "%s: on volume %s on host %s",
+          args[i].reply, args[i].volume, args[i].addr);
     } else {
       if (GB_ASPRINTF(success, "%s %s",
                       (s_tmp==NULL?"":s_tmp), args[i].addr) == -1) {
@@ -4658,8 +4661,9 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
     GB_ASPRINTF(&reply->out, "command exit abnormally for %s", blk->block_name);
     goto out;
   } else if (ret == 1) {
-    reply->exit = 0;
-    GB_ASPRINTF(&reply->out, "No %s.", blk->block_name);
+    reply->exit = GB_BLOCK_NOT_LOADED;
+    GB_ASPRINTF(&reply->out, "No target config for block %s.", blk->block_name);
+    LOG("mgmt", GB_LOG_ERROR, "No target config for block %s.", blk->block_name);
     goto out;
   }
   GB_FREE(exec);
@@ -4755,8 +4759,9 @@ block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
     GB_ASPRINTF(&reply->out, "command exit abnormally for %s", blk->block_name);
     goto out;
   } else if (ret == 1) {
-    reply->exit = 0;
-    GB_ASPRINTF(&reply->out, "No %s.", blk->block_name);
+    reply->exit = GB_BLOCK_NOT_LOADED;
+    GB_ASPRINTF(&reply->out, "No target config for block %s.", blk->block_name);
+    LOG("mgmt", GB_LOG_ERROR, "No target config for block %s.", blk->block_name);
     goto out;
   }
   GB_FREE(exec);
@@ -4884,8 +4889,9 @@ block_modify_size_1_svc_st(blockModifySize *blk, struct svc_req *rqstp)
     GB_ASPRINTF(&reply->out, "command exit abnormally for %s", blk->block_name);
     goto out;
   } else if (ret == 1) {
-    reply->exit = 0;
-    GB_ASPRINTF(&reply->out, "No %s.", blk->block_name);
+    reply->exit = GB_BLOCK_NOT_LOADED;
+    GB_ASPRINTF(&reply->out, "No target config for block %s.", blk->block_name);
+    LOG("mgmt", GB_LOG_ERROR, "No target config for block %s.", blk->block_name);
     goto out;
   }
   GB_FREE(exec);
