@@ -4646,7 +4646,6 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
   int ret;
   char *iqn = NULL;
   char *backstore = NULL;
-  char *save = NULL;
   char *exec = NULL;
   blockResponse *reply = NULL;
 
@@ -4684,17 +4683,12 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  if (GB_ASPRINTF(&backstore, "%s %s %s", GB_TGCLI_GLFS_PATH,
+  if (GB_ASPRINTF(&backstore, "%s %s name=%s save=True", GB_TGCLI_GLFS_PATH,
                   GB_DELETE, blk->block_name) == -1) {
     goto out;
   }
 
-  if (GB_ASPRINTF(&save, GB_TGCLI_GLFS_SAVE, blk->block_name) == -1) {
-    goto out;
-  }
-
-  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\n%s\nEOF", backstore, iqn,
-                  save) == -1) {
+  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", backstore, iqn) == -1) {
     goto out;
   }
 
@@ -4710,7 +4704,6 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
 
  out:
   GB_FREE(exec);
-  GB_FREE(save);
   GB_FREE(backstore);
   GB_FREE(iqn);
 

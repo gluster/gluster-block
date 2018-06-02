@@ -25,7 +25,7 @@
 # define   GB_TGCLI_GLOBALS     "targetcli set "                               \
                                 "global auto_add_default_portal=false "        \
                                 "auto_enable_tpgt=false loglevel_file=info "   \
-                                "logfile=%s"
+                                "logfile=%s auto_save_on_exit=false"
 
 
 extern size_t glfsLruCount;
