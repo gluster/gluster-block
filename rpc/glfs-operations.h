@@ -85,4 +85,7 @@ blockIncPrioAttr(struct glfs* glfs, char *volume, char *addr);
 void
 blockDecPrioAttr(struct glfs* glfs, char *volume, char *addr);
 
+int
+blockGetAddrStatusFromInfo(MetaInfo *info, char *addr);
+
 #endif /* _GLFS_OPERATIONS_H */

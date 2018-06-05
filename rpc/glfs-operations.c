@@ -817,3 +817,24 @@ blockDecPrioAttr(struct glfs* glfs, char *volume, char *addr)
 
   return;
 }
+
+
+int
+blockGetAddrStatusFromInfo(MetaInfo *info, char *addr)
+{
+  size_t i;
+
+
+  if (!addr) {
+    goto out;
+  }
+
+  for (i = 0; i < info->nhosts; i++) {
+    if (!strcmp(addr, info->list[i]->addr)) {
+      return blockMetaStatusEnumParse(info->list[i]->status);
+    }
+  }
+
+ out:
+  return GB_METASTATUS_MAX;
+}
