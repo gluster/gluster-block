@@ -1092,7 +1092,8 @@ glusterBlockDeleteFillArgs(MetaInfo *info, bool deleteall, blockRemoteObj *args,
 
 
 static int
-glusterBlockCollectAttemptSuccess(blockRemoteObj *args, size_t count,
+glusterBlockCollectAttemptSuccess(blockRemoteObj *args, MetaInfo *info,
+                                  operations opt, size_t count,
                                   char **attempt, char **success)
 {
   char *a_tmp = NULL;
@@ -1100,7 +1101,9 @@ glusterBlockCollectAttemptSuccess(blockRemoteObj *args, size_t count,
   int i = 0;
 
   for (i = 0; i < count; i++) {
-    if (args[i].exit) {
+    if (args[i].exit &&
+        !(args[i].exit == GB_BLOCK_NOT_LOADED && opt == DELETE_SRV &&
+          blockGetAddrStatusFromInfo(info, args[i].addr) == GB_CLEANUP_FAIL)) {
       if (GB_ASPRINTF(attempt, "%s %s",
                       (a_tmp==NULL?"":a_tmp), args[i].addr) == -1) {
         goto fail;
@@ -1215,7 +1218,8 @@ glusterBlockConnectAsync(char *blockname, MetaInfo *info,
 
 
 static int
-glusterBlockDeleteRemoteAsync(MetaInfo *info,
+glusterBlockDeleteRemoteAsync(char *blockname,
+                              MetaInfo *info,
                               struct glfs *glfs,
                               blockDelete *dobj,
                               size_t count,
@@ -1231,6 +1235,8 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
   char *s_tmp = NULL;
   int ret = -1;
   size_t i;
+  MetaInfo *info_new = NULL;
+  int cleanupsuccess = 0;
 
 
   if (GB_ALLOC_N(tid, count) < 0) {
@@ -1251,11 +1257,13 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
     pthread_join(tid[i], NULL);
   }
 
-  ret = glusterBlockCollectAttemptSuccess(args, count, &d_attempt, &d_success);
+  ret = glusterBlockCollectAttemptSuccess(args, info, DELETE_SRV, count,
+                                          &d_attempt, &d_success);
   if (ret) {
     goto out;
   }
 
+  ret = -1;
   if (d_attempt) {
     a_tmp = local->d_attempt;
     if (GB_ASPRINTF(&local->d_attempt, "%s %s",
@@ -1276,14 +1284,37 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
     s_tmp = local->d_success;
   }
 
-  ret = 0;
   for (i = 0; i < count; i++) {
-    if (args[i].exit) {
-      ret = -1;
-      break;
+    if (args[i].exit){
+      if (args[i].exit == GB_BLOCK_NOT_LOADED &&
+          blockGetAddrStatusFromInfo(info, args[i].addr) == GB_CLEANUP_FAIL) {
+        cleanupsuccess++;
+      }
     }
   }
 
+  /* get new MetaInfo and compare */
+  if (GB_ALLOC(info_new) < 0) {
+    goto out;
+  }
+
+  ret = blockGetMetaInfo(glfs, blockname, info_new, NULL);
+  if (ret) {
+    goto out;
+  }
+
+  for (i = 0; i < info_new->nhosts; i++) {
+    switch (blockMetaStatusEnumParse(info_new->list[i]->status)) {
+      case GB_CONFIG_INPROGRESS:  /* un touched */
+      case GB_CLEANUP_SUCCESS:
+        cleanupsuccess++;
+        break;
+    }
+  }
+
+  if (cleanupsuccess == info->nhosts) {
+    ret = 0;
+  }
   *savereply = local;
 
  out:
@@ -1291,6 +1322,7 @@ glusterBlockDeleteRemoteAsync(MetaInfo *info,
   GB_FREE(d_success);
   GB_FREE(args);
   GB_FREE(tid);
+  GB_FREE(info_new);
 
   return ret;
 }
@@ -1501,13 +1533,13 @@ glusterBlockModifyRemoteAsync(MetaInfo *info,
 
   if (!rollback) {
     /* collect return */
-    ret = glusterBlockCollectAttemptSuccess(args, count, &local->attempt,
+    ret = glusterBlockCollectAttemptSuccess(args, info, MODIFY_SRV, count, &local->attempt,
                                             &local->success);
     if (ret)
       goto out;
   } else {
     /* collect return */
-    ret = glusterBlockCollectAttemptSuccess(args, count, &local->rb_attempt,
+    ret = glusterBlockCollectAttemptSuccess(args, info, MODIFY_SRV, count, &local->rb_attempt,
                                             &local->rb_success);
     if (ret)
       goto out;
@@ -1594,8 +1626,8 @@ glusterBlockModifySizeRemoteAsync(MetaInfo *info,
   }
 
   /* collect return */
-  ret = glusterBlockCollectAttemptSuccess(args, count, &local->attempt,
-                                          &local->success);
+  ret = glusterBlockCollectAttemptSuccess(args, info, MODIFY_SIZE_SRV, count,
+                                          &local->attempt, &local->success);
   if (ret)
     goto out;
 
@@ -2887,7 +2919,6 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
   int ret = -1;
   size_t i;
   static blockDelete dobj;
-  size_t cleanupsuccess = 0;
   size_t count = 0;
   MetaInfo *info = NULL;
   int asyncret = 0;
@@ -2907,7 +2938,7 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
   GB_STRCPYSTATIC(dobj.gbid, info->gbid);
 
   count = glusterBlockDeleteFillArgs(info, deleteall, NULL, NULL, NULL);
-  asyncret = glusterBlockDeleteRemoteAsync(info, glfs, &dobj, count,
+  asyncret = glusterBlockDeleteRemoteAsync(blockname, info, glfs, &dobj, count,
                                            deleteall, &drobj);
   if (asyncret) {
     LOG("mgmt", GB_LOG_WARNING,
@@ -2917,27 +2948,7 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
 
   /* delete metafile and block file */
   if (deleteall) {
-    blockFreeMetaInfo(info);
-
-    if (GB_ALLOC(info) < 0) {
-      goto out;
-    }
-
-    ret = blockGetMetaInfo(glfs, blockname, info, NULL);
-    if (ret) {
-      goto out;
-    }
-
-    for (i = 0; i < info->nhosts; i++) {
-      switch (blockMetaStatusEnumParse(info->list[i]->status)) {
-      case GB_CONFIG_INPROGRESS:  /* un touched */
-      case GB_CLEANUP_SUCCESS:
-        cleanupsuccess++;
-        break;
-      }
-    }
-
-    if (forcedel || cleanupsuccess == info->nhosts) {
+    if (forcedel || !asyncret) {
       GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
                             ret, errMsg, out, "ENTRYDELETE: INPROGRESS\n");
       if (unlink && glusterBlockDeleteEntry(glfs, info->volume, info->gbid)) {
@@ -4596,7 +4607,7 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  errCode = glusterBlockCleanUp(glfs, blk->block_name, TRUE, TRUE, blk->unlink, savereply);
+  errCode = glusterBlockCleanUp(glfs, blk->block_name, TRUE, blk->force, blk->unlink, savereply);
   if (errCode) {
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockCleanUp: return %d "
         "on block %s for volume %s", errCode, blk->block_name, blk->volume);
