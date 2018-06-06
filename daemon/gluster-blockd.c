@@ -31,7 +31,7 @@
 
 extern size_t glfsLruCount;
 extern const char *argp_program_version;
-
+static gbConfig *gbCfg;
 
 static void
 glusterBlockDHelp(void)
@@ -196,6 +196,7 @@ glusterBlockDParseArgs(int count, char **options)
   size_t optind = 1;
   size_t opt = 0;
   int ret = 0;
+  int logLevel;
 
 
   while (optind < count) {
@@ -248,10 +249,10 @@ glusterBlockDParseArgs(int count, char **options)
         MSG("option '%s' needs argument <LOG-LEVEL>\n", options[optind-1]);
         return -1;
       }
-      gbConf.logLevel = blockLogLevelEnumParse(options[optind]);
-      if (gbConf.logLevel >= GB_LOG_MAX) {
-        MSG("unknown LOG-LEVEL: '%s'\n", options[optind]);
-        return -1;
+      logLevel = blockLogLevelEnumParse(options[optind]);
+      ret = glusterBlockSetLogLevel(logLevel);
+      if (ret) {
+        return ret;
       }
       break;
     }
@@ -329,13 +330,23 @@ main (int argc, char **argv)
   int errnosv = 0;
 
 
+  if (pthread_mutex_init(&gbConf.lock, NULL) < 0) {
+    exit(EXIT_FAILURE);
+  }
+
   if(initLogging()) {
     exit(EXIT_FAILURE);
   }
 
+  gbCfg = glusterBlockSetupConfig(NULL);
+  if (!gbCfg) {
+    LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockSetupConfig() failed");
+    return -1;
+  }
+
   if (glusterBlockDParseArgs(argc, argv)) {
     LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockDParseArgs() failed");
-    return -1;
+    goto out;
   }
 
   /* is gluster-blockd running ? */
@@ -390,6 +401,7 @@ main (int argc, char **argv)
   close(fd);
 
  out:
+  glusterBlockDestroyConfig(gbCfg);
   exit (1);
   /* NOTREACHED */
 }

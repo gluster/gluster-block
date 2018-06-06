@@ -30,6 +30,22 @@ const char *argp_program_version = ""                                 \
 
 
 int
+glusterBlockSetLogLevel(unsigned int logLevel)
+{
+  if (logLevel >= GB_LOG_MAX) {
+    MSG("unknown LOG-LEVEL: '%d'\n", logLevel);
+      return -1;
+  }
+  LOCK(gbConf.lock);
+  gbConf.logLevel = logLevel;
+  UNLOCK(gbConf.lock);
+  LOG("mgmt", GB_LOG_INFO,
+      "logLevel now is %s\n", LogLevelLookup[logLevel]);
+
+  return 0;
+}
+
+int
 glusterBlockCLIOptEnumParse(const char *opt)
 {
   int i;
