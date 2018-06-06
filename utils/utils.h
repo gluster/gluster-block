@@ -25,6 +25,9 @@
 # include  <limits.h>
 # include  <sys/time.h>
 # include  <ctype.h>
+# include  <pthread.h>
+
+# include  "list.h"
 
 # define  GB_LOGDIR              DATADIR "/log/gluster-block"
 # define  GB_INFODIR             DATADIR "/run"
@@ -53,6 +56,8 @@
 # define  SUN_PATH_MAX           (sizeof(struct sockaddr_un) - sizeof(unsigned short int)) /*sun_family*/
 
 # define  GB_METASTORE_RESERVE   10485760   /* 10 MiB reserve for block-meta */
+
+# define  GB_DEF_CONFIGPATH      "/etc/sysconfig/gluster-blockd"; /* the default config file */
 
 # define  GB_TIME_STRING_BUFLEN  \
           (4 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 6 + 1 +   5)
@@ -129,12 +134,13 @@
 
 
 struct gbConf {
-  int  logLevel;
+  unsigned int logLevel;
   char logDir[PATH_MAX];
   char daemonLogFile[PATH_MAX];
   char cliLogFile[PATH_MAX];
   char gfapiLogFile[PATH_MAX];
   char configShellLogFile[PATH_MAX];
+  pthread_mutex_t lock;
 };
 
 extern struct gbConf gbConf;
@@ -143,6 +149,7 @@ extern struct gbConf gbConf;
           do {                                                         \
             FILE *fd;                                                  \
             char timestamp[GB_TIME_STRING_BUFLEN] = {0};               \
+            LOCK(gbConf.lock);                                       \
             if (level <= gbConf.logLevel) {                            \
               if (!strcmp(str, "mgmt"))                                \
                 fd = fopen (gbConf.daemonLogFile, "a");                \
@@ -165,6 +172,7 @@ extern struct gbConf gbConf;
               if (fd != stderr)                                        \
                 fclose(fd);                                            \
             }                                                          \
+	    UNLOCK(gbConf.lock);                                     \
           } while (0)
 
 # define  GB_METALOCK_OR_GOTO(lkfd, volume, errCode, errMsg, label)  \
@@ -550,6 +558,15 @@ static const char *const RemoteCreateRespLookup[] = {
   [GB_REMOTE_CREATE_RESP_MAX] = NULL,
 };
 
+typedef struct gbConfig {
+  pthread_t threadId;
+  char *configPath;
+
+  bool isDynamic;
+  char *GB_LOG_LEVEL;
+} gbConfig;
+
+int glusterBlockSetLogLevel(unsigned int logLevel);
 
 int glusterBlockCLIOptEnumParse(const char *opt);
 
@@ -589,5 +606,9 @@ char* gbStrcpy(char *dest, const char *src, size_t destbytes,
                const char *filename, const char *funcname, size_t linenr);
 
 void gbFree(void *ptrptr);
+
+void glusterBlockDestroyConfig(struct gbConfig *cfg);
+
+gbConfig *glusterBlockSetupConfig(const char *path);
 
 #endif  /* _UTILS_H */

@@ -1,6 +1,6 @@
 noinst_LTLIBRARIES = libgb.la
 
-libgb_la_SOURCES = common.c utils.c lru.c capabilities.c
+libgb_la_SOURCES = common.c utils.c lru.c capabilities.c dyn-config.c
 
 noinst_HEADERS = common.h utils.h lru.h list.h capabilities.h
 
