@@ -731,7 +731,6 @@ glusterBlockReplace(int argcount, char **options, int json)
 {
   blockReplaceCli robj = {0};
   int ret = -1;
-  char helpMsg[256] = {0, };
 
 
   if (argcount < 5 || argcount > 6) {
@@ -741,7 +740,7 @@ glusterBlockReplace(int argcount, char **options, int json)
 
   if (glusterBlockParseVolumeBlock(options[2], robj.volume, robj.block_name,
                                    sizeof(robj.volume), sizeof(robj.block_name),
-                                   helpMsg, "replace")) {
+                                   GB_REPLACE_HELP_STR, "replace")) {
     goto out;
   }
 
@@ -793,7 +792,6 @@ glusterBlockGenConfig(int argcount, char **options, int json)
 {
   blockGenConfigCli robj = {0};
   int ret = -1;
-  char helpMsg[256] = {0, };
 
 
   GB_ARGCHECK_OR_RETURN(argcount, 5, "genconfig", GB_GENCONF_HELP_STR);

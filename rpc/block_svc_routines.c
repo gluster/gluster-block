@@ -571,6 +571,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   case LIST_SRV:
   case INFO_SRV:
   case REPLACE_GET_PORTAL_TPG_SRV:
+  case GENCONFIG_SRV:
       goto out;
   case REPLACE_SRV:
       *rpc_sent = TRUE;
@@ -1726,6 +1727,7 @@ glusterBlockBuildMinCaps(void *data, operations opt)
   case LIST_SRV:
   case INFO_SRV:
   case VERSION_SRV:
+  case GENCONFIG_SRV:
     break;
   }
 
@@ -2591,7 +2593,7 @@ getTpgObj(char *block, MetaInfo *info, blockGenConfigCli *blk, char *portal, int
   uuid_generate(uuid);
   uuid_unparse(uuid, alias);
   snprintf(alias_10, 11, "%.10s", alias+24);
-  json_object_object_add(tpg_lun_obj, "alias", GB_JSON_OBJ_TO_STR(alias_10));
+  json_object_object_add(tpg_lun_obj, "alias", GB_JSON_OBJ_TO_STR(alias_10[0]?alias_10:NULL));
   snprintf(lun_so, 256, "/backstores/user/%s", block);
   if (info->prio_path[0]) {
     if (!strcmp(info->prio_path, portal)) {
@@ -2602,7 +2604,7 @@ getTpgObj(char *block, MetaInfo *info, blockGenConfigCli *blk, char *portal, int
                              GB_JSON_OBJ_TO_STR(GB_ALUA_ANO_TPG_NAME));
     }
   }
-  json_object_object_add(tpg_lun_obj, "storage_object", GB_JSON_OBJ_TO_STR(lun_so));
+  json_object_object_add(tpg_lun_obj, "storage_object", GB_JSON_OBJ_TO_STR(lun_so[0]?lun_so:NULL));
   json_object_object_add(tpg_lun_obj, "index", json_object_new_int(0));
   json_object_array_add(tpg_luns_arr, tpg_lun_obj);
   json_object_object_add(tpg_obj, "luns", tpg_luns_arr);
@@ -2654,7 +2656,7 @@ getTgObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
   json_object_object_add(tg_obj, "tpgs", tpgs_arr);
 
   snprintf(iqn, 128, "iqn.2016-12.org.gluster-block:%s", info->gbid);
-  json_object_object_add(tg_obj, "wwn", GB_JSON_OBJ_TO_STR(iqn));
+  json_object_object_add(tg_obj, "wwn", GB_JSON_OBJ_TO_STR(iqn[0]?iqn:NULL));
 
   return tg_obj;
 }
@@ -2706,10 +2708,10 @@ getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
   // }
 
   snprintf(cfgstr, 1024, "glfs/%s@%s/block-store/%s", info->volume, blk->addr, info->gbid);
-  json_object_object_add(so_obj, "config", GB_JSON_OBJ_TO_STR(cfgstr));
+  json_object_object_add(so_obj, "config", GB_JSON_OBJ_TO_STR(cfgstr[0]?cfgstr:NULL));
   if (info->rb_size) {
     snprintf(control, 1024, "%s=%zu", GB_RING_BUFFER_STR, info->rb_size);
-    json_object_object_add(so_obj, "control", GB_JSON_OBJ_TO_STR(control));
+    json_object_object_add(so_obj, "control", GB_JSON_OBJ_TO_STR(control[0]?control:NULL));
   }
   json_object_object_add(so_obj, "name", GB_JSON_OBJ_TO_STR(block));
   json_object_object_add(so_obj, "plugin", GB_JSON_OBJ_TO_STR("user"));
@@ -2917,7 +2919,6 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
                     bool deleteall, bool forcedel, bool unlink, blockRemoteDeleteResp *drobj)
 {
   int ret = -1;
-  size_t i;
   static blockDelete dobj;
   size_t count = 0;
   MetaInfo *info = NULL;
