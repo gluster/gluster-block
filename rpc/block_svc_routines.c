@@ -3816,6 +3816,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   if (GB_ALLOC(reply) < 0) {
     return NULL;
   }
+  reply->exit = -1;
 
   list = blockServerParse(blk->block_hosts);
 
@@ -3826,7 +3827,6 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
          blk->block_name, blk->mpath, blk->block_hosts, blk->volume);
     if (GB_ASPRINTF(&errMsg, "multipath req: %d > block-hosts: %s\n",
                     blk->mpath, blk->block_hosts) == -1) {
-      reply->exit = -1;
       goto optfail;
     }
     reply->exit = ENODEV;
@@ -3845,7 +3845,6 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
     goto optfail;
   } else if (resultCaps[GB_CREATE_LOAD_BALANCE_CAP]) {
     GB_FREE(errMsg);
-    errCode = 0;
   }
 
   glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
@@ -3871,7 +3870,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
         blk->block_name, blk->volume);
     if (GB_ASPRINTF(&errMsg, "BLOCK with name: '%s' already EXIST\n",
                     blk->block_name) == -1) {
-            errCode = ENOMEM;
+      errCode = ENOMEM;
       goto exist;
     }
     errCode = EEXIST;
@@ -3900,8 +3899,8 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   }
 
   if (glusterBlockCreateEntry(glfs, blk, gbid, &errCode, &errMsg)) {
-    LOG("mgmt", GB_LOG_ERROR, "%s volume: %s host: %s",
-        FAILED_CREATING_FILE, blk->volume, blk->block_hosts);
+    LOG("mgmt", GB_LOG_ERROR, "%s volume: %s block: %s file: %s host: %s",
+        FAILED_CREATING_FILE, blk->volume, blk->block_name, gbid, blk->block_hosts);
     goto exist;
   }
 
@@ -3915,10 +3914,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   cobj.size = blk->size;
   cobj.rb_size = blk->rb_size;
   GB_STRCPYSTATIC(cobj.gbid, gbid);
-  if (GB_STRDUP(cobj.block_hosts,  blk->block_hosts) < 0) {
-    errCode = ENOMEM;
-    goto exist;
-  }
+  GB_STRDUP(cobj.block_hosts,  blk->block_hosts);
 
   if (blk->auth_mode) {
     uuid_generate(uuid);
@@ -3946,9 +3942,9 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
     LOG("mgmt", GB_LOG_ERROR, "glusterBlockAuditRequest: return %d"
         "volume: %s hosts: %s blockname %s", errCode,
         blk->volume, blk->block_hosts, blk->block_name);
-    reply->exit = GB_DEFAULT_ERRCODE;
   } else if (!resultCaps[GB_CREATE_LOAD_BALANCE_CAP] && cobj.prio_path[0]) {
     blockIncPrioAttr(glfs, blk->volume, cobj.prio_path);
+    reply->exit = 0;
   }
 
  exist:

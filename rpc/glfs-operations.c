@@ -215,7 +215,7 @@ unlink:
 
  out:
   if (ret) {
-    if (!errMsg) {
+    if (errMsg && !(*errMsg)) {
       GB_ASPRINTF (errMsg, "Not able to create storage for %s/%s [%s]",
                    blk->volume, blk->block_name, strerror(*errCode));
     }
