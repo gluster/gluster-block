@@ -40,8 +40,6 @@
             }                                                         \
           } while(0)
 
-# define  GB_DEFAULT_SECTOR_SIZE  512
-
 extern const char *argp_program_version;
 
 typedef enum clioperations {
@@ -414,11 +412,6 @@ glusterBlockModify(int argcount, char **options, int json)
       LOG("cli", GB_LOG_ERROR, "Modify failed while parsing size for block <%s/%s>",
           volume, block);
       goto out;
-    } else if (sparse_ret < GB_DEFAULT_SECTOR_SIZE) {
-      MSG("minimum acceptable block size is %d bytes\n", GB_DEFAULT_SECTOR_SIZE);
-      LOG("cli", GB_LOG_ERROR, "minimum acceptable block size is %d bytes <%s/%s>",
-          GB_DEFAULT_SECTOR_SIZE, volume, block);
-      goto out;
     }
 
     if ((argcount - optind) && !strcmp(options[optind], "force")) {
@@ -587,11 +580,6 @@ glusterBlockCreate(int argcount, char **options, int json)
       MSG("%s\n", GB_CREATE_HELP_STR);
       LOG("cli", GB_LOG_ERROR, "failed while parsing size for block <%s/%s>",
           cobj.volume, cobj.block_name);
-      goto out;
-    } else if (sparse_ret < GB_DEFAULT_SECTOR_SIZE) {
-      MSG("minimum acceptable block size is %d bytes\n", GB_DEFAULT_SECTOR_SIZE);
-      LOG("cli", GB_LOG_ERROR, "minimum acceptable block size is %d bytes <%s/%s>",
-          GB_DEFAULT_SECTOR_SIZE, cobj.volume, cobj.block_name);
       goto out;
     }
     cobj.size = sparse_ret;  /* size is unsigned long long */

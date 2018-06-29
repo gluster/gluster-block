@@ -37,6 +37,13 @@ jsonResponseFormatParse(const char *opt)
 }
 
 
+# define  GB_DEFAULT_SECTOR_SIZE  512
+
+# define round_down(a, b) ({           \
+        __typeof__ (a) _a = (a);       \
+        __typeof__ (b) _b = (b);       \
+        (_a - (_a % _b)); })
+
 ssize_t
 glusterBlockParseSize(const char *dom, char *value)
 {
@@ -49,8 +56,8 @@ glusterBlockParseSize(const char *dom, char *value)
     return -1;
 
   sizef = strtod(value, &postfix);
-  if (sizef < 0) {
-    LOG(dom, GB_LOG_ERROR, "%s", "size cannot be negative number");
+  if (sizef <= 0) {
+    LOG(dom, GB_LOG_ERROR, "%s", "size cannot be negative number or zero");
     return -1;
   }
 
@@ -86,6 +93,21 @@ glusterBlockParseSize(const char *dom, char *value)
     /* fall through */
   case 'b':
   case '\0':
+    if (sizef < GB_DEFAULT_SECTOR_SIZE) {
+        MSG("minimum acceptable block size is %d bytes\n", GB_DEFAULT_SECTOR_SIZE);
+        LOG(dom, GB_LOG_ERROR, "minimum acceptable block size is %d bytes",
+            GB_DEFAULT_SECTOR_SIZE);
+	return -1;
+    }
+
+    if (sizef % GB_DEFAULT_SECTOR_SIZE) {
+      MSG("The size %lld will align to sector size %d bytes\n",
+          sizef, GB_DEFAULT_SECTOR_SIZE);
+      LOG(dom, GB_LOG_ERROR,
+          "The target device size %lld is will align to the sector size %d",
+	  sizef, GB_DEFAULT_SECTOR_SIZE);
+      sizef = round_down(sizef, GB_DEFAULT_SECTOR_SIZE);
+    }
     break;
   default:
     goto fail;
