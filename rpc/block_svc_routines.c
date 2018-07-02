@@ -4243,7 +4243,7 @@ block_create_common(blockCreate *blk, char *rbsize, char *prio_path)
   }
 
   if (GB_ASPRINTF(&backstore_attr,
-                  "%s/%s set attribute cmd_time_out=0",
+                  "%s/%s set attribute cmd_time_out=130",
                   GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
     goto out;
   }
