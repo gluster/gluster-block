@@ -1265,8 +1265,8 @@ glusterBlockDeleteRemoteAsync(char *blockname,
   if (ret) {
     goto out;
   }
-
   ret = -1;
+
   if (d_attempt) {
     a_tmp = local->d_attempt;
     if (GB_ASPRINTF(&local->d_attempt, "%s %s",
@@ -1305,6 +1305,7 @@ glusterBlockDeleteRemoteAsync(char *blockname,
   if (ret) {
     goto out;
   }
+  ret = -1;
 
   for (i = 0; i < info_new->nhosts; i++) {
     switch (blockMetaStatusEnumParse(info_new->list[i]->status)) {
