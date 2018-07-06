@@ -592,7 +592,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
       *rpc_sent = TRUE;
       if (block_create_v2_1(cblk_v2, &reply, clnt) != RPC_SUCCESS) {
         LOG("mgmt", GB_LOG_ERROR, "%son host %s",
-            clnt_sperror(clnt, "block remote create failed"), host);
+            clnt_sperror(clnt, "block remote create2 call failed"), host);
         goto out;
       }
     } else {
@@ -600,7 +600,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
       *rpc_sent = TRUE;
       if (block_create_1(&cblk_v1, &reply, clnt) != RPC_SUCCESS) {
         LOG("mgmt", GB_LOG_ERROR, "%son host %s",
-            clnt_sperror(clnt, "block remote create failed"), host);
+            clnt_sperror(clnt, "block remote create call failed"), host);
         goto out;
       }
     }
@@ -609,8 +609,8 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     *rpc_sent = TRUE;
     ret = block_version_1((void*)cobj, &reply, clnt);
     if (ret != RPC_SUCCESS) {
-      LOG("mgmt", GB_LOG_ERROR, "%son host %s",
-          clnt_sperror(clnt, "block remote version failed"), host);
+      LOG("mgmt", GB_LOG_WARNING, "%son host %s",
+          clnt_sperror(clnt, "block remote version check call failed"), host);
       goto out;
     }
     break;
@@ -618,7 +618,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     *rpc_sent = TRUE;
     if (block_delete_1((blockDelete *)cobj, &reply, clnt) != RPC_SUCCESS) {
       LOG("mgmt", GB_LOG_ERROR, "%son host %s",
-          clnt_sperror(clnt, "block remote delete failed"), host);
+          clnt_sperror(clnt, "block remote delete call failed"), host);
       goto out;
     }
     break;
@@ -626,7 +626,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     *rpc_sent = TRUE;
     if (block_modify_1((blockModify *)cobj, &reply, clnt) != RPC_SUCCESS) {
       LOG("mgmt", GB_LOG_ERROR, "%son host %s",
-          clnt_sperror(clnt, "block remote modify failed"), host);
+          clnt_sperror(clnt, "block remote modify call failed"), host);
       goto out;
     }
     break;
@@ -634,7 +634,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     *rpc_sent = TRUE;
     if (block_modify_size_1((blockModifySize *)cobj, &reply, clnt) != RPC_SUCCESS) {
       LOG("mgmt", GB_LOG_ERROR, "%son host %s",
-          clnt_sperror(clnt, "block remote modify size failed"), host);
+          clnt_sperror(clnt, "block remote modify size call failed"), host);
       goto out;
     }
     break;
@@ -648,7 +648,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
       *rpc_sent = TRUE;
       if (block_replace_1((blockReplace *)cobj, &reply, clnt) != RPC_SUCCESS) {
         LOG("mgmt", GB_LOG_ERROR, "%son host %s",
-            clnt_sperror(clnt, "block remote replace failed"), host);
+            clnt_sperror(clnt, "block remote replace call failed"), host);
         goto out;
       }
       break;
@@ -1834,8 +1834,8 @@ glusterBlockCheckCapabilities(void* blk, operations opt, blockServerDefPtr list,
 
   errCode = glusterBlockCapabilityRemoteAsync(list, minCaps, resultCaps, &localErrMsg);
   if (errCode) {
-    LOG("mgmt", GB_LOG_ERROR, "glusterBlockCapabilityRemoteAsync() failed (%s)",
-                              localErrMsg);
+    LOG("mgmt", GB_LOG_WARNING, "glusterBlockCapabilityRemoteAsync() failed (%s)",
+                                localErrMsg);
     if (errCode == -ENOTCONN) {
       if (GB_ASPRINTF(errMsg, "Version check failed [%s] (Hint: See if all "
                       "servers are up and running gluster-blockd daemon)",
