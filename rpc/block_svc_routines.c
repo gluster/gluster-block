@@ -773,7 +773,6 @@ glusterBlockCapabilitiesRemote(void *data)
     } else {
       LOG("mgmt", GB_LOG_ERROR, "%s for on host %s",
           FAILED_REMOTE_CAPS, args->addr);
-      ret = -1;
     }
   }
 
@@ -1828,7 +1827,7 @@ glusterBlockCheckCapabilities(void* blk, operations opt, blockServerDefPtr list,
 
   minCaps = glusterBlockBuildMinCaps(blk, opt);
   if (!minCaps) {
-    errCode = ENOMEM;
+    errCode = GB_DEFAULT_ERRCODE;
     goto out;
   }
 
@@ -2301,7 +2300,6 @@ blockReplaceNodeCliFormatResponse(blockReplaceCli *blk, int errCode, char *errMs
   if (errCode < 0) {
     errCode = GB_DEFAULT_ERRCODE;
   }
-
   reply->exit = errCode;
 
   if (errMsg) {
@@ -3183,6 +3181,7 @@ blockModifyCliFormatResponse (blockModifyCli *blk, struct blockModify *mobj,
   if (errCode < 0) {
     errCode = GB_DEFAULT_ERRCODE;
   }
+  reply->exit = errCode;
 
   if (errMsg) {
     blockFormatErrorResponse(MODIFY_SRV, blk->json_resp, errCode,
@@ -3491,6 +3490,7 @@ blockModifySizeCliFormatResponse(blockModifySizeCli *blk, struct blockModifySize
   if (errCode < 0) {
     errCode = GB_DEFAULT_ERRCODE;
   }
+  reply->exit = errCode;
 
   if (errMsg) {
     blockFormatErrorResponse(MODIFY_SIZE_SRV, blk->json_resp, errCode,
@@ -3760,6 +3760,7 @@ blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
   if (errCode < 0) {
     errCode = GB_DEFAULT_ERRCODE;
   }
+  reply->exit = errCode;
 
   if (errMsg) {
     blockFormatErrorResponse(CREATE_SRV, blk->json_resp, errCode,
@@ -3946,6 +3947,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
     goto optfail;
   } else if (resultCaps[GB_CREATE_LOAD_BALANCE_CAP]) {
     GB_FREE(errMsg);
+    errCode = 0;
   }
 
   glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
@@ -4045,7 +4047,6 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
         blk->volume, blk->block_hosts, blk->block_name);
   } else if (!resultCaps[GB_CREATE_LOAD_BALANCE_CAP] && cobj.prio_path[0]) {
     blockIncPrioAttr(glfs, blk->volume, cobj.prio_path);
-    reply->exit = 0;
   }
 
  exist:
@@ -4565,7 +4566,6 @@ blockDeleteCliFormatResponse(blockDeleteCli *blk, int errCode, char *errMsg,
   if (errCode < 0) {
     errCode = GB_DEFAULT_ERRCODE;
   }
-
   reply->exit = errCode;
 
   if (errMsg) {
@@ -4798,15 +4798,20 @@ block_version_1_svc_st(void *data, struct svc_req *rqstp)
 {
   blockResponse *reply = NULL;
 
+
+  LOG("mgmt", GB_LOG_DEBUG, "%s", "version check request");
+
   if (GB_ALLOC(reply) < 0) {
     return NULL;
   }
 
   reply->exit = gbSetCapabilties(&reply);
 
-  GB_ASPRINTF(&reply->out, "In version");
-  return reply;
+  GB_ASPRINTF(&reply->out, "remote version check returns %d", reply->exit);
 
+  LOG("mgmt", GB_LOG_DEBUG, "command exit code, %d", reply->exit);
+
+  return reply;
 }
 
 blockResponse *
@@ -5081,7 +5086,6 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
   }
   reply->exit = errCode;
 
-  errCode = reply->exit;
   if (blk->json_resp) {
     if (errCode) {
       json_object_object_add(json_obj, "RESULT", GB_JSON_OBJ_TO_STR("FAIL"));
@@ -5138,6 +5142,8 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
   if (errCode < 0) {
     errCode = GB_DEFAULT_ERRCODE;
   }
+  reply->exit = errCode;
+
   if (errMsg) {
     blockFormatErrorResponse(INFO_SRV, blk->json_resp, errCode,
                              errMsg, reply);
