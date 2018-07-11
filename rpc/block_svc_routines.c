@@ -46,6 +46,8 @@
 # define   GB_ALUA_ANO_TPG_NAME         "glfs_tg_pt_gp_ano"
 # define   GB_RING_BUFFER_STR           "max_data_area_mb"
 
+#define    GB_CMD_TIME_OUT      130
+
 # define   GB_OLD_CAP_MAX       9
 
 # define   GB_OP_SKIPPED        222
@@ -2701,7 +2703,7 @@ getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
   // ]
 
   // "attributes": {
-  json_object_object_add(so_obj_attr, "cmd_time_out", json_object_new_int(0));
+  json_object_object_add(so_obj_attr, "cmd_time_out", json_object_new_int(GB_CMD_TIME_OUT));
   json_object_object_add(so_obj_attr, "dev_size", json_object_new_int64(info->size));
 
   json_object_object_add(so_obj, "attributes", so_obj_attr);
@@ -4243,8 +4245,8 @@ block_create_common(blockCreate *blk, char *rbsize, char *prio_path)
   }
 
   if (GB_ASPRINTF(&backstore_attr,
-                  "%s/%s set attribute cmd_time_out=130",
-                  GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
+                  "%s/%s set attribute cmd_time_out=%d",
+                  GB_TGCLI_GLFS_PATH, blk->block_name, GB_CMD_TIME_OUT) == -1) {
     goto out;
   }
 
