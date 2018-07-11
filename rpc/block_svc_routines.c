@@ -41,6 +41,7 @@
                                 "'%s' ls | grep -e tpg -e '%s' | grep -B1 '%s' | grep -o 'tpg\\w'"
 # define   GB_CHECK_PORTAL      "targetcli /iscsi/" GB_TGCLI_IQN_PREFIX \
                                 "'%s' ls | grep '%s' > " DEVNULLPATH
+# define   GB_SAVECONFIG_CHECK  "grep -m 1 '\"name\": \"%s\",' " GB_SAVECONFIG " > " DEVNULLPATH
 
 # define   GB_ALUA_AO_TPG_NAME          "glfs_tg_pt_gp_ao"
 # define   GB_ALUA_ANO_TPG_NAME         "glfs_tg_pt_gp_ano"
@@ -54,6 +55,7 @@
 # define   GB_NODE_NOT_EXIST    223
 # define   GB_NODE_IN_USE       224
 # define   GB_BLOCK_NOT_LOADED  225
+# define   GB_BLOCK_NOT_FOUND   226
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -257,6 +259,73 @@ blockStr2arrayAddToJsonObj(json_object *json_obj, char *string, char *label)
     tmp = strtok (NULL, " ");
   }
   json_object_object_add(json_obj, label, json_array);
+}
+
+
+static int
+blockCheckBlockLoadedStatus(char *block_name, char *gbid, blockResponse *reply)
+{
+
+  int ret = -1;
+  char *exec = NULL;
+  int is_loaded = true;
+
+
+  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, block_name, gbid) == -1) {
+    goto out;
+  }
+
+  ret = gbRunner(exec);
+  if (ret == -1) {
+    GB_ASPRINTF(&reply->out, "command exit abnormally for '%s'.", block_name);
+    LOG("mgmt", GB_LOG_ERROR, "%s", reply->out);
+    goto out;
+  } else if (ret == 1) {
+    is_loaded = false;
+    GB_ASPRINTF(&reply->out, "Block '%s' may be not loaded.", block_name);
+    LOG("mgmt", GB_LOG_ERROR, "%s", reply->out);
+  }
+
+  /* if block is loaded, skip the rest */
+  if (!ret) {
+    goto out;
+  }
+  GB_FREE(exec);
+
+  if (GB_ASPRINTF(&exec, GB_SAVECONFIG_CHECK, block_name) == -1) {
+    ret = -1;
+    goto out;
+  }
+
+  ret = gbRunner(exec);
+  if (ret == -1) {
+    GB_FREE(reply->out);
+    GB_ASPRINTF(&reply->out, "command exit abnormally for '%s'.", block_name);
+    LOG("mgmt", GB_LOG_ERROR, "%s", reply->out);
+    goto out;
+  } else if (ret == 1 || ret == 2) {  /* search not found or savefile not exist */
+    if (!is_loaded) {
+      reply->exit = GB_BLOCK_NOT_FOUND;
+      GB_FREE(reply->out);
+      GB_ASPRINTF(&reply->out, "Block '%s' already deleted.", block_name);
+      LOG("mgmt", GB_LOG_ERROR, "%s", reply->out);
+      goto out;
+    }
+  } else {
+    if (!is_loaded) {
+      reply->exit = GB_BLOCK_NOT_LOADED;
+      GB_FREE(reply->out);
+      GB_ASPRINTF(&reply->out, "Block '%s' not loaded.", block_name);
+      LOG("mgmt", GB_LOG_ERROR, "%s", reply->out);
+      ret = -1;
+      goto out;
+    }
+  }
+
+ out:
+  GB_FREE(exec);
+
+  return ret;
 }
 
 
@@ -1104,20 +1173,26 @@ glusterBlockCollectAttemptSuccess(blockRemoteObj *args, MetaInfo *info,
   int i = 0;
 
   for (i = 0; i < count; i++) {
+    /* GB_BLOCK_NOT_FOUND:
+     *        Delete: Success
+     *        Modify: Fail
+     * GB_BLOCK_NOT_LOADED:
+     *        Delete: Fail
+     *        Modify: Fail
+     */
     if (args[i].exit &&
-        !(args[i].exit == GB_BLOCK_NOT_LOADED && opt == DELETE_SRV &&
-          blockGetAddrStatusFromInfo(info, args[i].addr) == GB_CLEANUP_FAIL)) {
-      if (GB_ASPRINTF(attempt, "%s %s",
-                      (a_tmp==NULL?"":a_tmp), args[i].addr) == -1) {
-        goto fail;
-      }
-      GB_FREE(a_tmp);
-      a_tmp = *attempt;
-      LOG("mgmt", GB_LOG_ERROR, "%s: on volume %s on host %s",
-          args[i].reply, args[i].volume, args[i].addr);
+        !(args[i].exit == GB_BLOCK_NOT_FOUND && opt == DELETE_SRV)) {
+        if (GB_ASPRINTF(attempt, "%s %s",
+              (a_tmp==NULL?"":a_tmp), args[i].addr) == -1) {
+          goto fail;
+        }
+        GB_FREE(a_tmp);
+        a_tmp = *attempt;
+        LOG("mgmt", GB_LOG_ERROR, "%s: on volume %s on host %s",
+            args[i].reply, args[i].volume, args[i].addr);
     } else {
       if (GB_ASPRINTF(success, "%s %s",
-                      (s_tmp==NULL?"":s_tmp), args[i].addr) == -1) {
+            (s_tmp==NULL?"":s_tmp), args[i].addr) == -1) {
         goto fail;
       }
       GB_FREE(s_tmp);
@@ -1289,8 +1364,7 @@ glusterBlockDeleteRemoteAsync(char *blockname,
 
   for (i = 0; i < count; i++) {
     if (args[i].exit){
-      if (args[i].exit == GB_BLOCK_NOT_LOADED &&
-          blockGetAddrStatusFromInfo(info, args[i].addr) == GB_CLEANUP_FAIL) {
+      if (args[i].exit == GB_BLOCK_NOT_FOUND) {
         cleanupsuccess++;
       }
     }
@@ -3280,6 +3354,17 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
+  if (list->nhosts != info->mpath) {
+    errCode = ENOENT;
+
+    GB_ASPRINTF(&errMsg, "Some of the nodes are missing configuration, " \
+                "please look at logs for recent operations on the %s.",
+                blk->block_name);
+    LOG("mgmt", GB_LOG_ERROR, "%s", errMsg);
+
+    goto out;
+  }
+
   errCode = glusterBlockCheckCapabilities((void *)blk, MODIFY_SRV, list, NULL, &errMsg);
   if (errCode) {
     LOG("mgmt", GB_LOG_ERROR,
@@ -3381,6 +3466,7 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
     GB_FREE(savereply->rb_success);
     GB_FREE(savereply);
   }
+  GB_FREE(errMsg);
 
   return reply;
 }
@@ -3582,6 +3668,17 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
+  if (list->nhosts != info->mpath) {
+    errCode = ENOENT;
+
+    GB_ASPRINTF(&errMsg, "Some of the nodes are missing configuration, " \
+                "please look at logs for recent operations on the %s.",
+                blk->block_name);
+    LOG("mgmt", GB_LOG_ERROR, "%s", errMsg);
+
+    goto out;
+  }
+
   errCode = glusterBlockCheckCapabilities((void *)blk, MODIFY_SIZE_SRV, list, NULL, &errMsg);
   if (errCode) {
     LOG("mgmt", GB_LOG_ERROR,
@@ -3634,6 +3731,7 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
   blockFreeMetaInfo(info);
 
   blockRemoteRespFree(savereply);
+  GB_FREE(errMsg);
 
   return reply;
 }
@@ -4658,25 +4756,10 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name, blk->gbid) == -1) {
-    LOG("mgmt", GB_LOG_WARNING,
-        "block backend with name '%s' doesn't exist with matching gbid %s",
-        blk->block_name, blk->gbid);
+  ret = blockCheckBlockLoadedStatus(blk->block_name, blk->gbid, reply);
+  if (ret) {
     goto out;
   }
-
-  /* Check if block exist on this node ? */
-  ret = gbRunner(exec);
-  if (ret == -1) {
-    GB_ASPRINTF(&reply->out, "command exit abnormally for %s", blk->block_name);
-    goto out;
-  } else if (ret == 1) {
-    reply->exit = GB_BLOCK_NOT_LOADED;
-    GB_ASPRINTF(&reply->out, "No target config for block %s.", blk->block_name);
-    LOG("mgmt", GB_LOG_ERROR, "No target config for block %s.", blk->block_name);
-    goto out;
-  }
-  GB_FREE(exec);
 
   if (GB_ASPRINTF(&iqn, "%s %s %s%s", GB_TGCLI_ISCSI_PATH, GB_DELETE,
                   GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
@@ -4750,25 +4833,10 @@ block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name, blk->gbid) == -1) {
-    LOG("mgmt", GB_LOG_WARNING,
-        "block backend with name '%s' doesn't exist with matching gbid %s, volume '%s'",
-        blk->block_name, blk->gbid, blk->volume);
+  ret = blockCheckBlockLoadedStatus(blk->block_name, blk->gbid, reply);
+  if (ret) {
     goto out;
   }
-
-  /* Check if block exist on this node ? */
-  ret = gbRunner(exec);
-  if (ret == -1) {
-    GB_ASPRINTF(&reply->out, "command exit abnormally for %s", blk->block_name);
-    goto out;
-  } else if (ret == 1) {
-    reply->exit = GB_BLOCK_NOT_LOADED;
-    GB_ASPRINTF(&reply->out, "No target config for block %s.", blk->block_name);
-    LOG("mgmt", GB_LOG_ERROR, "No target config for block %s.", blk->block_name);
-    goto out;
-  }
-  GB_FREE(exec);
 
   if (GB_ASPRINTF(&exec, "targetcli %s/%s%s status", GB_TGCLI_ISCSI_PATH,
                   GB_TGCLI_IQN_PREFIX, blk->gbid) == -1) {
@@ -4880,25 +4948,10 @@ block_modify_size_1_svc_st(blockModifySize *blk, struct svc_req *rqstp)
   }
   reply->exit = -1;
 
-  if (GB_ASPRINTF(&exec, GB_TGCLI_CHECK, blk->block_name, blk->gbid) == -1) {
-    LOG("mgmt", GB_LOG_WARNING,
-        "block backend with name '%s' doesn't exist with matching gbid %s, volume '%s'",
-        blk->block_name, blk->gbid, blk->volume);
+  ret = blockCheckBlockLoadedStatus(blk->block_name, blk->gbid, reply);
+  if (ret) {
     goto out;
   }
-
-  /* Check if block exist on this node ? */
-  ret = gbRunner(exec);
-  if (ret == -1) {
-    GB_ASPRINTF(&reply->out, "command exit abnormally for %s", blk->block_name);
-    goto out;
-  } else if (ret == 1) {
-    reply->exit = GB_BLOCK_NOT_LOADED;
-    GB_ASPRINTF(&reply->out, "No target config for block %s.", blk->block_name);
-    LOG("mgmt", GB_LOG_ERROR, "No target config for block %s.", blk->block_name);
-    goto out;
-  }
-  GB_FREE(exec);
 
   if (GB_ASPRINTF(&tmp, "%s/%s set attribute dev_size=%zu", GB_TGCLI_GLFS_PATH,
                   blk->block_name, blk->size) == -1) {
