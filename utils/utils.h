@@ -40,6 +40,7 @@
 # define  GFAPI_LOG_LEVEL        7
 
 # define   DEVNULLPATH           "/dev/null"
+# define   GB_SAVECONFIG         "/etc/target/saveconfig.json"
 
 # define  GB_METADIR             "/block-meta"
 # define  GB_STOREDIR            "/block-store"
