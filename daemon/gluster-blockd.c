@@ -61,7 +61,7 @@ glusterBlockCliThreadProc (void *vargp)
 {
   register SVCXPRT *transp = NULL;
   struct sockaddr_un saun = {0, };
-  int sockfd = -1;
+  int sockfd = RPC_ANYSOCK;
 
 
   if (strlen(GB_UNIX_ADDRESS) > SUN_PATH_MAX) {
@@ -116,7 +116,7 @@ glusterBlockCliThreadProc (void *vargp)
     svc_destroy(transp);
   }
 
-  if (sockfd != -1) {
+  if (sockfd != RPC_ANYSOCK) {
     close(sockfd);
   }
 
@@ -129,7 +129,7 @@ glusterBlockServerThreadProc(void *vargp)
 {
   register SVCXPRT *transp = NULL;
   struct sockaddr_in sain = {0, };
-  int sockfd;
+  int sockfd = RPC_ANYSOCK;
   int opt = 1;
   char errMsg[2048] = {0};
 
@@ -177,7 +177,7 @@ glusterBlockServerThreadProc(void *vargp)
     svc_destroy(transp);
   }
 
-  if (sockfd != -1) {
+  if (sockfd != RPC_ANYSOCK) {
     close(sockfd);
   }
 

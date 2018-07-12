@@ -59,7 +59,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
 {
   CLIENT *clnt = NULL;
   int ret = -1;
-  int sockfd = -1;
+  int sockfd = RPC_ANYSOCK;
   struct sockaddr_un saun = {0,};
   blockCreateCli *create_obj;
   blockDeleteCli *delete_obj;
@@ -204,7 +204,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
     clnt_destroy (clnt);
   }
 
-  if (sockfd != -1) {
+  if (sockfd != RPC_ANYSOCK) {
     close (sockfd);
   }
 
