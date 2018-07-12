@@ -485,7 +485,7 @@ glusterBlockGetSockaddr(char *host)
 
 static int glusterBlockHostConnect(char *host)
 {
-  int sockfd = -1;
+  int sockfd = RPC_ANYSOCK;
   int errsv = 0;
   struct addrinfo *res = NULL;
 
@@ -522,7 +522,7 @@ out:
     freeaddrinfo(res);
   }
 
-  if (sockfd != -1) {
+  if (sockfd != RPC_ANYSOCK) {
     close(sockfd);
   }
 
@@ -560,7 +560,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
 {
   CLIENT *clnt = NULL;
   int ret = -1;
-  int sockfd = -1;
+  int sockfd = RPC_ANYSOCK;
   int errsv = 0;
   size_t i;
   blockResponse reply = {0,};
@@ -688,10 +688,6 @@ glusterBlockCallRPC_1(char *host, void *cobj,
 
   if (res) {
     freeaddrinfo(res);
-  }
-
-  if (sockfd != -1) {
-    close(sockfd);
   }
 
   if (errsv) {
