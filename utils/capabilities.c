@@ -12,6 +12,9 @@
 # include "capabilities.h"
 
 
+gbCapObj *globalCapabilities;
+
+
 int
 gbCapabilitiesEnumParse(const char *cap)
 {
@@ -32,27 +35,29 @@ gbCapabilitiesEnumParse(const char *cap)
 }
 
 
-int
-gbSetCapabilties(blockResponse **c)
+void
+gbSetCapabilties(void)
 {
-  FILE * fp;
+  FILE *fp = NULL;
   char *line = NULL;
   size_t len = 0;
   int count = 0;
-  int ret = 0;
-  blockResponse *reply = *c;
+  int ret;
   gbCapObj *caps = NULL;
   char *p, *sep;
 
 
   fp = fopen(GB_CAPS_FILE, "r");
   if (fp == NULL) {
-    return -1;
+    LOG("mgmt", GB_LOG_ERROR,
+        "gbSetCapabilties: fopen() failed (%s)", strerror(errno));
+    goto out;
   }
 
   if (GB_ALLOC_N(caps, GB_CAP_MAX) < 0) {
-    fclose(fp);
-    return -1;
+    LOG("mgmt", GB_LOG_ERROR,
+        "gbSetCapabilties: calloc() failed (%s)", strerror(errno));
+    goto out;
   }
 
   while ((getline(&line, &len, fp)) != -1) {
@@ -83,7 +88,9 @@ gbSetCapabilties(blockResponse **c)
       if (ret >= 0) {
         caps[count].status = ret;
       } else {
-        ret = -1;
+        LOG("mgmt", GB_LOG_ERROR,
+            "gbSetCapabilties: convertStringToTrillianParse(%s) failed (%s)", p,
+            strerror(errno));
         goto out;
       }
       count++;
@@ -93,17 +100,20 @@ gbSetCapabilties(blockResponse **c)
   }
 
   if (GB_CAP_MAX != count) {
-    ret = -1;
+    LOG("mgmt", GB_LOG_ERROR, "gbSetCapabilties: GB_CAP_MAX != %d", count);
     goto out;
   }
 
-  reply->xdata.xdata_len = GB_CAP_MAX * sizeof(gbCapObj);
-  reply->xdata.xdata_val = (char *) caps;
+  globalCapabilities = caps;
 
-  ret = 0;
  out:
+  if (!globalCapabilities) {
+    GB_FREE(caps);
+  }
   GB_FREE(line);
-  fclose(fp);
+  if (fp) {
+    fclose(fp);
+  }
 
-  return ret;
+  return;
 }

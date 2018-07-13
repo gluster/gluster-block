@@ -4793,10 +4793,13 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
   return reply;
 }
 
+
 blockResponse *
 block_version_1_svc_st(void *data, struct svc_req *rqstp)
 {
   blockResponse *reply = NULL;
+  gbCapObj *caps;
+  int i;
 
 
   LOG("mgmt", GB_LOG_DEBUG, "%s", "version check request");
@@ -4805,14 +4808,25 @@ block_version_1_svc_st(void *data, struct svc_req *rqstp)
     return NULL;
   }
 
-  reply->exit = gbSetCapabilties(&reply);
+  if (GB_ALLOC_N(caps, GB_CAP_MAX) < 0) {
+    GB_FREE(reply);
+    return NULL;
+  }
 
-  GB_ASPRINTF(&reply->out, "remote version check returns %d", reply->exit);
+  for (i = 0; i < GB_CAP_MAX; i++) {
+    GB_STRCPYSTATIC(caps[i].cap, globalCapabilities[i].cap);
+    caps[i].status = globalCapabilities[i].status;
+  }
 
-  LOG("mgmt", GB_LOG_DEBUG, "command exit code, %d", reply->exit);
+  reply->xdata.xdata_len = GB_CAP_MAX * sizeof(gbCapObj);
+  reply->xdata.xdata_val = (char *) caps;
+  reply->exit = 0;
+
+  GB_ASPRINTF(&reply->out, "version check routine");
 
   return reply;
 }
+
 
 blockResponse *
 block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
