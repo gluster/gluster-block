@@ -21,6 +21,7 @@
 # include  "lru.h"
 # include  "block.h"
 # include  "block_svc.h"
+# include  "capabilities.h"
 
 # define   GB_TGCLI_GLOBALS     "targetcli set "                               \
                                 "global auto_add_default_portal=false "        \
@@ -303,6 +304,21 @@ blockNodeSanityCheck(void)
   return 0;
 }
 
+
+static int
+initDaemonCapabilities(void)
+{
+
+  gbSetCapabilties();
+  if (!globalCapabilities) {
+    LOG("mgmt", GB_LOG_ERROR, "%s", "capabilities fetching failed");
+    return -1;
+  }
+
+  return 0;
+}
+
+
 int
 main (int argc, char **argv)
 {
@@ -343,6 +359,11 @@ main (int argc, char **argv)
   if (errnosv) {
     exit(errnosv);
   }
+
+  if (initDaemonCapabilities()) {
+    exit(EXIT_FAILURE);
+  }
+  LOG("mgmt", GB_LOG_INFO, "%s", "capabilities fetched successfully");
 
   initCache();
 

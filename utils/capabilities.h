@@ -73,5 +73,8 @@ static const char *const gbCapabilitiesLookup[] = {
 };
 
 
+extern gbCapObj *globalCapabilities;
+
+
 int gbCapabilitiesEnumParse(const char *cap);
-int gbSetCapabilties (blockResponse **c);
+void gbSetCapabilties(void);
