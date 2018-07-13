@@ -18,7 +18,7 @@
                                 "[ha <count>] [auth <enable|disable>] "        \
                                 "[prealloc <full|no>] [storage <filename>] "   \
                                 "[ring-buffer <size-in-MB-units>] "            \
-                                "<HOST1[,HOST2,...]> <size> [--json*]"
+                                "<HOST1[,HOST2,...]> [size] [--json*]"
 # define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> "      \
                                 "[unlink-storage <yes|no>] [force] [--json*]"
 # define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "      \
@@ -226,7 +226,7 @@ glusterBlockHelp(void)
       "                              [prealloc <full|no>]\n"
       "                              [storage <filename>]\n"
       "                              [ring-buffer <size-in-MB-units>]\n"
-      "                              <host1[,host2,...]> <size>\n"
+      "                              <host1[,host2,...]> [size]\n"
       "        create block device [defaults: ha 1, auth disable, prealloc no, size in bytes,\n"
       "                             ring-buffer default size dependends on kernel]\n"
       "\n"
@@ -559,7 +559,7 @@ glusterBlockCreate(int argcount, char **options, int json)
 
     if (argcount - optind != 1) {
       MSG("Inadequate arguments for create:\n%s\n", GB_CREATE_HELP_STR);
-      MSG("%s\n", "Hint: do not use <size> in combination with [storage <filename>] option");
+      MSG("%s\n", "Hint: do not use [size] in combination with [storage <filename>] option");
       LOG("cli", GB_LOG_ERROR,
           "failed with Inadequate args for create block %s on volume %s with hosts %s",
           cobj.block_name, cobj.volume, cobj.block_hosts);
@@ -576,7 +576,7 @@ glusterBlockCreate(int argcount, char **options, int json)
   if (TAKE_SIZE) {
     sparse_ret = glusterBlockParseSize("cli", options[optind]);
     if (sparse_ret < 0) {
-      MSG("%s\n", "'<size>' is incorrect");
+      MSG("%s\n", "'[size]' is incorrect");
       MSG("%s\n", GB_CREATE_HELP_STR);
       LOG("cli", GB_LOG_ERROR, "failed while parsing size for block <%s/%s>",
           cobj.volume, cobj.block_name);

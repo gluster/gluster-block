@@ -25,7 +25,7 @@ Note that the gluster-blockd daemon is responsible for block management, hence t
 
 .SH COMMANDS
 .SS
-\fBcreate\fR <VOLNAME/NEW-BLOCKNAME> [ha <COUNT>] [auth <enable|disable>] [prealloc <full|no>] [storage <filename>] [ring-buffer <size-in-MB-units>] <HOST1[,HOST2,..]> <BYTES>
+\fBcreate\fR <VOLNAME/NEW-BLOCKNAME> [ha <COUNT>] [auth <enable|disable>] [prealloc <full|no>] [storage <filename>] [ring-buffer <size-in-MB-units>] <HOST1[,HOST2,..]> [BYTES]
 create block device.
 .TP
 [ha <COUNT>]
@@ -46,7 +46,7 @@ kernel ring buffer size for exchanging iSCSI commands, range [1MB - 64MB] (defau
 <HOST1,[HOST2....]>
 servers in the pool where targets will be exported
 .TP
-<BYTES>
+[BYTES]
 size in B|KiB|MiB|GiB|TiB|PiB ... (default: bytes)
 .PP
 
