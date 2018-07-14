@@ -483,56 +483,6 @@ glusterBlockGetSockaddr(char *host)
 }
 
 
-static int glusterBlockHostConnect(char *host)
-{
-  int sockfd = RPC_ANYSOCK;
-  int errsv = 0;
-  struct addrinfo *res = NULL;
-
-
-
-  if(!(res = glusterBlockGetSockaddr(host))) {
-    goto out;
-  }
-
-  if ((sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0) {
-    errsv = errno;
-    LOG("mgmt", GB_LOG_ERROR, "socket creation failed (%s)",
-        strerror (errno));
-    goto out;
-  }
-
-  if (connect(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
-    errsv = errno;
-    LOG("mgmt", GB_LOG_ERROR, "connect on %s failed (%s)", host,
-        strerror (errno));
-    goto out;
-  }
-
-  if (res) {
-    freeaddrinfo(res);
-  }
-
-  close(sockfd);
-
-  return 0;
-
-out:
-  if (res) {
-    freeaddrinfo(res);
-  }
-
-  if (sockfd != RPC_ANYSOCK) {
-    close(sockfd);
-  }
-
-  if (errsv) {
-    errno = errsv;
-  }
-  return -1;
-}
-
-
 void
 convertTypeCreate2ToCreate(blockCreate2 *blk_v2, blockCreate *blk_v1)
 {
@@ -1203,90 +1153,6 @@ glusterBlockCollectAttemptSuccess(blockRemoteObj *args, MetaInfo *info,
   *attempt = NULL;
   *success = NULL;
   return -1;
-}
-
-
-void *
-glusterBlockDeleteHostConnect(void *data)
-{
-  int ret;
-  blockRemoteObj *args = (blockRemoteObj *)data;
-
-
-  args->exit = ret = glusterBlockHostConnect(args->addr);
-
-  return NULL;
-}
-
-
-static int
-glusterBlockConnectAsync(char *blockname, MetaInfo *info,
-                         int count, char **errMsg)
-{
-  pthread_t  *tid = NULL;
-  blockRemoteObj *args = NULL;
-  char *notreachable = NULL;
-  char *reachable = NULL;
-  char *a_tmp = NULL;
-  char *s_tmp = NULL;
-  int ret = -1;
-  size_t i;
-
-
-  if (GB_ALLOC_N(tid, count) < 0) {
-    goto out;
-  }
-
-  if (GB_ALLOC_N(args, count) < 0) {
-    goto out;
-  }
-
-  count = glusterBlockDeleteFillArgs(info, true, args, NULL, NULL);
-
-  for (i = 0; i < count; i++) {
-    pthread_create(&tid[i], NULL, glusterBlockDeleteHostConnect, &args[i]);
-  }
-
-  for (i = 0; i < count; i++) {
-    pthread_join(tid[i], NULL);
-  }
-
-  ret = 0;
-  for (i = 0; i < count; i++) {
-    if (args[i].exit) {
-      ret = -1;
-      if (GB_ASPRINTF(&notreachable, "%s %s",
-                      (a_tmp==NULL?"":a_tmp), args[i].addr) == -1) {
-        goto fail;
-      }
-      GB_FREE(a_tmp);
-      a_tmp = notreachable;
-    } else {
-      if (GB_ASPRINTF(&reachable, "%s %s",
-                      (s_tmp==NULL?"":s_tmp), args[i].addr) == -1) {
-        goto fail;
-      }
-      GB_FREE(s_tmp);
-      s_tmp = reachable;
-    }
-  }
-
-  if (ret) {
-    GB_ASPRINTF(errMsg, "block delete: %s: failed: Some of the nodes are down\n"
-                        "Nodes reachable: %s\nNodes down: %s",
-                        blockname, reachable?reachable:"None",
-                        notreachable?notreachable:"None");
-  }
-
- fail:
-  GB_FREE(a_tmp);
-  GB_FREE(s_tmp);
-
- out:
-  GB_FREE(args);
-  GB_FREE(tid);
-
-  return ret;
 }
 
 
@@ -4669,36 +4535,29 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
+  if (GB_ALLOC(info) < 0) {
+    goto out;
+  }
+
+  ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
+  if (ret) {
+    goto out;
+  }
+
   if (!blk->force) {
-    if (GB_ALLOC(info) < 0) {
+    list = glusterBlockGetListFromInfo(info);
+    if (!list) {
+      errCode = ENOMEM;
       goto out;
     }
 
-    ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
-    if (ret) {
+    errCode = glusterBlockCheckCapabilities((void *)blk, DELETE_SRV, list, NULL, &errMsg);
+    if (errCode) {
+      LOG("mgmt", GB_LOG_ERROR,
+          "glusterBlockCheckCapabilities() for block %s on volume %s failed",
+          blk->block_name, blk->volume);
       goto out;
     }
-
-    ret = glusterBlockConnectAsync(blk->block_name, info,
-                                   glusterBlockDeleteFillArgs(info, true, NULL, NULL, NULL),
-                                   &errMsg);
-    if (ret) {
-      goto out;
-    }
-  }
-
-  list = glusterBlockGetListFromInfo(info);
-  if (!list) {
-    errCode = ENOMEM;
-    goto out;
-  }
-
-  errCode = glusterBlockCheckCapabilities((void *)blk, DELETE_SRV, list, NULL, &errMsg);
-  if (errCode) {
-    LOG("mgmt", GB_LOG_ERROR,
-        "glusterBlockCheckCapabilities() for block %s on volume %s failed",
-        blk->block_name, blk->volume);
-    goto out;
   }
 
   errCode = glusterBlockCleanUp(glfs, blk->block_name, TRUE, blk->force, blk->unlink, savereply);
