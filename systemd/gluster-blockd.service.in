@@ -12,6 +12,7 @@ Environment="GB_LOG_LEVEL=INFO"
 EnvironmentFile=-@sysconfigdir@/gluster-blockd
 ExecStart=@prefix@/sbin/gluster-blockd --glfs-lru-count $GB_GLFS_LRU_COUNT --log-level $GB_LOG_LEVEL $GB_EXTRA_ARGS
 KillMode=process
+TimeoutStartSec=600
 
 [Install]
 WantedBy=multi-user.target
