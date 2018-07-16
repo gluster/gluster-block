@@ -51,7 +51,8 @@ AC_CONFIG_FILES([gluster-block.spec
                  systemd/gluster-blockd.service
                  systemd/gluster-block-target.service
                  systemd/gluster-blockd.initd
-                 docs/Makefile])
+                 docs/Makefile
+                 extras/Makefile])
 AC_CONFIG_MACRO_DIR([m4])
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 
@@ -102,6 +103,20 @@ if test "x$prefix" = xNONE; then
    test $localstatedir = '${prefix}/var' && localstatedir=$ac_default_prefix/var
    localstatedir=/var
 fi
+
+localstatedir="$(eval echo ${localstatedir})"
+LOCALSTATEDIR=${localstatedir}
+
+GLUSTER_BLOCKD_WORKDIR="${LOCALSTATEDIR}/lib/gluster-block"
+AC_SUBST(GLUSTER_BLOCKD_WORKDIR)
+
+if test "x$prefix" = xNONE; then
+   test $libexecdir = '${prefix}/libexec' && localstatedir=$ac_default_prefix/libexec
+   libexecdir=/usr/libexec
+fi
+
+GLUSTER_BLOCKD_LIBEXECDIR="$(eval echo ${libexecdir}/gluster-block)"
+AC_SUBST(GLUSTER_BLOCKD_LIBEXECDIR)
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL

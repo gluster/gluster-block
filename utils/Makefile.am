@@ -4,8 +4,8 @@ libgb_la_SOURCES = common.c utils.c lru.c capabilities.c
 
 noinst_HEADERS = common.h utils.h lru.h list.h capabilities.h
 
-libgb_la_CFLAGS = $(GFAPI_CFLAGS)                                              \
-                  -DDATADIR=\"$(localstatedir)\" -DCONFDIR=\"$(sysconfigdir)\" \
+libgb_la_CFLAGS = $(GFAPI_CFLAGS) -DDATADIR=\"$(localstatedir)\"               \
+                  -DCONFDIR=\"$(GLUSTER_BLOCKD_WORKDIR)\"                      \
                   -I$(top_builddir)/ -I$(top_builddir)/rpc/rpcl
 
 libgb_la_LIBADD = $(GFAPI_LIBS)
@@ -19,9 +19,9 @@ DISTCLEANFILES = Makefile.in
 CLEANFILES = *~
 
 install-data-local:
-	$(MKDIR_P) $(DESTDIR)${sysconfigdir};                    \
-	$(INSTALL_DATA) gluster-block-caps.info                  \
-		$(DESTDIR)${sysconfigdir}/gluster-block-caps.info;
+	$(MKDIR_P) $(DESTDIR)$(GLUSTER_BLOCKD_WORKDIR);                              \
+	$(INSTALL_DATA) gluster-block-caps.info                                      \
+		$(DESTDIR)$(GLUSTER_BLOCKD_WORKDIR)/gluster-block-caps.info;
 
 uninstall-local:
-	rm -f $(DESTDIR)${sysconfigdir}/gluster-block-caps.info
+	rm -f $(DESTDIR)$(GLUSTER_BLOCKD_WORKDIR)/gluster-block-caps.info

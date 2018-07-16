@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = rpc utils cli daemon systemd docs
+SUBDIRS = rpc utils cli daemon systemd docs extras
 
 DISTCLEANFILES = Makefile.in gluster-block.spec autom4te.cache
 
