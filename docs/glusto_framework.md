@@ -13,6 +13,7 @@ Follow this link for the setup: https://github.com/gluster/glusto-tests
 ## Running the tests
 
 Before writing gluster-block test cases, create 3-4 virtual machines which will serve as clients and servers.
+In order to run glusto tests, the server side machines should have glusterfs and gluster-block packages installed and the client side machines should have iscsi related packages installed.
 Edit the config file tests/gluster_tests_config.yml inside glusto-tests repo with the information of the allocated machines.
 We can start writing the test cases now.
 
@@ -23,8 +24,9 @@ Here are a few examples of how test cases can be automated for gluster-block.
 
 @runs_on decorator is used to define the volume types for test cases. Multiple volume types can be given at the same time.
 
-In the below example, the setUpClass method creates a glusterfs volume of type repicated using the information from the config file.
-For this example I am assuming that glusterd and gluster-blockd are already started on the servers but they can be started/restarted in the test cases too as you can see below. 
+In the below example, the setUpClass method creates a glusterfs volume of type replicated using the information from the config file.
+For this example, we assume that the glusterd and gluster-blockd srevices are already running on the servers. However, they can be started/re-started in the tests cases as are shown in examples below.
+
 
 ```
 @runs_on([['replicated'],['glusterfs']])
