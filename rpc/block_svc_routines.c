@@ -2592,7 +2592,7 @@ getTgObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
 
   json_object_object_add(tg_obj, "tpgs", tpgs_arr);
 
-  snprintf(iqn, 128, "iqn.2016-12.org.gluster-block:%s", info->gbid);
+  snprintf(iqn, 128, "%s:%s", GB_TGCLI_IQN_PREFIX, info->gbid);
   json_object_object_add(tg_obj, "wwn", GB_JSON_OBJ_TO_STR(iqn[0]?iqn:NULL));
 
   return tg_obj;
@@ -3955,9 +3955,8 @@ blockValidateCommandOutput(const char *out, int opt, void *data)
 
     /* target iqn create validation */
     GB_OUT_VALIDATE_OR_GOTO(out, out, "target iqn creation failed for: %s",
-                    cblk, cblk->volume,
-                    "Created target iqn.2016-12.org.gluster-block:%s.",
-                    cblk->gbid);
+                    cblk, cblk->volume, "Created target %s:%s.",
+                    GB_TGCLI_IQN_PREFIX, cblk->gbid);
 
     /* LUN create validation */
     GB_OUT_VALIDATE_OR_GOTO(out, out, "LUN creation failed for: %s",cblk,
