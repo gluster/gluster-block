@@ -22,68 +22,24 @@ function printLog()
     echo "[$(date -u +'%Y-%m-%d %I:%M:%S')] ${msg}" >> "${LOGDIR}/gluster-block-bricks-start.log"
 }
 
-function volinfo_field()
-{
-    local vol=$1;
-    local field=$2;
-
-    gluster volume info "$vol" --xml | grep -oPm1 "(?<=<$field>)[^<]+"
-}
-
-function is_enabled()
-{
-        case "$1" in
-        0|off|no|false|disable)
-                echo "N"
-                ;;
-        1|on|yes|true|enable)
-                echo "Y"
-                ;;
-        *)
-                echo "N/A"
-                ;;
-        esac
-}
-
-function volinfo_option()
-{
-    local vol=$1;
-    local key=$2;
-
-    gluster volume get "$vol" "$key"| awk '{print $NF}' | tail -1
-}
-
-function check_brick_status() {
-        local volname=$1
-        local daemon=$2
-
-        cmd="gluster --xml volume status $volname"
-        if [[ -z "$daemon" ]]
-        then
-                 $cmd | grep -c '<status>1'
-        else
-                 $cmd | sed -n -e "/${daemon}/,/<status>/ p" | grep -c '<status>1'
-        fi
-}
-
 function volume_online_brick_count()
 {
         local volname=$1
-        local v1=0
-        local v2=0
-        local v3=0
-        local v4=0
-        local v5=0
-        local tot=0
+        local brick_count=$2
+        gluster --xml volume status "$volname" | grep '<status>' | head -n "$brick_count" | grep -c '<status>1'
+}
 
-        #First count total Number of bricks and then subtract daemon status
-        v1=$(check_brick_status "$volname")
-        v2=$(check_brick_status "$volname" "Self-heal")
-        v3=$(check_brick_status "$volname" "Quota")
-        v4=$(check_brick_status "$volname" "Snapshot")
-        v5=$(check_brick_status "$volname" "Tier")
-        tot=$((v1-v2-v3-v4-v5))
-        echo $tot
+function block_volnames_brick_count_get()
+{
+        gluster v info | \
+ # get volume name, status, shard-status, number-of-bricks
+        grep -P "(^Volume Name:|^Status:|^features.shard:|^Number of Bricks:)" | \
+ # get the 'started' volumes
+        sed '/^Volume Name:/{x;p;x;}' | sed -e '/./{H;$!d;}' -e 'x;/Status: Started/!d;' | \
+ # get shard enabled volumes
+        sed -e '/./{H;$!d;}' -e 'x;/features.shard: on/b' -e '/features.shard: yes/b' -e '/features.shard: enable/b' -e '/features.shard: true/b' -e '/features.shard: 1/b' -e d | \
+ #Print volume names
+        grep -P "(^Volume Name:|^Number of Bricks:)" | awk '{print $NF}'
 }
 
 function volumes_waiting_for_bricks_up()
@@ -92,31 +48,33 @@ function volumes_waiting_for_bricks_up()
         local vol_down_info
         while read -r volname
         do
-                if [[ "Started" == "$(volinfo_field "$volname" 'statusStr')" ]]
+                read -r total_brick_count
+                brick_count="$(volume_online_brick_count "$volname" "$total_brick_count")"
+                if [[ $brick_count -ne $total_brick_count ]]
                 then
-                        if [[ "Y" == "$(is_enabled "$(volinfo_option "$volname" features.shard)")" ]]
+                        vol_down_info="$volname ($((total_brick_count - brick_count))/$total_brick_count)"
+                        if [[ -z "$wait_info" ]]
                         then
-                                brick_count="$(volume_online_brick_count "$volname")"
-                                total_brick_count=$(volinfo_field "$volname" 'brickCount')
-                                if [[ $brick_count -ne $total_brick_count ]]
-                                then
-                                        vol_down_info="$volname ($((total_brick_count - brick_count))/$total_brick_count)"
-                                        if [[ -z "$wait_info" ]]
-                                        then
-                                                wait_info="$vol_down_info"
-                                        else
-                                                wait_info="$wait_info, $vol_down_info"
-                                        fi
-                                fi
+                                wait_info="$vol_down_info"
+                        else
+                                wait_info="$wait_info, $vol_down_info"
                         fi
                 fi
-        done < <(gluster volume list)
+        done < <(block_volnames_brick_count_get)
         if [[ ! -z "$wait_info" ]]; then echo "$wait_info"; fi
 }
 
 function check_glusterd_running()
 {
-        if ! pidof glusterd > /dev/null 2>&1
+        if ! command -v ps > /dev/null 2>&1
+        then
+                printLog "ERROR: 'ps' command is not found"
+                exit 1;
+        fi
+
+# Explanation of why ps command is used this way:
+# https://stackoverflow.com/questions/9117507/linux-unix-command-to-determine-if-process-is-running
+        if ! ps cax | grep -w '[g]lusterd' > /dev/null 2>&1
         then
                 printLog "ERROR: Glusterd is not running";
                 exit 1;
