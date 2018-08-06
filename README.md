@@ -1,18 +1,18 @@
 # gluster-block
-gluster-block is a CLI utility, which aims at making gluster backed block
+gluster-block is a CLI utility, which aims at making Gluster backed block
 storage creation and maintenance as simple as possible.
 
 ## License
 gluster-block is licensed to you under your choice of the GNU Lesser General Public License, version 3 or any later version ([LGPLv3](https://opensource.org/licenses/lgpl-3.0.html) or later), or the GNU General Public License, version 2 ([GPLv2](https://opensource.org/licenses/GPL-2.0)), in all cases as published by the Free Software Foundation.
 
 ## Gluster
-[Gluster](http://gluster.readthedocs.io/en/latest/) is a well known scale-out distributed storage system, flexible in its design and easy to use. One of its key goals is to provide high availability of data. Despite its distributed nature, Gluster is very easy to setup and use. Addition and removal of storage servers from a Gluster cluster is very easy. These capabilities along with other data services that Gluster provides makes it a reliable software defined storage platform.
+[Gluster](http://gluster.readthedocs.io/en/latest/) is a well known scale-out distributed storage system, flexible in its design and easy to use. One of its key goals is to provide high availability of data. Gluster is very easy to setup and use. Addition and removal of storage servers from a Gluster cluster is intuitive. These capabilities along with other data services that Gluster provides makes it a reliable software defined storage platform.
 
-We can access glusterfs via [FUSE](https://en.wikipedia.org/wiki/Filesystem_in_Userspace) module. However to perform a single filesystem operation various context switches are required which leads to performance issues. [Libgfapi](http://blog.gluster.org/2014/04/play-with-libgfapi-and-its-python-bindings/) is a userspace library for accessing data in Glusterfs. It can perform IO on gluster volumes without the FUSE module, kernel VFS layer and hence requires no context switches. It exposes a filesystem like API for accessing gluster volumes. Samba, NFS-Ganesha, QEMU and now the tcmu-runner all use libgfapi to integrate with Glusterfs.
+We can access glusterfs via [FUSE](https://en.wikipedia.org/wiki/Filesystem_in_Userspace) module. However to perform a single filesystem operation various context switches are required which can often exhibit performance issues. [Libgfapi](http://blog.gluster.org/2014/04/play-with-libgfapi-and-its-python-bindings/) is a userspace library for accessing data in Glusterfs. It can perform I/O on gluster volumes without the FUSE module, kernel VFS layer and hence requires no context switches. It exposes a filesystem like API for accessing gluster volumes. Samba, NFS-Ganesha, QEMU and now the tcmu-runner all use libgfapi to integrate with Gluster.
 
 > A unique distributed storage solution build on traditional filesystems
 
-### How we achieve block storage in gluster ?
+### How we provide block storage in gluster ?
 
 ![untitled diagram](https://cloud.githubusercontent.com/assets/12432241/21478518/235e533c-cb72-11e6-9c5a-e351513a34b7.png)
 
@@ -21,7 +21,7 @@ We can access glusterfs via [FUSE](https://en.wikipedia.org/wiki/Filesystem_in_U
 3. From the initiator we login to the exported LUN and play with the block device
 
 #### Background
-The [SCSI](http://searchstorage.techtarget.com/definition/SCSI) subsystem uses a sort of client-server model.  The Client/Initiator request IO happen through target which is a storage device. The SCSI target subsystem enables a computer node to behave as a SCSI storage device, responding to storage requests by other SCSI initiator nodes.
+The [SCSI](http://searchstorage.techtarget.com/definition/SCSI) subsystem uses a form of client-server model.  The Client/Initiator request I/O happen through target which is a storage device. The SCSI target subsystem enables a computer node to behave as a SCSI storage device, responding to storage requests by other SCSI initiator nodes.
 
 In simple terms SCSI is a set of standards for physically connecting and transferring data between computers and peripheral devices.
 
@@ -60,7 +60,7 @@ managing the command ring buffers
 
 ### Usage
 ------
-**Prerequisites:** *this guide assume we already have*
+**Prerequisites:** *this guide assumes that the following are already present*
 - [x] *A gluster volume with name 'block-test'*
 - [x] *Open 24007(for glusterd) 24010(gluster-blockd) 3260(iscsi targets) 111(rpcbind) ports and glusterfs service in your firewall*
 
@@ -151,7 +151,7 @@ IQN: iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea
 PORTAL(S): 192.168.1.11:3260 192.168.1.12:3260 192.168.1.13:3260
 RESULT: SUCCESS
 
-Enable Authentication (you can do this as part of create as well)
+Enable Authentication (this can be part of create as well)
 <b># gluster-block modify block-test/sample-block auth enable</b>
 IQN: iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea
 USERNAME: aafea465-9167-4880-b37c-2c36db8562ea
