@@ -62,7 +62,9 @@ glusterBlockCliThreadProc (void *vargp)
 {
   register SVCXPRT *transp = NULL;
   struct sockaddr_un saun = {0, };
+#if 0
   int sockfd = RPC_ANYSOCK;
+#endif
 
 
   if (strlen(GB_UNIX_ADDRESS) > SUN_PATH_MAX) {
@@ -72,11 +74,13 @@ glusterBlockCliThreadProc (void *vargp)
     goto out;
   }
 
+#if 0
   if ((sockfd = socket(AF_UNIX, SOCK_STREAM, IPPROTO_IP)) < 0) {
     LOG("mgmt", GB_LOG_ERROR, "UNIX socket creation failed (%s)",
         strerror (errno));
     goto out;
   }
+#endif
 
   saun.sun_family = AF_UNIX;
   GB_STRCPYSTATIC(saun.sun_path, GB_UNIX_ADDRESS);
@@ -87,14 +91,16 @@ glusterBlockCliThreadProc (void *vargp)
     goto out;
   }
 
+#if 0
   if (bind(sockfd, (struct sockaddr *) &saun,
            sizeof(struct sockaddr_un)) < 0) {
     LOG("mgmt", GB_LOG_ERROR, "bind on '%s' failed (%s)",
         GB_UNIX_ADDRESS, strerror (errno));
     goto out;
   }
+#endif
 
-  transp = svcunix_create(sockfd, 0, 0, GB_UNIX_ADDRESS);
+  transp = svcunix_create(RPC_ANYSOCK, 0, 0, GB_UNIX_ADDRESS);
   if (!transp) {
     LOG("mgmt", GB_LOG_ERROR,
         "RPC service transport create failed for unix (%s)",
@@ -117,9 +123,11 @@ glusterBlockCliThreadProc (void *vargp)
     svc_destroy(transp);
   }
 
+#if 0
   if (sockfd != RPC_ANYSOCK) {
     close(sockfd);
   }
+#endif
 
   return NULL;
 }
@@ -153,6 +161,13 @@ glusterBlockServerThreadProc(void *vargp)
 
   if (bind(sockfd, (struct sockaddr *) &sain, sizeof (sain)) < 0) {
     snprintf(errMsg, sizeof (errMsg), "bind on port %d failed (%s)",
+             GB_TCP_PORT, strerror (errno));
+    goto out;
+  }
+
+  // TODO: #define backlog somehere
+  if (listen(sockfd, 128) < 0) {
+    snprintf(errMsg, sizeof (errMsg), "listen on port %d failed (%s)",
              GB_TCP_PORT, strerror (errno));
     goto out;
   }

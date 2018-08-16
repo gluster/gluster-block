@@ -80,15 +80,18 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
     goto out;
   }
 
+#if 0
   if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
     snprintf (errMsg, sizeof (errMsg), "%s: socket creation failed (%s)",
               GB_UNIX_ADDRESS, strerror (errno));
     goto out;
   }
+#endif
 
   saun.sun_family = AF_UNIX;
   GB_STRCPYSTATIC(saun.sun_path, GB_UNIX_ADDRESS);
 
+#if 0
   if (connect(sockfd, (struct sockaddr *) &saun,
               sizeof(struct sockaddr_un)) < 0) {
     if (errno == ENOENT || errno == ECONNREFUSED) {
@@ -100,6 +103,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
     }
     goto out;
   }
+#endif
 
   clnt = clntunix_create((struct sockaddr_un *) &saun,
                          GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS,
