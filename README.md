@@ -54,7 +54,16 @@ managing the command ring buffers
 <pre>
 # git clone https://github.com/gluster/gluster-block.git
 # cd gluster-block/
-# dnf install autoconf automake libtool libuuid-devel json-c-devel glusterfs-api-devel tcmu-runner targetcli (on fedora)
+
+# dnf install gcc autoconf automake make file libtool libuuid-devel json-c-devel glusterfs-api-devel tcmu-runner targetcli
+
+On Fedora27 and Centos7 [Which use legacy glibc RPC], pass '--enable-tirpc=no' flag at configure time
+# ./autogen.sh && ./configure --enable-tirpc=no && make -j install
+
+On Fedora28 and higher [Which use TIRPC], in addition to above, we should also install
+# dnf install rpcgen libtirpc-devel
+
+And pass '--enable-tirpc=yes'(default) flag or nothing at configure time
 # ./autogen.sh && ./configure && make -j install
 </pre>
 
