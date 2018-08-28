@@ -52,8 +52,10 @@
 
 # define  SUN_PATH_MAX           (sizeof(struct sockaddr_un) - sizeof(unsigned short int)) /*sun_family*/
 
-# define GB_TIME_STRING_BUFLEN  \
-         (4 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 6 + 1 +   5)
+# define  GB_METASTORE_RESERVE   10485760   /* 10 MiB reserve for block-meta */
+
+# define  GB_TIME_STRING_BUFLEN  \
+          (4 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 6 + 1 +   5)
      /*   Yr      Mon     Day     Hour    Min     Sec     Ms  NULL  Round-off(32)
          2017 -   06  -   01  ' ' 18  :   58  :   29  . 695147 '\0' Power^2
          2017-06-01 18:58:29.695147                                             */

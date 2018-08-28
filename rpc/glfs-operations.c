@@ -88,13 +88,50 @@ glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg)
 
 
 int
+glusterBlockCheckAvailableSpace(struct glfs *glfs,
+                                char *volume, size_t blockSize, char **errMsg)
+{
+  struct statvfs buf = {'\0', };
+  int errSave = 0;
+
+
+  if (!glfs_statvfs(glfs, "/", &buf)) {
+    if ((buf.f_bfree * buf.f_bsize) >= GB_METASTORE_RESERVE + blockSize) {
+      return 0;
+    }
+    LOG("gfapi", GB_LOG_ERROR,
+        "glfs_statvfs('%s'): Low space on volume => "
+        "Total size: %lu, Free space: %lu, Block request space: %lu", volume,
+        buf.f_blocks * buf.f_bsize, buf.f_bfree * buf.f_bsize, blockSize);
+    GB_ASPRINTF(errMsg, "Low space on the volume %s\n", volume);
+    errSave = ENOSPC;
+  } else {
+    errSave = errno;
+    LOG("gfapi", GB_LOG_ERROR,
+        "glfs_statvfs('%s'): couldn't get file-system statistics", volume);
+    GB_ASPRINTF(errMsg,
+                "couldn't get file-system statistics on volume %s\n", volume);
+  }
+  errno = errSave;
+
+  return -1;
+}
+
+
+int
 glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
                         int *errCode, char **errMsg)
 {
   struct glfs_fd *tgfd;
   struct stat st;
   char *tmp;
-  int ret;
+  int ret = -1;
+
+
+  if (glusterBlockCheckAvailableSpace(glfs, blk->volume, blk->size, errMsg)) {
+    *errCode = errno;
+    goto out;
+  }
 
   ret = glfs_mkdir (glfs, GB_STOREDIR, 0);
   if (ret && errno != EEXIST) {
@@ -271,6 +308,12 @@ glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk,
       goto close;
     }
 
+    if (glusterBlockCheckAvailableSpace(glfs, blk->volume, blk->size - sb.st_size, errMsg)) {
+      *errCode = errno;
+      ret = -1;
+      goto close;
+    }
+
     ret = glfs_ftruncate(tgfd, blk->size);
     if (ret) {
       *errCode = errno;
@@ -307,8 +350,10 @@ glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk,
 
  out:
   if (ret) {
-    GB_ASPRINTF (errMsg, "Not able to resize storage for %s/%s [%s]",
-                 blk->volume, blk->block_name, strerror(*errCode));
+    if (errMsg && !(*errMsg)) {
+      GB_ASPRINTF (errMsg, "Not able to resize storage for %s/%s [%s]",
+                   blk->volume, blk->block_name, strerror(*errCode));
+    }
 
   }
 
