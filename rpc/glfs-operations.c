@@ -283,9 +283,7 @@ glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk,
   snprintf(fpath, sizeof fpath, "%s/%s", GB_STOREDIR, blk->gbid);
   tgfd = glfs_open(glfs, fpath, O_WRONLY | O_SYNC);
   if (!tgfd) {
-    if (errCode) {
-      *errCode = errno;
-    }
+    *errCode = errno;
     LOG("gfapi", GB_LOG_ERROR, "glfs_open(%s) failed[%s]", blk->gbid,
         strerror(errno));
     ret = -1;
@@ -340,7 +338,9 @@ glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk,
 
  close:
   if (tgfd && glfs_close(tgfd) != 0) {
-    *errCode = errno;
+    if (!(*errCode)) {
+      *errCode = errno;
+    }
     LOG("gfapi", GB_LOG_ERROR,
         "glfs_close(%s): on volume %s for block %s failed[%s]",
         blk->gbid, blk->volume, blk->block_name, strerror(errno));

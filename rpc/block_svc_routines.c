@@ -3558,7 +3558,6 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
   if (ret) {
     LOG("mgmt", GB_LOG_ERROR, "%s block: %s volume: %s file: %s size: %zu",
         FAILED_MODIFY_SIZE, mobj.block_name, mobj.volume, mobj.gbid, mobj.size);
-    errCode = ret;
     goto out;
   }
 
