@@ -29,7 +29,6 @@
                                 "logfile=%s auto_save_on_exit=false"
 
 
-extern size_t glfsLruCount;
 extern const char *argp_program_version;
 static gbConfig *gbCfg;
 
@@ -195,6 +194,7 @@ glusterBlockDParseArgs(int count, char **options)
 {
   size_t optind = 1;
   size_t opt = 0;
+  ssize_t lruCount;
   int ret = 0;
   int logLevel;
 
@@ -229,17 +229,13 @@ glusterBlockDParseArgs(int count, char **options)
         MSG("option '%s' needs argument <COUNT>\n", options[optind-1]);
         return -1;
       }
-      if (sscanf(options[optind], "%zu", &glfsLruCount) != 1) {
+      if (sscanf(options[optind], "%zu", &lruCount) != 1) {
         MSG("option '%s' expect argument type integer <COUNT>\n",
             options[optind-1]);
         return -1;
       }
-      if (!glfsLruCount || (glfsLruCount > LRU_COUNT_MAX)) {
-        MSG("glfs-lru-count argument should be [0 < COUNT < %d]\n",
-            LRU_COUNT_MAX);
-        LOG("mgmt", GB_LOG_ERROR,
-            "glfs-lru-count argument should be [0 < COUNT < %d]\n",
-            LRU_COUNT_MAX);
+
+      if (glusterBlockSetLruCount(lruCount)) {
         return -1;
       }
       break;

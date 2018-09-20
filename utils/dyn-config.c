@@ -23,6 +23,7 @@
 #include <pthread.h>
 
 #include "utils.h"
+#include "lru.h"
 
 typedef enum {
   GB_OPT_NONE = 0,
@@ -176,6 +177,11 @@ glusterBlockConfSetOptions(gbConfig *cfg, bool reloading)
     glusterBlockSetLogLevel(logLevel);
   }
 
+  /* set lruCount option */
+  GB_PARSE_CFG_INT(cfg, GB_GLFS_LRU_COUNT, LRU_COUNT_DEF);
+  if (cfg->GB_GLFS_LRU_COUNT) {
+    glusterBlockSetLruCount(cfg->GB_GLFS_LRU_COUNT);
+  }
   /* add your new config options */
 }
 

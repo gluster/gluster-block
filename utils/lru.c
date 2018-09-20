@@ -9,11 +9,11 @@
 */
 
 # include "lru.h"
+# include "utils.h"
 
 
 static struct list_head Cache;
 static int lruCount;
-size_t glfsLruCount = 5;  /* default lru cache size */
 
 typedef struct Entry {
   char volume[255];
@@ -21,6 +21,27 @@ typedef struct Entry {
 
   struct list_head list;
 } Entry;
+
+int
+glusterBlockSetLruCount(const size_t lruCount)
+{
+  if (!lruCount || (lruCount > LRU_COUNT_MAX)) {
+    MSG("glfsLruCount should be [0 < COUNT < %d]\n",
+        LRU_COUNT_MAX);
+    LOG("mgmt", GB_LOG_ERROR,
+        "glfsLruCount should be [0 < COUNT < %d]\n",
+        LRU_COUNT_MAX);
+    return -1;
+  }
+
+  LOCK(gbConf.lock);
+  gbConf.glfsLruCount = lruCount;
+  UNLOCK(gbConf.lock);
+
+  LOG("mgmt", GB_LOG_INFO,
+      "glfsLruCount now is %lu\n", lruCount);
+  return 0;
+}
 
 
 static void
@@ -49,11 +70,13 @@ appendNewEntry(const char *volname, glfs_t *fs)
   Entry *tmp;
 
 
-  if (lruCount == glfsLruCount) {
+  LOCK(gbConf.lock);
+  if (lruCount == gbConf.glfsLruCount) {
     releaseColdEntry();
   }
 
   if (GB_ALLOC(tmp) < 0) {
+    UNLOCK(gbConf.lock);
     return -1;
   }
   GB_STRCPYSTATIC(tmp->volume, volname);
@@ -62,6 +85,7 @@ appendNewEntry(const char *volname, glfs_t *fs)
   list_add(&(tmp->list), &Cache);
 
   lruCount++;
+  UNLOCK(gbConf.lock);
 
   return 0;
 }
