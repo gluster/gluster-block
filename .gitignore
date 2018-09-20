@@ -25,6 +25,11 @@ gluster-blockd.service
 *.tar.gz
 VERSION
 
+cli/gluster-block
+daemon/gluster-blockd
+systemd/gluster-block-target.service
+systemd/gluster-blockd.initd
+
 cscope.*
 tags
 TAGS
