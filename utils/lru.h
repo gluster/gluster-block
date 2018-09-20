@@ -18,6 +18,7 @@
 # include  "list.h"
 
 # define   LRU_COUNT_MAX   512
+# define   LRU_COUNT_DEF   5
 
 void
 initCache(void);
@@ -27,6 +28,9 @@ queryCache(const char *volname);
 
 int
 appendNewEntry(const char *volname, glfs_t *glfs);
+
+int
+glusterBlockSetLruCount(const size_t lruCount);
 
 
 # endif /* _LRU_H */

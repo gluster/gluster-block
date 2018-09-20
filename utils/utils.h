@@ -134,6 +134,7 @@
 
 
 struct gbConf {
+  size_t glfsLruCount;
   unsigned int logLevel;
   char logDir[PATH_MAX];
   char daemonLogFile[PATH_MAX];
@@ -564,6 +565,7 @@ typedef struct gbConfig {
 
   bool isDynamic;
   char *GB_LOG_LEVEL;
+  ssize_t GB_GLFS_LRU_COUNT;
 } gbConfig;
 
 int glusterBlockSetLogLevel(unsigned int logLevel);
