@@ -142,6 +142,7 @@ struct gbConf {
   char gfapiLogFile[PATH_MAX];
   char configShellLogFile[PATH_MAX];
   pthread_mutex_t lock;
+  char cmdhistoryLogFile[PATH_MAX];
 };
 
 extern struct gbConf gbConf;
@@ -158,6 +159,8 @@ extern struct gbConf gbConf;
                 fd = fopen (gbConf.cliLogFile, "a");                   \
               else if (!strcmp(str, "gfapi"))                          \
                 fd = fopen (gbConf.gfapiLogFile, "a");                 \
+              else if (!strcmp(str, "cmdlog"))                         \
+                fd = fopen (gbConf.cmdhistoryLogFile, "a");            \
               else                                                     \
                 fd = stderr;                                           \
               if (fd == NULL) {                                        \
