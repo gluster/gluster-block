@@ -15,6 +15,8 @@
 # include  <pthread.h>
 # include  <rpc/pmap_clnt.h>
 # include  <signal.h>
+# include  <sys/utsname.h>
+# include  <linux/version.h>
 
 # include  "config.h"
 # include  "common.h"
@@ -28,6 +30,9 @@
                                 "auto_enable_tpgt=false loglevel_file=info "   \
                                 "logfile=%s auto_save_on_exit=false"
 
+# define   VERNUM_BUFLEN        8
+
+# define   GB_DISTRO_CHECK      "grep -P '(^ID=)' /etc/os-release"
 
 extern const char *argp_program_version;
 static gbConfig *gbCfg;
@@ -259,12 +264,108 @@ glusterBlockDParseArgs(int count, char **options)
   return 0;
 }
 
+
+static void
+gbMinKernelVersionCheck(void)
+{
+  struct utsname verStr = {'\0', };
+  char out[32] = {'\0', };
+  size_t vNum[VERNUM_BUFLEN] = {0, };
+  FILE *fp = NULL;
+  int i = 0;
+  char *tptr;
+
+
+  fp = popen(GB_DISTRO_CHECK, "r");
+  if (fp) {
+    size_t newLen = fread(out, sizeof(char), 32, fp);
+    if (ferror(fp)) {
+      LOG("mgmt", GB_LOG_ERROR, "fread(%s) failed: %s",
+          GB_DISTRO_CHECK, strerror(errno));
+      goto fail;
+    }
+    out[newLen++] = '\0';
+    tptr = strchr(out,'\n');
+    if (tptr) {
+      *tptr = '\0';
+    }
+  } else {
+    LOG("mgmt", GB_LOG_ERROR, "popen(%s): failed: %s",
+        GB_DISTRO_CHECK, strerror(errno));
+    goto fail;
+  }
+
+  if (uname(&verStr) != 0) {
+    LOG("mgmt", GB_LOG_ERROR, "uname() failed: %s", strerror(errno));
+    goto fail;
+  }
+
+  tptr = verStr.release;
+  while (*tptr) {
+    if (isdigit(*tptr)) {
+      vNum[i] = strtol(tptr, &tptr, 10);
+      i++;
+    } else if (isalpha(*tptr)) {
+      break;
+    } else {
+      tptr++;
+    }
+
+    if (i >= VERNUM_BUFLEN) {
+      break;
+    }
+  }
+
+  if (strstr(out, "fedora")) {
+    tptr = "4.12.0-1"; /* Minimum recommended fedora kernel version */
+    if (KERNEL_VERSION(vNum[0], vNum[1], vNum[2]) < KERNEL_VERSION(4, 12, 0)) {
+      goto out;
+    } else if (KERNEL_VERSION(vNum[0], vNum[1], vNum[2]) == KERNEL_VERSION(4, 12, 0)) {
+      if (KERNEL_VERSION(vNum[3], vNum[4], vNum[5]) < KERNEL_VERSION(1, 0, 0)) {
+        goto out;
+      }
+    }
+  } else if (strstr(out, "rhel")) {
+    tptr = "3.10.0-862.11.1"; /* Minimum recommended rhel kernel version */
+    if (KERNEL_VERSION(vNum[0], vNum[1], vNum[2]) < KERNEL_VERSION(3, 10, 0)) {
+      goto out;
+    } else if (KERNEL_VERSION(vNum[0], vNum[1], vNum[2]) == KERNEL_VERSION(3, 10, 0)) {
+      if (KERNEL_VERSION(vNum[3], vNum[4], vNum[5]) < KERNEL_VERSION(862, 11, 1)) {
+        goto out;
+      }
+    }
+  } else {
+    LOG("mgmt", GB_LOG_INFO, "Distro %s. Skipping kernel version check.", out);
+  }
+
+  LOG("mgmt", GB_LOG_INFO, "Distro %s. Current kernel version: '%s'.",
+      out, verStr.release);
+
+  pclose(fp);
+  return;
+
+ out:
+  LOG("mgmt", GB_LOG_ERROR,
+      "Distro %s. Minimum recommended kernel version: '%s' and "
+      "current kernel version: '%s'. Hint: Upgrade your kernel and try again.",
+      out, tptr, verStr.release);
+
+ fail:
+  pclose(fp);
+
+  exit(EXIT_FAILURE);
+}
+
+
 static int
 blockNodeSanityCheck(void)
 {
   int ret;
   char *global_opts;
 
+
+  /* Check minimum recommended kernel version */
+  gbMinKernelVersionCheck();
 
   /* Check if tcmu-runner is running */
   ret = gbRunner("ps aux ww | grep -w '[t]cmu-runner' > /dev/null");
