@@ -72,6 +72,7 @@ struct blockCreateCli {
   char      storage[255];
   char      block_name[255];
   string    block_hosts<>;
+  string    cmd<>;
   enum JsonResponseFormat     json_resp;
 };
 
@@ -80,6 +81,7 @@ struct blockDeleteCli {
   char      volume[255];
   bool      unlink;
   bool      force;
+  string    cmd<>;
   enum JsonResponseFormat     json_resp;
 };
 
@@ -104,6 +106,7 @@ struct blockModifyCli {
   char      block_name[255];
   char      volume[255];
   bool      auth_mode;
+  string     cmd<>;
   enum JsonResponseFormat     json_resp;
 };
 
@@ -112,6 +115,7 @@ struct blockModifySizeCli {
   char      volume[255];
   u_quad_t  size;
   bool      force;
+  string    cmd<>;
   enum JsonResponseFormat     json_resp;
 };
 
@@ -121,6 +125,7 @@ struct blockReplaceCli {
   char      old_node[255];
   char      new_node[255];
   bool      force;
+  string    cmd<>;
   enum JsonResponseFormat     json_resp;
 };
 
