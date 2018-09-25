@@ -37,8 +37,8 @@ int
 glusterBlockSetLogLevel(unsigned int logLevel)
 {
   if (logLevel >= GB_LOG_MAX) {
-    MSG("unknown LOG-LEVEL: '%d'\n", logLevel);
-      return -1;
+    MSG(stderr, "unknown LOG-LEVEL: '%d'\n", logLevel);
+    return -1;
   }
   LOCK(gbConf.lock);
   gbConf.logLevel = logLevel;

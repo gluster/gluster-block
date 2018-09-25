@@ -121,15 +121,11 @@
             pthread_mutex_unlock(&x);                                \
           } while (0)
 
-# define ERROR(fmt, ...)                                             \
-         do {                                                        \
-           fprintf(stderr, "Error: " fmt " [at %s+%d :<%s>]\n",      \
-                   __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__);   \
-          } while (0)
-
-# define  MSG(fmt, ...)                                              \
+# define  MSG(fd, fmt, ...)                                          \
           do {                                                       \
-            fprintf(stdout, fmt, __VA_ARGS__);                       \
+            if (fd <= 0)       /* including STDIN_FILENO 0 */        \
+              fd = stderr;                                           \
+            fprintf(fd, fmt, __VA_ARGS__);                           \
           } while (0)
 
 

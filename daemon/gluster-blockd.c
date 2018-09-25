@@ -40,7 +40,7 @@ static gbConfig *gbCfg;
 static void
 glusterBlockDHelp(void)
 {
-  MSG("%s",
+  MSG(stdout, "%s",
       "gluster-blockd ("PACKAGE_VERSION")\n"
       "usage:\n"
       "  gluster-blockd [--glfs-lru-count <COUNT>]\n"
@@ -192,7 +192,7 @@ glusterBlockServerThreadProc(void *vargp)
 
   if (errMsg[0]) {
     LOG ("mgmt", GB_LOG_ERROR, "%s", errMsg);
-    MSG("%s\n", errMsg);
+    MSG(stderr, "%s\n", errMsg);
     exit(EXIT_FAILURE);
   }
   return NULL;
@@ -212,7 +212,7 @@ glusterBlockDParseArgs(int count, char **options)
   while (optind < count) {
     opt = glusterBlockDaemonOptEnumParse(options[optind++]);
     if (!opt || opt >= GB_DAEMON_OPT_MAX) {
-      MSG("unknown option: %s\n", options[optind-1]);
+      MSG(stderr, "unknown option: %s\n", options[optind-1]);
       return -1;
     }
 
@@ -220,7 +220,7 @@ glusterBlockDParseArgs(int count, char **options)
     case GB_DAEMON_HELP:
     case GB_DAEMON_USAGE:
       if (count != 2) {
-        MSG("undesired options for: '%s'\n", options[optind-1]);
+        MSG(stderr, "undesired options for: '%s'\n", options[optind-1]);
         ret = -1;
       }
       glusterBlockDHelp();
@@ -228,19 +228,19 @@ glusterBlockDParseArgs(int count, char **options)
 
     case GB_DAEMON_VERSION:
       if (count != 2) {
-        MSG("undesired options for: '%s'\n", options[optind-1]);
+        MSG(stderr, "undesired options for: '%s'\n", options[optind-1]);
         ret = -1;
       }
-      MSG("%s\n", argp_program_version);
+      MSG(stdout, "%s\n", argp_program_version);
       exit(ret);
 
     case GB_DAEMON_GLFS_LRU_COUNT:
       if (count - optind  < 1) {
-        MSG("option '%s' needs argument <COUNT>\n", options[optind-1]);
+        MSG(stderr, "option '%s' needs argument <COUNT>\n", options[optind-1]);
         return -1;
       }
       if (sscanf(options[optind], "%zu", &lruCount) != 1) {
-        MSG("option '%s' expect argument type integer <COUNT>\n",
+        MSG(stderr, "option '%s' expect argument type integer <COUNT>\n",
             options[optind-1]);
         return -1;
       }
@@ -252,7 +252,7 @@ glusterBlockDParseArgs(int count, char **options)
 
     case GB_DAEMON_LOG_LEVEL:
       if (count - optind  < 1) {
-        MSG("option '%s' needs argument <LOG-LEVEL>\n", options[optind-1]);
+        MSG(stderr, "option '%s' needs argument <LOG-LEVEL>\n", options[optind-1]);
         return -1;
       }
       logLevel = blockLogLevelEnumParse(options[optind]);
