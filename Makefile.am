@@ -29,6 +29,9 @@ srpm: prep
 prep: dist
 	@mkdir -p build/rpmbuild/{BUILD,SPECS,RPMS,SRPMS,SOURCES}
 
+install-data-local:
+	mkdir -p $(DESTDIR)/$(localstatedir)/log/gluster-block
+
 uninstall-local:
 	cd $(DESTDIR)$(bindir) && rm -f gluster-block gluster-blockd
 

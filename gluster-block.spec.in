@@ -73,6 +73,7 @@ rm -rf ${RPM_BUILD_ROOT}
 %{_sbindir}/gluster-block
 %{_sbindir}/gluster-blockd
 %{_mandir}/man8/gluster-block*.8*
+%dir %{_localstatedir}/log/gluster-block
 %if ( 0%{?_with_systemd:1} )
 %{_unitdir}/gluster-blockd.service
 %{_unitdir}/gluster-block-target.service
@@ -86,6 +87,9 @@ rm -rf ${RPM_BUILD_ROOT}
      %attr(0644,-,-) %{_sharedstatedir}/gluster-block/gluster-block-caps.info
 
 %changelog
+* Fri Sep 28 2018 Michael Adam <obnox@redhat.com>
+- create and package log directory
+
 * Tue Jul 17 2018 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - change install path for gluster-block-caps.info
 - add install details for wait-for-bricks.sh
