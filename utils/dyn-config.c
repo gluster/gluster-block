@@ -193,6 +193,7 @@ glusterBlockConfFreeStrKeys(gbConfig *cfg)
    * For example:
    * GB_FREE_CFG_STR_KEY(cfg, 'STR KEY');
    */
+   GB_FREE_CFG_STR_KEY(cfg, GB_LOG_LEVEL);
 }
 
 #define GB_MAX_CFG_FILE_SIZE (32 * 1024)
