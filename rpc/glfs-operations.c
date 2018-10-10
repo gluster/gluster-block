@@ -713,6 +713,14 @@ blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info,
     *errCode = errno;
     goto out;
   }
+  if (!info->prio_path[0]) {
+    for (count = 0; count < info->nhosts; count++) {
+      if (blockhostIsValid(info->list[count]->status)) {
+        GB_STRCPYSTATIC(info->prio_path, info->list[count]->addr);
+        break;
+      }
+    }
+  }
   blockParseRSstatus(info);
 
  out:
