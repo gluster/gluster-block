@@ -93,7 +93,7 @@ You can run gluster-blockd as systemd service, note '/etc/sysconfig/gluster-bloc
 <b>CLI</b>: you can choose to run gluster-block(cli) from any node which has gluster-blockd running
 ```script
 # gluster-block --help
-gluster-block (0.2.1)
+gluster-block (0.3)
 usage:
   gluster-block <command> <volname[/blockname]> [<args>] [--json*]
 
@@ -101,8 +101,11 @@ commands:
   create  <volname/blockname> [ha <count>]
                               [auth <enable|disable>]
                               [prealloc <full|no>]
-                              <host1[,host2,...]> <size>
-        create block device [defaults: ha 1, auth disable, prealloc no]
+                              [storage <filename>]
+                              [ring-buffer <size-in-MB-units>]
+                              <host1[,host2,...]> [size]
+        create block device [defaults: ha 1, auth disable, prealloc no, size in bytes,
+	                     ring-buffer default size dependends on kernel]
 
   list    <volname>
         list available block devices.
@@ -110,11 +113,17 @@ commands:
   info    <volname/blockname>
         details about block device.
 
-  delete  <volname/blockname>
+  delete  <volname/blockname> [unlink-storage <yes|no>] [force]
         delete block device.
 
-  modify  <volname/blockname> <auth enable|disable>
+  modify  <volname/blockname> [auth <enable|disable>] [size <size>] [force]
         modify block device.
+
+  replace <volname/blockname> <old-node> <new-node> [force]
+        replace operations.
+
+  genconfig <volname[,volume2,volume3,...]> enable-tpg <host>
+        generate the block volumes target configuration.
 
   help
         show this message and exit.
