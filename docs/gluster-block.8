@@ -9,7 +9,7 @@ gluster-block - Gluster Block Storage Console Manager (command line utility)
 
 .SH SYNOPSIS
 .B gluster-block
-<\fBcreate|list|info|delete|modify|replace\fR>
+<\fBcreate|list|info|delete|modify|replace|genconfig\fR>
 <\fBvolname\fR[\fB/blockname\fR]>
 [\fB<args>\fR]
 [\fB--json*\fR]
@@ -85,6 +85,14 @@ replace block device.
 .PP
 
 .SS
+\fBgenconfig\fR <VOLNAME1[,VOLNAME2,VOLNAME3,...]> enable-tpg <host>
+generate the block volumes target configuration.
+.TP
+enable-tpg <host>
+specify the active path node
+.PP
+
+.SS
 .BR help
 show help message and exit.
 .PP
@@ -147,6 +155,14 @@ To delete a block device, but let backend file persist in blockVol(for later use
 
 To replace a block device from ${NODE1} to ${NODE2}
 .B # gluster-block replace blockVol/sampleBlock ${NODE1} ${NODE2}
+
+To simply generate the block volumes target configuration.
+.B # gluster-block genconfig blockVol1[,blockVol2,blockVol3,...] enable-tpg ${HOST} | tee new_saveconfig.json
+
+To generate the block volumes target configuration and load it
+.B # mv /etc/target/saveconfig.json /etc/target/saveconfig.json.bak
+.B # gluster-block genconfig blockVol1[,blockVol2,blockVol3,...] enable-tpg ${HOST} | tee /etc/target/saveconfig.json
+.B # systemctl restart gluster-blockd tcmu-runner
 .fi
 .PP
 
