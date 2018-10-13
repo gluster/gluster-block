@@ -55,6 +55,7 @@ mv %{buildroot}/%{_initddir}/gluster-blockd.initd %{buildroot}/%{_initddir}/glus
 
 %preun
 %systemd_preun gluster-blockd.service
+rm -rf %{_sharedstatedir}/gluster-block/gb_upgrade.status
 
 %postun
 %systemd_postun_with_restart gluster-blockd.service

@@ -13,4 +13,5 @@ install-data-local:
 
 uninstall-local:
 	rm -f $(DESTDIR)$(GLUSTER_BLOCKD_LIBEXECDIR)/wait-for-bricks.sh              \
-		$(DESTDIR)$(GLUSTER_BLOCKD_LIBEXECDIR)/upgrade_activities.sh
+		$(DESTDIR)$(GLUSTER_BLOCKD_LIBEXECDIR)/upgrade_activities.sh               \
+		$(DESTDIR)$(GLUSTER_BLOCKD_WORKDIR)/gb_upgrade.status;
