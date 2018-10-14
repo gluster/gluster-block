@@ -1854,12 +1854,12 @@ blockRemoteReplaceRespFree(blockRemoteReplaceResp *resp)
 
 int
 glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
-                                   char *block, blockRemoteReplaceResp **savereply)
+                                    MetaInfo *info, char *block,
+                                    blockRemoteReplaceResp **savereply)
 {
   blockRemoteReplaceResp *reply = NULL;
   pthread_t  *tid = NULL;
   blockRemoteObj *args = NULL;
-  MetaInfo *info = NULL;
   blockCreate2 *cobj = NULL;
   blockDelete *dobj = NULL;
   blockReplace *robj = NULL;
@@ -1883,13 +1883,6 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
   reply->rop->status = -1;
   reply->force = blk->force;
 
-  if (GB_ALLOC(info) < 0) {
-    goto out;
-  }
-  if (blockGetMetaInfo(glfs, block, info, NULL)) {
-    goto out;
-  }
-
   if ((GB_ALLOC(cobj) < 0) || (GB_ALLOC(robj) < 0)  || (GB_ALLOC(dobj) < 0)){
     goto out;
   }
@@ -1901,8 +1894,12 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
   cobj->rb_size = info->rb_size;
   GB_STRCPYSTATIC(cobj->passwd, info->passwd);
   GB_STRCPYSTATIC(cobj->block_name, block);
-  if (info->prio_path[0] && !strcmp(info->prio_path, info->list[i]->addr)) {
-    GB_STRCPYSTATIC(cobj->prio_path, info->prio_path);
+  if (info->prio_path[0]) {
+    if (!strcmp(info->prio_path, blk->old_node)) {
+      GB_STRCPYSTATIC(cobj->prio_path, blk->new_node);
+    } else {
+      GB_STRCPYSTATIC(cobj->prio_path, info->prio_path);
+    }
   }
 
   GB_STRCPYSTATIC(robj->volume, info->volume);
@@ -2139,7 +2136,6 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
   GB_FREE(dobj);
   GB_FREE(robj);
   GB_FREE(args);
-  blockFreeMetaInfo(info);
   blockRemoteReplaceRespFree(reply);
 
   return ret;
@@ -2381,6 +2377,7 @@ block_replace_cli_1_svc_st(blockReplaceCli *blk, struct svc_req *rqstp)
   char *errMsg = NULL;
   int ret;
   blockServerDefPtr list = NULL;
+  MetaInfo *info = NULL;
 
 
   LOG("mgmt", GB_LOG_DEBUG,
@@ -2441,7 +2438,14 @@ block_replace_cli_1_svc_st(blockReplaceCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  ret = glusterBlockReplaceNodeRemoteAsync(glfs, blk, blk->block_name, &savereply);
+  if (GB_ALLOC(info) < 0) {
+    goto out;
+  }
+  if (blockGetMetaInfo(glfs, blk->block_name, info, NULL)) {
+    goto out;
+  }
+
+  ret = glusterBlockReplaceNodeRemoteAsync(glfs, blk, info, blk->block_name, &savereply);
   if (ret) {
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockReplaceNodeRemoteAsync: return"
         " %d %s for single block %s on volume %s", ret, FAILED_REMOTE_REPLACE,
@@ -2462,6 +2466,10 @@ block_replace_cli_1_svc_st(blockReplaceCli *blk, struct svc_req *rqstp)
     GB_METAUPDATE_OR_GOTO(lock, glfs,  blk->block_name,  blk->volume,
                           errCode, errMsg, out, "%s: CLEANUPSUCCESS\n", blk->old_node);
   }
+  if (info->prio_path[0] && !strcmp(info->prio_path, blk->old_node)) {
+    GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
+        errCode, errMsg, out, "PRIOPATH: %s\n", blk->new_node);
+  }
 
   errCode = 0;
 
@@ -2473,6 +2481,7 @@ block_replace_cli_1_svc_st(blockReplaceCli *blk, struct svc_req *rqstp)
   LOG("cmdlog", errCode?GB_LOG_ERROR:GB_LOG_INFO, "%s", reply->out);
   blockServerDefFree(list);
   blockRemoteReplaceRespFree(savereply);
+  blockFreeMetaInfo(info);
 
 optfail:
   if (lkfd && glfs_close(lkfd) != 0) {
