@@ -43,18 +43,23 @@ glusterBlockDHelp(void)
   MSG("%s",
       "gluster-blockd ("PACKAGE_VERSION")\n"
       "usage:\n"
-      "  gluster-blockd [--glfs-lru-count <COUNT>] [--log-level <LOGLEVEL>]\n"
+      "  gluster-blockd [--glfs-lru-count <COUNT>]\n"
+      "                 [--log-level <LOGLEVEL>]\n"
+      "                 [--no-remote-rpc]\n"
       "\n"
       "commands:\n"
       "  --glfs-lru-count <COUNT>\n"
-      "        glfs objects cache capacity [max: 512] [default: 5]\n"
+      "        Glfs objects cache capacity [max: 512] [default: 5]\n"
       "  --log-level <LOGLEVEL>\n"
       "        Logging severity. Valid options are,\n"
       "        TRACE, DEBUG, INFO, WARNING, ERROR and NONE [default: INFO]\n"
+      "  --no-remote-rpc\n"
+      "        Ignore remote rpc communication, capabilities check and\n"
+      "        other node sanity checks\n"
       "  --help\n"
-      "        show this message and exit.\n"
+      "        Show this message and exit.\n"
       "  --version\n"
-      "        show version info and exit.\n"
+      "        Show version info and exit.\n"
       "\n"
      );
 }
@@ -256,6 +261,11 @@ glusterBlockDParseArgs(int count, char **options)
         return ret;
       }
       break;
+
+    case GB_DAEMON_NO_REMOTE_RPC:
+      gbConf.noRemoteRpc = true;
+      break;
+
     }
 
     optind++;
@@ -463,15 +473,19 @@ main (int argc, char **argv)
     exit(errnosv);
   }
 
-  errnosv = blockNodeSanityCheck();
-  if (errnosv) {
-    exit(errnosv);
-  }
+  if (!gbConf.noRemoteRpc) {
+    errnosv = blockNodeSanityCheck();
+    if (errnosv) {
+      exit(errnosv);
+    }
 
-  if (initDaemonCapabilities()) {
-    exit(EXIT_FAILURE);
+    if (initDaemonCapabilities()) {
+      exit(EXIT_FAILURE);
+    }
+    LOG("mgmt", GB_LOG_INFO, "%s", "capabilities fetched successfully");
+  } else {
+    LOG("mgmt", GB_LOG_DEBUG, "%s", "gluster-blockd running in noRemoteRpc mode");
   }
-  LOG("mgmt", GB_LOG_INFO, "%s", "capabilities fetched successfully");
 
   initCache();
 
@@ -479,13 +493,17 @@ main (int argc, char **argv)
   signal(SIGPIPE, SIG_IGN);
 
   pmap_unset(GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS);
-  pmap_unset(GLUSTER_BLOCK, GLUSTER_BLOCK_VERS);
+  if (!gbConf.noRemoteRpc) {
+    pmap_unset(GLUSTER_BLOCK, GLUSTER_BLOCK_VERS);
+  }
 
   pthread_create(&cli_thread, NULL, glusterBlockCliThreadProc, NULL);
-  pthread_create(&server_thread, NULL, glusterBlockServerThreadProc, NULL);
-
+  if (!gbConf.noRemoteRpc) {
+    pthread_create(&server_thread, NULL, glusterBlockServerThreadProc, NULL);
+    pthread_join(server_thread, NULL);
+  }
   pthread_join(cli_thread, NULL);
-  pthread_join(server_thread, NULL);
+
 
   LOG("mgmt", GB_LOG_ERROR, "svc_run returned (%s)", strerror (errno));
 

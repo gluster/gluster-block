@@ -143,6 +143,7 @@ struct gbConf {
   char configShellLogFile[PATH_MAX];
   pthread_mutex_t lock;
   char cmdhistoryLogFile[PATH_MAX];
+  bool noRemoteRpc;
 };
 
 extern struct gbConf gbConf;
@@ -427,6 +428,7 @@ typedef enum gbDaemonCmdlineOption {
   GB_DAEMON_USAGE          = 3,
   GB_DAEMON_GLFS_LRU_COUNT = 4,
   GB_DAEMON_LOG_LEVEL      = 5,
+  GB_DAEMON_NO_REMOTE_RPC  = 6,
 
   GB_DAEMON_OPT_MAX
 } gbDaemonCmdlineOption;
@@ -438,6 +440,7 @@ static const char *const gbDaemonCmdlineOptLookup[] = {
   [GB_DAEMON_USAGE]          = "usage",
   [GB_DAEMON_GLFS_LRU_COUNT] = "glfs-lru-count",
   [GB_DAEMON_LOG_LEVEL]      = "log-level",
+  [GB_DAEMON_NO_REMOTE_RPC]  = "no-remote-rpc",
 
   [GB_DAEMON_OPT_MAX]        = NULL,
 };
