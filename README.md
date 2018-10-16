@@ -67,20 +67,25 @@ managing the command ring buffers
 <b>Daemon</b>: run gluster-blockd on all the nodes
 ```script
 # gluster-blockd --help
-gluster-blockd (0.2)
+gluster-blockd (0.3)
 usage:
-  gluster-blockd [--glfs-lru-count <COUNT>] [--log-level <LOGLEVEL>]
+  gluster-blockd [--glfs-lru-count <COUNT>]
+                 [--log-level <LOGLEVEL>]
+                 [--no-remote-rpc]
 
 commands:
   --glfs-lru-count <COUNT>
-        glfs objects cache capacity [max: 512] [default: 5]
+        Glfs objects cache capacity [max: 512] [default: 5]
   --log-level <LOGLEVEL>
         Logging severity. Valid options are,
         TRACE, DEBUG, INFO, WARNING, ERROR and NONE [default: INFO]
+  --no-remote-rpc
+        Ignore remote rpc communication, capabilities check and
+        other node sanity checks
   --help
-        show this message and exit.
+        Show this message and exit.
   --version
-        show version info and exit.
+        Show version info and exit.
 ```
 
 You can run gluster-blockd as systemd service, note '/etc/sysconfig/gluster-blockd' is the configuration file where you can choose to edit various options, while systemd will take care of parsing them all and supply to daemon.
