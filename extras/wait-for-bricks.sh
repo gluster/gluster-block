@@ -12,7 +12,7 @@
 # seconds before erroring out with the status about
 # online-bricks/expected-online-bricks
 
-LOGDIR="${GB_LOGDIR:-/var/log/gluster-block}"
+LOGDIR="${TCMU_LOGDIR:-/var/log/gluster-block}"
 mkdir -p "${LOGDIR}"
 
 function printLog()
