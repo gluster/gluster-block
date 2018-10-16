@@ -12,7 +12,7 @@
 # it is triggered by gluster-blockd unit startup.
 
 GB_STATUSFILE="/var/lib/gluster-block/gb_upgrade.status"
-LOGDIR="${GB_LOGDIR:-/var/log/gluster-block}"
+LOGDIR="${TCMU_LOGDIR:-/var/log/gluster-block}"
 GB_LOGFILE="${LOGDIR}/gluster-block-upgrade-activities.log"
 GB_SAVEFILE="/etc/target/saveconfig.json"
 GB_TMP_SAVEFILE="/tmp/gb_saveconfig.json"
