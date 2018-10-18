@@ -144,6 +144,10 @@ struct gbConf {
   pthread_mutex_t lock;
   char cmdhistoryLogFile[PATH_MAX];
   bool noRemoteRpc;
+
+  /* Required only if blockhosting volume is in a remote node */
+  char *glusterdHostname;
+  int glusterdPort;
 };
 
 extern struct gbConf gbConf;
@@ -429,6 +433,8 @@ typedef enum gbDaemonCmdlineOption {
   GB_DAEMON_GLFS_LRU_COUNT = 4,
   GB_DAEMON_LOG_LEVEL      = 5,
   GB_DAEMON_NO_REMOTE_RPC  = 6,
+  GB_DAEMON_GLUSTERD_HOST  = 7,
+  GB_DAEMON_GLUSTERD_PORT  = 8,
 
   GB_DAEMON_OPT_MAX
 } gbDaemonCmdlineOption;
@@ -441,6 +447,8 @@ static const char *const gbDaemonCmdlineOptLookup[] = {
   [GB_DAEMON_GLFS_LRU_COUNT] = "glfs-lru-count",
   [GB_DAEMON_LOG_LEVEL]      = "log-level",
   [GB_DAEMON_NO_REMOTE_RPC]  = "no-remote-rpc",
+  [GB_DAEMON_GLUSTERD_HOST]  = "glusterd-hostname",
+  [GB_DAEMON_GLUSTERD_PORT]  = "glusterd-port",
 
   [GB_DAEMON_OPT_MAX]        = NULL,
 };

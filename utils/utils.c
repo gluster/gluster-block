@@ -17,7 +17,7 @@
 # include "config.h"
 
 
-struct gbConf gbConf = {LRU_COUNT_DEF, GB_LOG_INFO, GB_LOGDIR, '\0', '\0', '\0', '\0', '\0'};
+struct gbConf gbConf = {LRU_COUNT_DEF, GB_LOG_INFO, GB_LOGDIR, '\0', '\0', '\0', '\0', '\0', '\0', 0};
 
 const char *argp_program_version = ""                                 \
   PACKAGE_NAME" ("PACKAGE_VERSION")"                                  \

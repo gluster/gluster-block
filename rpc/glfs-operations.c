@@ -18,6 +18,8 @@
 struct glfs *
 glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg)
 {
+  char *hostname;
+  int port;
   struct glfs *glfs;
   int ret;
 
@@ -36,7 +38,12 @@ glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg)
     return NULL;
   }
 
-  ret = glfs_set_volfile_server(glfs, "tcp", "localhost", 24007);
+  port = gbConf.glusterdPort;
+  hostname = gbConf.glusterdHostname;
+
+  ret = glfs_set_volfile_server(glfs, "tcp",
+                                (hostname? hostname: "localhost"),
+                                (port? port: 24007));
   if (ret) {
     *errCode = errno;
     GB_ASPRINTF (errMsg, "Not able to add Volfile server for volume %s[%s]",

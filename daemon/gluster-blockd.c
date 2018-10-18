@@ -46,6 +46,8 @@ glusterBlockDHelp(void)
       "  gluster-blockd [--glfs-lru-count <COUNT>]\n"
       "                 [--log-level <LOGLEVEL>]\n"
       "                 [--no-remote-rpc]\n"
+      "                 [--glusterd-hostname]\n"
+      "                 [--glusterd-port]\n"
       "\n"
       "commands:\n"
       "  --glfs-lru-count <COUNT>\n"
@@ -56,6 +58,12 @@ glusterBlockDHelp(void)
       "  --no-remote-rpc\n"
       "        Ignore remote rpc communication, capabilities check and\n"
       "        other node sanity checks\n"
+      "  --glusterd-hostname\n"
+      "        hostname of where to fetch the volume details for block\n"
+      "        hosting volume [Default: localhost]\n"
+      "  --glusterd-port\n"
+      "        port of glusterd, either on localhost or remote.\n"
+      "        [Default: 24007]\n"
       "  --help\n"
       "        Show this message and exit.\n"
       "  --version\n"
@@ -266,6 +274,27 @@ glusterBlockDParseArgs(int count, char **options)
       gbConf.noRemoteRpc = true;
       break;
 
+    case GB_DAEMON_GLUSTERD_HOST:
+      if (count - optind  < 1) {
+        MSG("option '%s' needs argument <hostname>\n", options[optind-1]);
+        return -1;
+      }
+      if (GB_STRDUP(gbConf.glusterdHostname, options[optind]) < 0) {
+        MSG("failed to copy hostname: %s\n", options[optind]);
+        return -1;
+      }
+      break;
+
+    case GB_DAEMON_GLUSTERD_PORT:
+      if (count - optind  < 1) {
+        MSG("option '%s' needs argument <port>\n", options[optind-1]);
+        return -1;
+      }
+      if (sscanf(options[optind], "%d", &gbConf.glusterdPort) != 1) {
+        MSG("failed to get port details: %s\n", options[optind]);
+        return -1;
+      }
+      break;
     }
 
     optind++;
