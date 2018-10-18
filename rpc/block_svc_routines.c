@@ -4201,6 +4201,7 @@ block_create_common(blockCreate *blk, char *rbsize, char *prio_path)
   char *authcred = NULL;
   char *save = NULL;
   char *exec = NULL;
+  char *gdHostname = NULL;
   blockResponse *reply = NULL;
   blockServerDefPtr list = NULL;
   size_t i;
@@ -4221,9 +4222,15 @@ block_create_common(blockCreate *blk, char *rbsize, char *prio_path)
     prioCap = true;
   }
 
+  /* If it is known that glusterd is hosted in a
+     given hostname, use that instead */
+  gdHostname = gbConf.glusterdHostname;
+  if (!strcmp(gdHostname, "localhost")) {
+    gdHostname = blk->ipaddr;
+  }
   if (GB_ASPRINTF(&backstore, "%s %s name=%s size=%zu cfgstring=%s@%s%s/%s%s wwn=%s",
                   GB_TGCLI_GLFS_PATH, GB_CREATE, blk->block_name, blk->size,
-                  blk->volume, blk->ipaddr, GB_STOREDIR, blk->gbid,
+                  blk->volume, gdHostname, GB_STOREDIR, blk->gbid,
                   rbsize ? rbsize: "", blk->gbid) == -1) {
     goto out;
   }

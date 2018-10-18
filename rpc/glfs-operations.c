@@ -36,7 +36,8 @@ glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg)
     return NULL;
   }
 
-  ret = glfs_set_volfile_server(glfs, "tcp", "localhost", 24007);
+  ret = glfs_set_volfile_server(glfs, "tcp", gbConf.glusterdHostname,
+                                gbConf.glusterdPort);
   if (ret) {
     *errCode = errno;
     GB_ASPRINTF (errMsg, "Not able to add Volfile server for volume %s[%s]",

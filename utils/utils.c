@@ -19,7 +19,9 @@
 struct gbConf gbConf = {
   .glfsLruCount = LRU_COUNT_DEF,
   .logLevel = GB_LOG_INFO,
-  .logDir = GB_LOGDIR
+  .logDir = GB_LOGDIR,
+  .glusterdHostname = "localhost",
+  .glusterdPort = 24007,
 };
 
 const char *argp_program_version = ""                                 \
