@@ -1,0 +1,7 @@
+sudo: required
+
+service:
+- docker
+
+script:
+- docker build -f ./Dockerfile.buildtest .
