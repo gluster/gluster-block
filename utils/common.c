@@ -101,10 +101,10 @@ glusterBlockParseSize(const char *dom, char *value)
     }
 
     if (sizef % GB_DEFAULT_SECTOR_SIZE) {
-      MSG("The size %lld will align to sector size %d bytes\n",
+      MSG("The size %ld will align to sector size %d bytes\n",
           sizef, GB_DEFAULT_SECTOR_SIZE);
       LOG(dom, GB_LOG_ERROR,
-          "The target device size %lld is will align to the sector size %d",
+          "The target device size %ld is will align to the sector size %d",
 	  sizef, GB_DEFAULT_SECTOR_SIZE);
       sizef = round_down(sizef, GB_DEFAULT_SECTOR_SIZE);
     }
