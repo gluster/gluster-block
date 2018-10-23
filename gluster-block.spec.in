@@ -114,7 +114,7 @@ rm -rf ${RPM_BUILD_ROOT}
 * Fri Aug 11 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - add wrapper target service unit
 
-* Tue Jun 22 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
+* Thu Jun 22 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - update with missing dependencies
 
 * Tue Jun 06 2017 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
