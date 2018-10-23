@@ -4,4 +4,4 @@ service:
 - docker
 
 script:
-- docker build -f ./Dockerfile.buildtest .
+- docker build -f ./extras/docker/Dockerfile.buildtest .
