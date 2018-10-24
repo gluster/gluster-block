@@ -2978,45 +2978,48 @@ glusterBlockAuditRequest(struct glfs *glfs,
           blk->block_name, blk->volume, blk->block_hosts);
     ret = 0;
     goto out;
-  } else {
-    spent = successcnt + failcnt;  /* total spent */
-    spare = list->nhosts  - spent;  /* spare after spent */
-    morereq = blk->mpath  - successcnt;  /* needed nodes to complete req */
-    if (spare == 0) {
-      LOG("mgmt", GB_LOG_WARNING,
-          "No Spare nodes to create (%s): rollingback creation of target"
-          " on volume %s with given hosts %s",
-          blk->block_name, blk->volume, blk->block_hosts);
-      glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, TRUE, (*reply)->obj);
-      needcleanup = FALSE;   /* already clean attempted */
-      ret = -1;
-      goto out;
-    } else if (spare < morereq) {
-      LOG("mgmt", GB_LOG_WARNING,
-          "Not enough Spare nodes for (%s): rollingback creation of target"
-          " on volume %s with given hosts %s",
-          blk->block_name, blk->volume, blk->block_hosts);
-      glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, TRUE, (*reply)->obj);
-      needcleanup = FALSE;   /* already clean attempted */
-      ret = -1;
-      goto out;
-    } else {
-      /* create on spare */
-      LOG("mgmt", GB_LOG_INFO,
-          "Trying to serve request for (%s)  on volume %s from spare machines",
-          blk->block_name, blk->volume);
-      ret = glusterBlockCreateRemoteAsync(list, spent, morereq,
-                                          glfs, cobj, reply);
-      if (ret) {
-        LOG("mgmt", GB_LOG_WARNING, "glusterBlockCreateRemoteAsync: return %d"
-            " %s for block %s on volume %s with hosts %s", ret,
-            FAILED_REMOTE_AYNC_CREATE, blk->block_name,
-            blk->volume, blk->block_hosts);
-      }
-      /* we could ideally moved this into #CreateRemoteAsync fail {} */
-      needcleanup = TRUE;
-    }
   }
+
+  spent = successcnt + failcnt;  /* total spent */
+  spare = list->nhosts  - spent;  /* spare after spent */
+  morereq = blk->mpath  - successcnt;  /* needed nodes to complete req */
+
+  if (spare == 0) {
+    LOG("mgmt", GB_LOG_WARNING,
+        "No Spare nodes to create (%s): rollingback creation of target"
+        " on volume %s with given hosts %s",
+        blk->block_name, blk->volume, blk->block_hosts);
+    glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, TRUE, (*reply)->obj);
+    needcleanup = FALSE;   /* already clean attempted */
+    ret = -1;
+    goto out;
+  }
+
+  if (spare < morereq) {
+    LOG("mgmt", GB_LOG_WARNING,
+        "Not enough Spare nodes for (%s): rollingback creation of target"
+        " on volume %s with given hosts %s",
+        blk->block_name, blk->volume, blk->block_hosts);
+    glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, TRUE, (*reply)->obj);
+    needcleanup = FALSE;   /* already clean attempted */
+    ret = -1;
+    goto out;
+  }
+
+  /* create on spare */
+  LOG("mgmt", GB_LOG_INFO,
+      "Trying to serve request for (%s)  on volume %s from spare machines",
+      blk->block_name, blk->volume);
+  ret = glusterBlockCreateRemoteAsync(list, spent, morereq,
+                                      glfs, cobj, reply);
+  if (ret) {
+    LOG("mgmt", GB_LOG_WARNING, "glusterBlockCreateRemoteAsync: return %d"
+        " %s for block %s on volume %s with hosts %s", ret,
+        FAILED_REMOTE_AYNC_CREATE, blk->block_name,
+        blk->volume, blk->block_hosts);
+  }
+  /* we could ideally moved this into #CreateRemoteAsync fail {} */
+  needcleanup = TRUE;
 
   ret = glusterBlockAuditRequest(glfs, blk, cobj, list, reply);
   if (ret) {
