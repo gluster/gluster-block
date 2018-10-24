@@ -2490,6 +2490,8 @@ optfail:
         GB_TXLOCKFILE, blk->volume, blk->block_name, strerror(errno));
   }
 
+  GB_FREE(errMsg);
+
   return reply;
 }
 
@@ -2858,6 +2860,7 @@ block_gen_config_cli_1_svc_st(blockGenConfigCli *blk, struct svc_req *rqstp)
   LOG("mgmt", GB_LOG_DEBUG, "genconfig cli success, volume[s]=%s", blk->volume);
 
  out:
+  GB_FREE(errMsg);
   return reply;
 }
 
@@ -4609,6 +4612,7 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
     GB_FREE(savereply->d_success);
     GB_FREE(savereply);
   }
+  GB_FREE(errMsg);
 
   return reply;
 }
@@ -5005,6 +5009,8 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
     LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",
         GB_TXLOCKFILE, blk->volume, strerror(errno));
   }
+
+  GB_FREE(errMsg);
 
   return reply;
 }
