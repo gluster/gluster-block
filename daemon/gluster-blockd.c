@@ -336,11 +336,11 @@ gbMinKernelVersionCheck(void)
       }
     }
   } else if (strstr(distro, "rhel")) {
-    tptr = "3.10.0-862.11.1"; /* Minimum recommended rhel kernel version */
+    tptr = "3.10.0-862.14.4"; /* Minimum recommended rhel kernel version */
     if (KERNEL_VERSION(vNum[0], vNum[1], vNum[2]) < KERNEL_VERSION(3, 10, 0)) {
       goto out;
     } else if (KERNEL_VERSION(vNum[0], vNum[1], vNum[2]) == KERNEL_VERSION(3, 10, 0)) {
-      if (KERNEL_VERSION(vNum[3], vNum[4], vNum[5]) < KERNEL_VERSION(862, 11, 1)) {
+      if (KERNEL_VERSION(vNum[3], vNum[4], vNum[5]) < KERNEL_VERSION(862, 14, 4)) {
         goto out;
       }
     }
