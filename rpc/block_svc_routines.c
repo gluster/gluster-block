@@ -700,6 +700,53 @@ blockServerParse(char *blkServers)
 }
 
 
+static blockServerDefPtr
+blockMetaInfoToServerParse(MetaInfo *info)
+{
+  blockServerDefPtr list;
+  size_t i, j;
+
+
+  if (!info) {
+    return NULL;
+  }
+
+  if (GB_ALLOC(list) < 0) {
+    goto out;
+  }
+
+  j = 0;
+  for (i = 0; i < info->nhosts; i++) {
+    if (!blockhostIsValid(info->list[i]->status)) {
+      continue;
+    }
+    j++;
+  }
+
+  list->nhosts = j;
+
+  if (GB_ALLOC_N(list->hosts, list->nhosts) < 0) {
+    goto out;
+  }
+
+  j = 0;
+  for (i = 0; i < info->nhosts; i++) {
+    if (!blockhostIsValid(info->list[i]->status)) {
+      continue;
+    }
+    if (GB_STRDUP(list->hosts[j++], info->list[i]->addr) < 0) {
+      goto out;
+    }
+  }
+
+  return list;
+
+ out:
+  blockServerDefFree(list);
+  return NULL;
+}
+
+
 void *
 glusterBlockCapabilitiesRemote(void *data)
 {
@@ -2685,6 +2732,7 @@ getSoTgArraysForAllVolume(struct soTgObj *obj, blockGenConfigCli *blk,
   size_t i, j;
   int ret = -1;
   bool partOfBlock;
+  blockServerDefPtr list = NULL;
   struct json_object *so_obj = NULL;
   struct json_object *tg_obj = NULL;
 
@@ -2732,6 +2780,21 @@ getSoTgArraysForAllVolume(struct soTgObj *obj, blockGenConfigCli *blk,
         ret = blockGetMetaInfo(glfs, entry->d_name, info, NULL);
         if (ret) {
           goto out;
+        }
+
+        if (!info->prio_path[0]) {
+          /* default as the load balancing is enabled */
+          list = blockMetaInfoToServerParse(info);
+          if (!list) {
+            ret = -1;
+            goto out;
+          }
+
+          blockGetPrioPath(glfs, blk->volume, list, info->prio_path, sizeof(info->prio_path));
+          blockIncPrioAttr(glfs, blk->volume, info->prio_path);
+
+          GB_METAUPDATE_OR_GOTO(lock, glfs, entry->d_name, vols->data[i],
+                                *errCode, *errMsg, out, "PRIOPATH: %s\n", info->prio_path);
         }
 
         partOfBlock = false;
@@ -2787,6 +2850,7 @@ getSoTgArraysForAllVolume(struct soTgObj *obj, blockGenConfigCli *blk,
 
  free:
   strToCharArrayDefFree(vols);
+  blockServerDefFree(list);
 
   return ret;
 }
