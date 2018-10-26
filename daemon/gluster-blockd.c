@@ -279,7 +279,7 @@ static void
 gbMinKernelVersionCheck(void)
 {
   struct utsname verStr = {'\0', };
-  char out[32] = {'\0', };
+  char distro[32] = {'\0', };
   size_t vNum[VERNUM_BUFLEN] = {0, };
   FILE *fp = NULL;
   int i = 0;
@@ -288,14 +288,14 @@ gbMinKernelVersionCheck(void)
 
   fp = popen(GB_DISTRO_CHECK, "r");
   if (fp) {
-    size_t newLen = fread(out, sizeof(char), 32, fp);
+    size_t newLen = fread(distro, sizeof(char), 32, fp);
     if (ferror(fp)) {
       LOG("mgmt", GB_LOG_ERROR, "fread(%s) failed: %s",
           GB_DISTRO_CHECK, strerror(errno));
       goto fail;
     }
-    out[newLen++] = '\0';
-    tptr = strchr(out,'\n');
+    distro[newLen++] = '\0';
+    tptr = strchr(distro,'\n');
     if (tptr) {
       *tptr = '\0';
     }
@@ -326,7 +326,7 @@ gbMinKernelVersionCheck(void)
     }
   }
 
-  if (strstr(out, "fedora")) {
+  if (strstr(distro, "fedora")) {
     tptr = "4.12.0-1"; /* Minimum recommended fedora kernel version */
     if (KERNEL_VERSION(vNum[0], vNum[1], vNum[2]) < KERNEL_VERSION(4, 12, 0)) {
       goto out;
@@ -335,7 +335,7 @@ gbMinKernelVersionCheck(void)
         goto out;
       }
     }
-  } else if (strstr(out, "rhel")) {
+  } else if (strstr(distro, "rhel")) {
     tptr = "3.10.0-862.11.1"; /* Minimum recommended rhel kernel version */
     if (KERNEL_VERSION(vNum[0], vNum[1], vNum[2]) < KERNEL_VERSION(3, 10, 0)) {
       goto out;
@@ -345,11 +345,11 @@ gbMinKernelVersionCheck(void)
       }
     }
   } else {
-    LOG("mgmt", GB_LOG_INFO, "Distro %s. Skipping kernel version check.", out);
+    LOG("mgmt", GB_LOG_INFO, "Distro %s. Skipping kernel version check.", distro);
   }
 
   LOG("mgmt", GB_LOG_INFO, "Distro %s. Current kernel version: '%s'.",
-      out, verStr.release);
+      distro, verStr.release);
 
   pclose(fp);
   return;
@@ -358,7 +358,7 @@ gbMinKernelVersionCheck(void)
   LOG("mgmt", GB_LOG_ERROR,
       "Distro %s. Minimum recommended kernel version: '%s' and "
       "current kernel version: '%s'. Hint: Upgrade your kernel and try again.",
-      out, tptr, verStr.release);
+      distro, tptr, verStr.release);
 
  fail:
   pclose(fp);
