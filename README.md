@@ -200,6 +200,8 @@ Below we set mapth in Active/Passive mode; Note currently Active/Active is not s
 
 Please add the below configuration at the end of /etc/multipath.conf file.
 # LIO iSCSI
+
+For both the versions with and without load-balance support:
 devices {
         device {
                 vendor "LIO-ORG"
@@ -211,6 +213,21 @@ devices {
                 prio "const"
                 no_path_retry 120
                 rr_weight "uniform"
+        }
+}
+
+For versions with load-balance support:
+devices {
+        device {
+                vendor "LIO-ORG"
+                user_friendly_names "yes" # names like mpatha
+                path_grouping_policy "failover" # one path per group
+                hardware_handler "1 alua"
+                path_selector "round-robin 0"
+                failback immediate
+                path_checker "tur"
+                prio "alua"
+                no_path_retry 120
         }
 }
 
