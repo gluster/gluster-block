@@ -2724,11 +2724,7 @@ getSoTgArraysForAllVolume(struct soTgObj *obj, blockGenConfigCli *blk,
     }
 
     while ((entry = glfs_readdir(tgmdfd))) {
-      if (strcmp(entry->d_name, ".") &&
-          strcmp(entry->d_name, "..") &&
-          strcmp(entry->d_name, GB_TXLOCKFILE) &&
-          strcmp(entry->d_name, GB_PRIO_FILENAME)) {
-
+      if (!strchr(entry->d_name, '.')) {
         if (GB_ALLOC(info) < 0) {
           ret = -1;
           goto out;
@@ -4937,10 +4933,7 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
   }
 
   while ((entry = glfs_readdir (tgmdfd))) {
-    if (strcmp(entry->d_name, ".") &&
-        strcmp(entry->d_name, "..") &&
-        strcmp(entry->d_name, GB_TXLOCKFILE) &&
-        strcmp(entry->d_name, GB_PRIO_FILENAME)) {
+    if (!strchr(entry->d_name, '.')) {
       if (blk->json_resp) {
         json_object_array_add(json_array,
                               GB_JSON_OBJ_TO_STR(entry->d_name));
