@@ -263,8 +263,11 @@ static bool
 glusterBlockIsNameAcceptable(char *name)
 {
   int i = 0;
-  if (!name || strlen(name) >= 255)
+
+
+  if (!name || strlen(name) >= 255) {
     return FALSE;
+  }
   for (i = 0; i < strlen(name); i++) {
     if (!isalnum(name[i]) && (name[i] != '_') && (name[i] != '-'))
       return FALSE;
@@ -279,8 +282,9 @@ glusterBlockIsVolListAcceptable(char *name)
   char delim[2] = {'\0', };
 
 
-  if (!name || GB_STRDUP(tmp, name) < 0)
+  if (!name || GB_STRDUP(tmp, name) < 0) {
     return FALSE;
+  }
 
   delim[0] = GB_VOLS_DELIMITER;
   tok = strtok(tmp, delim);
@@ -300,8 +304,11 @@ static bool
 glusterBlockIsAddrAcceptable(char *addr)
 {
   int i = 0;
-  if (!addr || strlen(addr) == 0 || strlen(addr) > 255)
+
+
+  if (!addr || strlen(addr) == 0 || strlen(addr) > 255) {
     return FALSE;
+  }
   for (i = 0; i < strlen(addr); i++) {
     if (!isdigit(addr[i]) && (addr[i] != '.'))
       return FALSE;
@@ -766,23 +773,23 @@ glusterBlockReplace(int argcount, char **options, int json)
   }
 
   if (!glusterBlockIsAddrAcceptable(options[3])) {
-      MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
-          options[3], GB_REPLACE_HELP_STR);
-      goto out;
+    MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
+        options[3], GB_REPLACE_HELP_STR);
+    goto out;
   }
   GB_STRCPYSTATIC(robj.old_node, options[3]);
 
   if (!glusterBlockIsAddrAcceptable(options[4])) {
-      MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
-          options[4], GB_REPLACE_HELP_STR);
-      goto out;
+    MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
+        options[4], GB_REPLACE_HELP_STR);
+    goto out;
   }
   GB_STRCPYSTATIC(robj.new_node, options[4]);
 
   if (!strcmp(robj.old_node, robj.new_node)) {
-      MSG(stderr, "<old-node> (%s) and <new-node> (%s) cannot be same\n%s\n",
-          robj.old_node, robj.new_node, GB_REPLACE_HELP_STR);
-      goto out;
+    MSG(stderr, "<old-node> (%s) and <new-node> (%s) cannot be same\n%s\n",
+        robj.old_node, robj.new_node, GB_REPLACE_HELP_STR);
+    goto out;
   }
 
   robj.json_resp = json;
@@ -866,14 +873,14 @@ glusterBlockParseArgs(int count, char **options)
   }
 
   if (opt > 0 && opt < GB_CLI_HELP) {
-          json = jsonResponseFormatParse (options[count-1]);
-          if (json == GB_JSON_MAX) {
-            MSG(stderr, "expecting '--json*', got '%s'\n",
-                options[count-1]);
-            return -1;
-          } else if (json != GB_JSON_NONE) {
-                  count--;/*Commands don't need to handle json*/
-          }
+    json = jsonResponseFormatParse(options[count-1]);
+    if (json == GB_JSON_MAX) {
+      MSG(stderr, "expecting '--json*', got '%s'\n",
+          options[count-1]);
+      return -1;
+    } else if (json != GB_JSON_NONE) {
+      count--;/*Commands don't need to handle json*/
+    }
   }
 
   while (1) {
@@ -912,12 +919,14 @@ glusterBlockParseArgs(int count, char **options)
         LOG("cli", GB_LOG_ERROR, "%s", FAILED_REPLACE);
       }
       goto out;
+
     case GB_CLI_GENCONFIG:
       ret = glusterBlockGenConfig(count, options, json);
       if (ret) {
         LOG("cli", GB_LOG_ERROR, "%s", FAILED_GENCONFIG);
       }
       goto out;
+
     case GB_CLI_DELETE:
       ret = glusterBlockDelete(count, options, json);
       if (ret) {
