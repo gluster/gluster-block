@@ -3863,6 +3863,9 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   reply->exit = -1;
 
   list = blockServerParse(blk->block_hosts);
+  if (!list) {
+    goto optfail;
+  }
 
   /* Fail if mpath > list->nhosts */
   if (blk->mpath > list->nhosts) {
@@ -4322,6 +4325,9 @@ block_create_common(blockCreate *blk, char *rbsize, char *prio_path)
   }
 
   list = blockServerParse(blk->block_hosts);
+  if (!list) {
+    goto out;
+  }
 
   /* i = 2; because tpg1 is created by default while iqn create */
   for (i = 2; i <= list->nhosts; i++) {
