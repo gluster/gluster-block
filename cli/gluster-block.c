@@ -9,6 +9,11 @@
 */
 
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <string.h>
 # include  "common.h"
 # include  "block.h"
 # include  "config.h"
@@ -212,6 +217,93 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
 }
 
 
+static bool
+glusterBlockIsAddrAndAcceptable(const char *addr)
+{
+  if (!strchr(addr, ':') && !strchr(addr, '.')) {
+    return false;
+  }
+
+  if (strspn(addr, "0123456789abcdef.:,") == strlen(addr)) {
+    return true;
+  }
+
+  return false;
+}
+
+
+static char*
+glusterGetHostAddr(char *hostNames)
+{
+  blockServerDefPtr list = NULL;
+  char *blockHosts = NULL;
+  struct addrinfo hints;
+  struct addrinfo *res;
+  struct sockaddr_in *sa;
+  char buf[INET_ADDRSTRLEN];
+  ssize_t len = 0;
+  int i;
+
+  if (!hostNames) {
+    return NULL;
+  }
+
+  if (glusterBlockIsAddrAndAcceptable(hostNames)) {
+    if (GB_STRDUP(blockHosts, hostNames) < 0) {
+      return NULL;
+    }
+  }
+
+  list = blockServerParse(hostNames);
+  if (!list) {
+    return NULL;
+  }
+
+  bzero(&hints, sizeof (hints));
+  hints.ai_flags = AI_CANONNAME;
+  hints.ai_family = AF_INET;
+
+  if (GB_ALLOC_N(blockHosts, list->nhosts * (INET_ADDRSTRLEN + 1)) < 0) {
+    goto out;
+  }
+
+  for (i = 0; i < list->nhosts; i++) {
+    if(getaddrinfo(list->hosts[i], NULL, &hints, &res) != 0) {
+      MSG(stderr, "getaddrinfo failed for parsing hostname \'%s\'\n",
+          list->hosts[i]);
+      LOG("cli", GB_LOG_ERROR, "getaddrinfo failed for parsing hostname \'%s\'\n",
+          list->hosts[i]);
+      goto out;
+    }
+
+    sa = (struct sockaddr_in *)res->ai_addr;
+    if (inet_ntop(AF_INET, &sa->sin_addr, buf, sizeof(buf)) == NULL) {
+      MSG(stderr, "inet_ntop failed for parsing hostname \'%s\'\n",
+          list->hosts[i]);
+      LOG("cli", GB_LOG_ERROR, "inet_ntop failed for parsing hostname \'%s\'\n",
+          list->hosts[i]);
+      goto out;
+    }
+
+    len = INET_ADDRSTRLEN * i;
+
+    if (i != 0) {
+      blockHosts[len - 1] = ',';
+    }
+
+    GB_STRCPY(blockHosts + len, buf, sizeof(buf));
+  }
+
+  blockServerDefFree(list);
+  return blockHosts;
+
+ out:
+  GB_FREE(blockHosts);
+  blockServerDefFree(list);
+  return NULL;
+}
+
+
 static void
 glusterBlockHelp(void)
 {
@@ -297,22 +389,6 @@ glusterBlockIsVolListAcceptable(char *name)
   }
 
   GB_FREE(tmp);
-  return TRUE;
-}
-
-static bool
-glusterBlockIsAddrAcceptable(char *addr)
-{
-  int i = 0;
-
-
-  if (!addr || strlen(addr) == 0 || strlen(addr) > 255) {
-    return FALSE;
-  }
-  for (i = 0; i < strlen(addr); i++) {
-    if (!isdigit(addr[i]) && (addr[i] != '.'))
-      return FALSE;
-  }
   return TRUE;
 }
 
@@ -602,7 +678,8 @@ glusterBlockCreate(int argcount, char **options, int json)
     }
   }
 
-  if (GB_STRDUP(cobj.block_hosts, options[optind++]) < 0) {
+  cobj.block_hosts = glusterGetHostAddr(options[optind++]);
+  if (!cobj.block_hosts) {
     LOG("cli", GB_LOG_ERROR, "failed while parsing servers for block <%s/%s>",
         cobj.volume, cobj.block_name);
     goto out;
@@ -759,6 +836,7 @@ glusterBlockReplace(int argcount, char **options, int json)
 {
   blockReplaceCli robj = {0};
   int ret = -1;
+  char *addr;
 
 
   if (argcount < 5 || argcount > 6) {
@@ -772,19 +850,19 @@ glusterBlockReplace(int argcount, char **options, int json)
     goto out;
   }
 
-  if (!glusterBlockIsAddrAcceptable(options[3])) {
-    MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
-        options[3], GB_REPLACE_HELP_STR);
+  addr = glusterGetHostAddr(options[3]);
+  if (!addr) {
     goto out;
   }
-  GB_STRCPYSTATIC(robj.old_node, options[3]);
+  GB_STRCPYSTATIC(robj.old_node, addr);
+  GB_FREE(addr);
 
-  if (!glusterBlockIsAddrAcceptable(options[4])) {
-    MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
-        options[4], GB_REPLACE_HELP_STR);
+  addr = glusterGetHostAddr(options[4]);
+  if (!addr) {
     goto out;
   }
-  GB_STRCPYSTATIC(robj.new_node, options[4]);
+  GB_STRCPYSTATIC(robj.new_node, addr);
+  GB_FREE(addr);
 
   if (!strcmp(robj.old_node, robj.new_node)) {
     MSG(stderr, "<old-node> (%s) and <new-node> (%s) cannot be same\n%s\n",
@@ -822,6 +900,7 @@ glusterBlockGenConfig(int argcount, char **options, int json)
 {
   blockGenConfigCli robj = {0};
   int ret = -1;
+  char *addr;
 
 
   GB_ARGCHECK_OR_RETURN(argcount, 5, "genconfig", GB_GENCONF_HELP_STR);
@@ -835,15 +914,15 @@ glusterBlockGenConfig(int argcount, char **options, int json)
   GB_STRCPYSTATIC(robj.volume, options[2]);
 
   if (!strcmp(options[3], "enable-tpg")) {
-    if (!glusterBlockIsAddrAcceptable(options[4])) {
-      MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
-          options[3], GB_REPLACE_HELP_STR);
+    addr = glusterGetHostAddr(options[4]);
+    if (!addr) {
       goto out;
     }
-    GB_STRCPYSTATIC(robj.addr, options[4]);
+    GB_STRCPYSTATIC(robj.addr, addr);
+    GB_FREE(addr);
   } else {
       MSG(stderr, "unknown option '%s' for genconfig:\n%s\n", options[3], GB_GENCONF_HELP_STR);
-      return -1;
+      goto out;
   }
   robj.json_resp = json;
 

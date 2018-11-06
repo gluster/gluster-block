@@ -108,4 +108,6 @@ void blockServerDefFree(blockServerDefPtr blkServers);
 
 bool blockhostIsValid(char *status);
 
+blockServerDefPtr blockServerParse(char *blkServers);
+
 # endif /* _COMMON_H */

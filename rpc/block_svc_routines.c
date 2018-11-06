@@ -24,7 +24,6 @@
 
 # define   GB_CREATE            "create"
 # define   GB_DELETE            "delete"
-# define   GB_MSERVER_DELIMITER ","
 
 # define   GB_TGCLI_GLFS_PATH   "/backstores/user:glfs"
 # define   GB_TGCLI_GLFS        "targetcli " GB_TGCLI_GLFS_PATH
@@ -645,58 +644,6 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   }
 
   return ret;
-}
-
-
-static blockServerDefPtr
-blockServerParse(char *blkServers)
-{
-  blockServerDefPtr list;
-  char *tmp;
-  char *base;
-  size_t i = 0;
-
-  if (!blkServers) {
-    return NULL;
-  }
-
-  if (GB_STRDUP(tmp, blkServers) < 0) {
-    return NULL;
-  }
-  base = tmp;
-
-  if (GB_ALLOC(list) < 0) {
-    goto out;
-  }
-
-  /* count number of servers */
-  while (*tmp) {
-    if (*tmp == ',') {
-      list->nhosts++;
-    }
-    tmp++;
-  }
-  list->nhosts++;
-  tmp = base; /* reset addr */
-
-
-  if (GB_ALLOC_N(list->hosts, list->nhosts) < 0) {
-    goto out;
-  }
-
-  for (i = 0; tmp != NULL; i++) {
-    if (GB_STRDUP(list->hosts[i], strsep(&tmp, GB_MSERVER_DELIMITER)) < 0) {
-      goto out;
-    }
-  }
-
-  GB_FREE(base);
-  return list;
-
- out:
-  GB_FREE(base);
-  blockServerDefFree(list);
-  return NULL;
 }
 
 
