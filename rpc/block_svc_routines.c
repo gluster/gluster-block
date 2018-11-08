@@ -915,16 +915,15 @@ glusterBlockCreateRemote(void *data)
       LOG("mgmt", GB_LOG_ERROR, "%s hence %s for block %s on "
           "host %s volume %s", strerror(errno), FAILED_REMOTE_CREATE,
           cobj.block_name, args->addr, args->volume);
-      goto out;
     } else if (args->reply) {
       errMsg = args->reply;
       args->reply = NULL;
+      LOG("mgmt", GB_LOG_ERROR, "%s for block %s on host %s volume %s",
+          FAILED_REMOTE_CREATE, cobj.block_name, args->addr, args->volume);
     }
 
     GB_METAUPDATE_OR_GOTO(lock, args->glfs, cobj.block_name, cobj.volume,
                           ret, errMsg, out, "%s: CONFIGFAIL\n", args->addr);
-    LOG("mgmt", GB_LOG_ERROR, "%s for block %s on host %s volume %s",
-        FAILED_REMOTE_CREATE, cobj.block_name, args->addr, args->volume);
 
     ret = saveret;
     goto out;
