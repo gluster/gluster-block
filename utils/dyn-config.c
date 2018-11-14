@@ -475,7 +475,6 @@ glusterBlockDynConfigStart(void *arg)
   gbConfig *cfg = arg;
   int monitor, wd, len;
   char buf[GB_BUF_LEN];
-  char cfgDir[PATH_MAX];
   struct inotify_event *event;
   struct timespec mtim = {0, }; /* Time of last modification.  */
   struct stat statbuf;
@@ -489,8 +488,6 @@ glusterBlockDynConfigStart(void *arg)
     return NULL;
   }
 
-  snprintf(cfgDir, PATH_MAX, GB_DEF_CONFIGDIR);
-
   /* Editors (vim, nano ..) follow different approaches to save conf file.
    * The two commonly followed techniques are to overwrite the existing
    * file, or to write to a new file (.swp, .tmp ..) and move it to actual
@@ -500,15 +497,15 @@ glusterBlockDynConfigStart(void *arg)
    * To handle both the file save approaches mentioned above, it is better
    * we watch the directory and filter for MODIFY events.
    */
-  wd = inotify_add_watch(monitor, cfgDir, IN_MODIFY);
+  wd = inotify_add_watch(monitor, GB_DEF_CONFIGDIR, IN_MODIFY);
   if (wd == -1) {
     LOG("mgmt", GB_LOG_ERROR,
-        "Failed to add \"%s\" to inotify (%d)\n", cfgDir, monitor);
+        "Failed to add \"%s\" to inotify (%d)\n", GB_DEF_CONFIGDIR, monitor);
     return NULL;
   }
 
   LOG("mgmt", GB_LOG_INFO,
-      "Inotify is watching \"%s\", wd: %d, mask: IN_MODIFY\n", cfgDir, wd);
+      "Inotify is watching \"%s\", wd: %d, mask: IN_MODIFY\n", GB_DEF_CONFIGDIR, wd);
 
   while (1) {
     len = read(monitor, buf, GB_BUF_LEN);

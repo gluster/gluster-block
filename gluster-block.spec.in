@@ -82,6 +82,7 @@ rm -rf ${RPM_BUILD_ROOT}
 %attr(0755,-,-) %{_initddir}/gluster-blockd
 %endif
 %config(noreplace) %{_sysconfdir}/sysconfig/gluster-blockd
+%config(noreplace) %{_sysconfdir}/logrotate.d/gluster-block
 %dir %attr(0755,-,-) %{_libexecdir}/gluster-block
      %attr(0755,-,-) %{_libexecdir}/gluster-block/wait-for-bricks.sh
      %attr(0755,-,-) %{_libexecdir}/gluster-block/upgrade_activities.sh
@@ -89,6 +90,9 @@ rm -rf ${RPM_BUILD_ROOT}
      %attr(0644,-,-) %{_sharedstatedir}/gluster-block/gluster-block-caps.info
 
 %changelog
+* Sun Apr 3 2019 Xiubo Li <xiubli@redhat.com>
+- Add logrotate support
+
 * Sun Oct 14 2018 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - add install details for upgrade_activities.sh
 
