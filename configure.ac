@@ -129,6 +129,9 @@ fi
 GLUSTER_BLOCKD_LIBEXECDIR="$(eval echo ${libexecdir}/gluster-block)"
 AC_SUBST(GLUSTER_BLOCKD_LIBEXECDIR)
 
+GLUSTER_BLOCKD_LOGROTATEDIR="$(eval echo /etc/logrotate.d)"
+AC_SUBST(GLUSTER_BLOCKD_LOGROTATEDIR)
+
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
 AC_TYPE_SIZE_T
