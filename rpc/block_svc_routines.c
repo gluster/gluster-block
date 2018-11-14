@@ -1934,6 +1934,8 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
     goto out;
   }
 
+  cobj->xdata.xdata_len = strlen(gbConf.volServer);
+  cobj->xdata.xdata_val = (char *) gbConf.volServer;
   GB_STRCPYSTATIC(cobj->ipaddr, blk->new_node);
   GB_STRCPYSTATIC(cobj->volume, info->volume);
   GB_STRCPYSTATIC(cobj->gbid, info->gbid);
