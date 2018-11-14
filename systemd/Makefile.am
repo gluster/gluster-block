@@ -18,7 +18,11 @@ endif
 install-data-local:
 	$(MKDIR_P) $(DESTDIR)${sysconfigdir};              \
 	$(INSTALL_DATA) gluster-blockd.sysconfig           \
-		$(DESTDIR)${sysconfigdir}/gluster-blockd;
+		$(DESTDIR)${sysconfigdir}/gluster-blockd;  \
+	$(MKDIR_P) $(DESTDIR)$(GLUSTER_BLOCKD_LOGROTATEDIR);\
+	$(INSTALL_DATA) -m 644 gluster-block.logrotate     \
+		$(DESTDIR)$(GLUSTER_BLOCKD_LOGROTATEDIR)/gluster-block;
 
 uninstall-local:
-	rm -f $(DESTDIR)${sysconfigdir}/gluster-blockd
+	rm -f $(DESTDIR)${sysconfigdir}/gluster-blockd     \
+		$(DESTDIR)$(GLUSTER_BLOCKD_LOGROTATEDIR)/gluster-block   
