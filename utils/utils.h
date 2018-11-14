@@ -276,12 +276,17 @@ extern struct gbConf gbConf;
             snprintf(tmp, 1024, "%s/%s", vol?vol:"", blk->block_name); \
             if (fp) {                                                  \
               size_t newLen = fread(sr->out, sizeof(char), 8192, fp);  \
-              if (ferror( fp ) != 0)                                   \
+              if (ferror( fp ) != 0) {                                 \
                 LOG("mgmt", GB_LOG_ERROR,                              \
                     "reading command %s output for %s failed(%s)", tmp,\
                     cmd, strerror(errno));                             \
-              else                                                     \
+                sr->out[0] = '\0';                                     \
+                sr->exit = -1;                                         \
+                pclose(fp);                                            \
+                break;                                                 \
+              } else {                                                 \
                 sr->out[newLen++] = '\0';                              \
+              }                                                        \
               sr->exit = blockValidateCommandOutput(sr->out, opt,      \
                                                     (void*)blk);       \
               pclose(fp);                                              \

@@ -603,20 +603,21 @@ glusterBlockCallRPC_1(char *host, void *cobj,
       }
       break;
   }
+  ret = -1;
 
-  ret = reply.exit;
   if (opt != VERSION_SRV) {
     if (GB_STRDUP(*out, reply.out) < 0) {
       goto out;
     }
   } else {
     if (GB_ALLOC(obj) < 0) {
-      return -1;
+      goto out;
     }
     obj->capMax = reply.xdata.xdata_len/sizeof(gbCapObj);
     gbCapObj *caps = (gbCapObj *)reply.xdata.xdata_val;
     if (GB_ALLOC_N(obj->response, obj->capMax) < 0) {
-      return -1;
+      GB_FREE(obj);
+      goto out;
     }
     for (i = 0; i < obj->capMax; i++) {
       GB_STRCPYSTATIC(obj->response[i].cap, caps[i].cap);
@@ -624,6 +625,7 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     }
     *out = (char *) obj;
   }
+  ret = reply.exit;
 
  out:
   if (clnt) {
@@ -4992,7 +4994,7 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
     GB_ASPRINTF (&errMsg, "Not able to open metadata directory for volume "
                  "%s[%s]", blk->volume, strerror(errCode));
     LOG("mgmt", GB_LOG_ERROR, "glfs_opendir(%s): on volume %s failed[%s]",
-        GB_METADIR, blk->volume, strerror(errno));
+        GB_METADIR, blk->volume, strerror(errCode));
     goto out;
   }
 
