@@ -2706,7 +2706,11 @@ getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
   json_object_object_add(so_obj, "attributes", so_obj_attr);
   // }
 
-  snprintf(cfgstr, 1024, "glfs/%s@%s/block-store/%s", info->volume, blk->addr, info->gbid);
+  if (!strcmp(gbConf.volServer, "localhost")) {
+    snprintf(cfgstr, 1024, "glfs/%s@%s/block-store/%s", info->volume, blk->addr, info->gbid);
+  } else {
+    snprintf(cfgstr, 1024, "glfs/%s@%s/block-store/%s", info->volume, gbConf.volServer, info->gbid);
+  }
   json_object_object_add(so_obj, "config", GB_JSON_OBJ_TO_STR(cfgstr[0]?cfgstr:NULL));
   if (info->rb_size) {
     snprintf(control, 1024, "%s=%zu", GB_RING_BUFFER_STR, info->rb_size);
