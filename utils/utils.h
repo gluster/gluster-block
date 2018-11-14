@@ -140,6 +140,7 @@ struct gbConf {
   pthread_mutex_t lock;
   char cmdhistoryLogFile[PATH_MAX];
   bool noRemoteRpc;
+  char volServer[HOST_NAME_MAX];
 };
 
 extern struct gbConf gbConf;
@@ -587,6 +588,8 @@ int blockMetaStatusEnumParse(const char *opt);
 int blockRemoteCreateRespEnumParse(const char *opt);
 
 void logTimeNow(char* buf, size_t bufSize);
+
+void fetchGlfsVolServerFromEnv(void);
 
 int initLogging(void);
 

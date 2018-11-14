@@ -237,6 +237,21 @@ glusterBlockLogdirCreate(void)
 }
 
 
+void fetchGlfsVolServerFromEnv()
+{
+  char *volServer;
+
+
+  volServer = getenv("GB_BHV_VOLSERVER");
+  if (!volServer) {
+    volServer = "localhost";
+  }
+  snprintf(gbConf.volServer, HOST_NAME_MAX, "%s", volServer);
+
+  LOG("mgmt", GB_LOG_INFO, "Block Hosting Volfile Server Set to: %s", gbConf.volServer);
+}
+
+
 int
 initLogging(void)
 {

@@ -3961,6 +3961,8 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   cobj.rb_size = blk->rb_size;
   GB_STRCPYSTATIC(cobj.gbid, gbid);
   GB_STRDUP(cobj.block_hosts,  blk->block_hosts);
+  cobj.xdata.xdata_len = strlen(gbConf.volServer);
+  cobj.xdata.xdata_val = (char *) gbConf.volServer;
 
   if (blk->auth_mode) {
     uuid_generate(uuid);
@@ -4245,7 +4247,7 @@ out:
 
 
 blockResponse *
-block_create_common(blockCreate *blk, char *rbsize, char *prio_path)
+block_create_common(blockCreate *blk, char *rbsize, char *volServer, char *prio_path)
 {
   char *tmp = NULL;
   char *backstore = NULL;
@@ -4268,8 +4270,9 @@ block_create_common(blockCreate *blk, char *rbsize, char *prio_path)
 
 
   LOG("mgmt", GB_LOG_INFO,
-      "create request, volume=%s blockname=%s blockhosts=%s filename=%s authmode=%d "
-      "passwd=%s size=%lu", blk->volume, blk->block_name, blk->block_hosts,
+      "create request, volume=%s volserver=%s blockname=%s blockhosts=%s "
+      "filename=%s authmode=%d passwd=%s size=%lu", blk->volume,
+      volServer?volServer:blk->ipaddr, blk->block_name, blk->block_hosts,
       blk->gbid, blk->auth_mode, blk->auth_mode?blk->passwd:"", blk->size);
 
   if (GB_ALLOC(reply) < 0) {
@@ -4283,8 +4286,8 @@ block_create_common(blockCreate *blk, char *rbsize, char *prio_path)
 
   if (GB_ASPRINTF(&backstore, "%s %s name=%s size=%zu cfgstring=%s@%s%s/%s%s wwn=%s",
                   GB_TGCLI_GLFS_PATH, GB_CREATE, blk->block_name, blk->size,
-                  blk->volume, blk->ipaddr, GB_STOREDIR, blk->gbid,
-                  rbsize ? rbsize: "", blk->gbid) == -1) {
+                  blk->volume, volServer?volServer:blk->ipaddr, GB_STOREDIR,
+                  blk->gbid, rbsize ? rbsize: "", blk->gbid) == -1) {
     goto out;
   }
 
@@ -4465,6 +4468,7 @@ block_create_common(blockCreate *blk, char *rbsize, char *prio_path)
   GB_FREE(glfs_alua_type);
   GB_FREE(rbsize);
   GB_FREE(backstore_attr);
+  GB_FREE(volServer);
   blockServerDefFree(list);
 
   return reply;
@@ -4474,7 +4478,7 @@ block_create_common(blockCreate *blk, char *rbsize, char *prio_path)
 blockResponse *
 block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
 {
-  return block_create_common(blk, NULL, NULL);
+  return block_create_common(blk, NULL, NULL, NULL);
 }
 
 
@@ -4483,6 +4487,8 @@ block_create_v2_1_svc_st(blockCreate2 *blk, struct svc_req *rqstp)
 {
   char *rbsize= NULL;
   blockCreate blk_v1 = {0, };
+  char *volServer = NULL;
+  size_t len = blk->xdata.xdata_len;
 
 
   if (blk->rb_size) {
@@ -4491,7 +4497,14 @@ block_create_v2_1_svc_st(blockCreate2 *blk, struct svc_req *rqstp)
 
   convertTypeCreate2ToCreate(blk, &blk_v1);
 
-  return block_create_common(&blk_v1, rbsize, blk->prio_path);
+  if (len > 0 && len <= HOST_NAME_MAX) {
+    if (strcmp(blk->xdata.xdata_val, "localhost")) {
+      GB_ALLOC_N(volServer, len);
+      strncpy(volServer, blk->xdata.xdata_val, len);
+    }
+  }
+
+  return block_create_common(&blk_v1, rbsize, volServer, blk->prio_path);
 }
 
 
