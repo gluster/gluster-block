@@ -32,17 +32,17 @@ glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg)
     GB_ASPRINTF (errMsg, "Not able to Initialize volume %s [%s]", volume,
                  strerror(*errCode));
     LOG("gfapi", GB_LOG_ERROR, "glfs_new(%s) from %s failed[%s]", volume,
-        "localhost", strerror(*errCode));
+        gbConf.volServer, strerror(*errCode));
     return NULL;
   }
 
-  ret = glfs_set_volfile_server(glfs, "tcp", "localhost", 24007);
+  ret = glfs_set_volfile_server(glfs, "tcp", gbConf.volServer, 24007);
   if (ret) {
     *errCode = errno;
     GB_ASPRINTF (errMsg, "Not able to add Volfile server for volume %s[%s]",
                  volume, strerror(*errCode));
     LOG("gfapi", GB_LOG_ERROR, "glfs_set_volfile_server(%s) of %s "
-        "failed[%s]", "localhost", volume, strerror(*errCode));
+        "failed[%s]", gbConf.volServer, volume, strerror(*errCode));
     goto out;
   }
 

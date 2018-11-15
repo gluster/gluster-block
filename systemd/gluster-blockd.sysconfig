@@ -15,6 +15,9 @@
 # default level, uncomment it and set your level:
 #GB_LOG_LEVEL=INFO
 
+# Support setting block hosting volumes global volfile server (can be FQDN)
+# default volfile server is set to localhost
+#GB_BHV_VOLSERVER="localhost"
 
 # Expert use only, just incase if we have any extra args to pass for daemon
 #GB_EXTRA_ARGS=""

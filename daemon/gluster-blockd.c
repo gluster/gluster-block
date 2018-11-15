@@ -445,6 +445,8 @@ main (int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
+  fetchGlfsVolServerFromEnv();
+
   gbCfg = glusterBlockSetupConfig(NULL);
   if (!gbCfg) {
     LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockSetupConfig() failed");
