@@ -13,7 +13,7 @@ COPY . $BUILDDIR
 RUN true \
  && dnf -y install \
            git autoconf automake gcc libtool make file \
-           glusterfs-api-devel libuuid-devel json-c-devel \
+           glusterfs-api-devel libuuid-devel json-c-devel libtirpc-devel \
  && true
 
 # build

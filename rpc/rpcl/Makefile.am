@@ -9,6 +9,9 @@ BUILT_SOURCES = block.h block_clnt.c block_svc.c block_xdr.c
 DISTCLEANFILES = Makefile.in $(BUILT_SOURCES)
 CLEANFILES = *~ $(BUILT_SOURCES)
 
+libgbrpcxdr_la_CFLAGS = $(TIRPC_CFLAGS)
+libgbrpcxdr_la_LDFLAGS = $(TIRPC_LIBS)
+
 block.h: block.x
 	rpcgen -hM -o $(top_builddir)/rpc/rpcl/$@ $^
 

@@ -22,7 +22,11 @@ Source0:          @PACKAGE_NAME@-@PACKAGE_VERSION@.tar.gz
 
 BuildRequires:    pkgconfig(glusterfs-api)
 BuildRequires:    pkgconfig(json-c)
+BuildRequires:    pkgconfig(libtirpc)
 BuildRequires:    help2man >= 1.36
+%if ( 0%{?fedora} && 0%{?fedora} >= 28 )
+BuildRequires:    rpcgen
+%endif
 %if ( 0%{?_with_systemd:1} )
 %{?systemd_requires}
 BuildRequires:    systemd
@@ -88,6 +92,10 @@ rm -rf ${RPM_BUILD_ROOT}
      %attr(0644,-,-) %{_sharedstatedir}/gluster-block/gluster-block-caps.info
 
 %changelog
+* Fri Nov 16 2018 Niels de Vos <ndevos@redhat.com>
+- use the modern libtirpc package, will be removed from glibc
+- new Fedora releases require rpcgen (unbundled from glibc)
+
 * Sun Oct 14 2018 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - add install details for upgrade_activities.sh
 

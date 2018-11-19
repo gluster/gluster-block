@@ -77,7 +77,7 @@ AC_CHECK_HEADERS([stdio.h stdlib.h string.h stdbool.h stddef.h \
                   unistd.h errno.h memory.h time.h             \
                   netdb.h netinet/in.h sys/socket.h            \
                   pthread.h uuid/uuid.h glusterfs/api/glfs.h   \
-                  rpc/pmap_clnt.h ])
+                  rpc/pmap_clnt.h rpc/rpc.h ])
 
 # Checks for libraries.
 # glusterfs-api versions have a prefix of "7."
@@ -90,6 +90,12 @@ PKG_CHECK_MODULES([JSONC], [json-c],,
                   [AC_MSG_ERROR([json-c library is required to build gluster-block])])
 AC_SUBST(JSONC_CFLAGS)
 AC_SUBST(JSONC_LIBS)
+
+PKG_CHECK_MODULES([TIRPC], [libtirpc],,
+                  [AC_MSG_ERROR([tirpc library is required to build gluster-block])])
+AC_SUBST(TIRPC_CFLAGS)
+AC_SUBST(TIRPC_LIBS)
+
 
 AC_CHECK_LIB([uuid], [uuid_generate], [UUID="-luuid"],
              AC_MSG_ERROR([uuid library is required to build gluster-block]))

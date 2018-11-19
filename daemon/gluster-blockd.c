@@ -14,6 +14,7 @@
 # include  <sys/stat.h>
 # include  <pthread.h>
 # include  <rpc/pmap_clnt.h>
+# include  <rpc/rpc.h>
 # include  <signal.h>
 # include  <sys/utsname.h>
 # include  <linux/version.h>
@@ -33,6 +34,10 @@
 # define   VERNUM_BUFLEN        8
 
 # define   GB_DISTRO_CHECK      "grep -P '(^ID=)' /etc/os-release"
+
+/* EasyFix: This can become configurable option */
+# define   GB_LISTEN_BACKLOG    128
+
 
 extern const char *argp_program_version;
 static gbConfig *gbCfg;
@@ -70,19 +75,11 @@ glusterBlockCliThreadProc (void *vargp)
 {
   register SVCXPRT *transp = NULL;
   struct sockaddr_un saun = {0, };
-  int sockfd = RPC_ANYSOCK;
-
 
   if (strlen(GB_UNIX_ADDRESS) > SUN_PATH_MAX) {
     LOG("mgmt", GB_LOG_ERROR,
         "%s: path length is more than SUN_PATH_MAX: (%zu > %zu chars)",
         GB_UNIX_ADDRESS, strlen(GB_UNIX_ADDRESS), SUN_PATH_MAX);
-    goto out;
-  }
-
-  if ((sockfd = socket(AF_UNIX, SOCK_STREAM, IPPROTO_IP)) < 0) {
-    LOG("mgmt", GB_LOG_ERROR, "UNIX socket creation failed (%s)",
-        strerror (errno));
     goto out;
   }
 
@@ -95,14 +92,7 @@ glusterBlockCliThreadProc (void *vargp)
     goto out;
   }
 
-  if (bind(sockfd, (struct sockaddr *) &saun,
-           sizeof(struct sockaddr_un)) < 0) {
-    LOG("mgmt", GB_LOG_ERROR, "bind on '%s' failed (%s)",
-        GB_UNIX_ADDRESS, strerror (errno));
-    goto out;
-  }
-
-  transp = svcunix_create(sockfd, 0, 0, GB_UNIX_ADDRESS);
+  transp = svcunix_create(RPC_ANYSOCK, 0, 0, GB_UNIX_ADDRESS);
   if (!transp) {
     LOG("mgmt", GB_LOG_ERROR,
         "RPC service transport create failed for unix (%s)",
@@ -123,10 +113,6 @@ glusterBlockCliThreadProc (void *vargp)
  out:
   if (transp) {
     svc_destroy(transp);
-  }
-
-  if (sockfd != RPC_ANYSOCK) {
-    close(sockfd);
   }
 
   return NULL;
@@ -161,6 +147,12 @@ glusterBlockServerThreadProc(void *vargp)
 
   if (bind(sockfd, (struct sockaddr *) &sain, sizeof (sain)) < 0) {
     snprintf(errMsg, sizeof (errMsg), "bind on port %d failed (%s)",
+             GB_TCP_PORT, strerror (errno));
+    goto out;
+  }
+
+  if (listen(sockfd, GB_LISTEN_BACKLOG) < 0) {
+    snprintf(errMsg, sizeof (errMsg), "listen on port %d failed (%s)",
              GB_TCP_PORT, strerror (errno));
     goto out;
   }
