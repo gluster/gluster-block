@@ -45,7 +45,7 @@ gbSetCapabilties(void)
   int ret;
   gbCapObj *caps = NULL;
   char *p, *sep;
-
+  bool free_caps = true;
 
   fp = fopen(GB_CAPS_FILE, "r");
   if (fp == NULL) {
@@ -105,9 +105,10 @@ gbSetCapabilties(void)
   }
 
   globalCapabilities = caps;
+  free_caps = false;
 
  out:
-  if (!globalCapabilities) {
+  if (free_caps) {
     GB_FREE(caps);
   }
   GB_FREE(line);
