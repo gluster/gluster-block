@@ -185,7 +185,11 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
  out:
   if (reply.out) {
     ret = reply.exit;
-    MSG(stdout, "%s", reply.out);
+    if (!ret) {
+      MSG(stdout, "%s", reply.out);
+    } else {
+      MSG(stderr, "%s", reply.out);
+    }
   } else if (errMsg[0]) {
     LOG("cli", GB_LOG_ERROR, "%s", errMsg);
     MSG(stderr, "%s\n", errMsg);
