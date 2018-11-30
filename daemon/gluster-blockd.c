@@ -54,7 +54,7 @@ glusterBlockDHelp(void)
       "        Glfs objects cache capacity [max: 512] [default: 5]\n"
       "  --log-level <LOGLEVEL>\n"
       "        Logging severity. Valid options are,\n"
-      "        TRACE, DEBUG, INFO, WARNING, ERROR and NONE [default: INFO]\n"
+      "        TRACE, DEBUG, INFO, WARNING, ERROR, CRIT and NONE [default: INFO]\n"
       "  --no-remote-rpc\n"
       "        Ignore remote rpc communication, capabilities check and\n"
       "        other node sanity checks\n"
