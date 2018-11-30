@@ -10,7 +10,7 @@
 #GB_GLFS_LRU_COUNT=5
 
 
-# Supported loglevels [ NONE, ERROR, WARNING, INFO, DEBUG, TRACE ]
+# Supported loglevels [ NONE, CRIT, ERROR, WARNING, INFO, DEBUG, TRACE ]
 # And the default logging level is INFO, if you want to change the
 # default level, uncomment it and set your level:
 #GB_LOG_LEVEL=INFO

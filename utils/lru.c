@@ -38,7 +38,7 @@ glusterBlockSetLruCount(const size_t lruCount)
   gbConf.glfsLruCount = lruCount;
   UNLOCK(gbConf.lock);
 
-  LOG("mgmt", GB_LOG_INFO,
+  LOG("mgmt", GB_LOG_CRIT,
       "glfsLruCount now is %lu\n", lruCount);
   return 0;
 }

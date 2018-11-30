@@ -78,7 +78,7 @@ commands:
         Glfs objects cache capacity [max: 512] [default: 5]
   --log-level <LOGLEVEL>
         Logging severity. Valid options are,
-        TRACE, DEBUG, INFO, WARNING, ERROR and NONE [default: INFO]
+        TRACE, DEBUG, INFO, WARNING, ERROR, CRIT and NONE [default: INFO]
   --no-remote-rpc
         Ignore remote rpc communication, capabilities check and
         other node sanity checks
