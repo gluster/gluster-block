@@ -13,15 +13,17 @@
 # include  <stdio.h>
 # include  <dirent.h>
 # include  <sys/stat.h>
+# include  <pthread.h>
 
 # include "utils.h"
 # include "lru.h"
 # include "config.h"
 
 struct gbConf gbConf = {
+  .lock = PTHREAD_MUTEX_INITIALIZER,
   .glfsLruCount = LRU_COUNT_DEF,
   .logLevel = GB_LOG_INFO,
-  .logDir = GB_LOGDIR,
+  .logDir = GB_LOGDIR_DEF,
   .cliTimeout = CLI_TIMEOUT_DEF
 };
 
@@ -246,12 +248,14 @@ static bool
 glusterBlockLogdirCreate(void)
 {
   DIR* dir = opendir(gbConf.logDir);
+  char *buf = NULL;
 
 
   if (dir) {
     closedir(dir);
   } else if (errno == ENOENT) {
-    if (mkdir(gbConf.logDir, 0755) == -1) {
+    GB_ASPRINTF(&buf, "mkdir -p %s -m 0755 > /dev/null", gbConf.logDir);
+    if (gbRunner(buf) == -1) {
       fprintf(stderr, "mkdir(%s) failed (%s)", gbConf.logDir, strerror (errno));
       return 0;  /* False */
     }
@@ -260,6 +264,7 @@ glusterBlockLogdirCreate(void)
     return 0;  /* False */
   }
 
+  GB_FREE(buf);
   return 1;
 }
 
@@ -278,24 +283,43 @@ void fetchGlfsVolServerFromEnv()
   LOG("mgmt", GB_LOG_INFO, "Block Hosting Volfile Server Set to: %s", gbConf.volServer);
 }
 
-
-int
-initLogging(void)
+static int
+initLogDirAndFiles(char *newLogDir)
 {
   char *logDir = NULL;
+  char *tmpLogDir = NULL;
+  int ret = 0;
 
 
-  logDir = getenv("GB_LOGDIR");
-  if (!logDir) {
-    logDir = GB_LOGDIR;
+  /*
+   * The priority of the logdir setting is:
+   * 1, /etc/sysconfig/gluster-blockd config file
+   * 2, "GB_LOGDIR" from the ENV setting
+   * 3, default as GB_LOGDIR_DEF
+   */
+  if (newLogDir) {
+    logDir = newLogDir;
+  } else {
+    logDir = getenv("GB_LOGDIR");
+
+    tmpLogDir = glusterBlockDynConfigGetLogDir();
+    if (tmpLogDir) {
+      logDir = tmpLogDir;
+    }
+
+    if (!logDir) {
+      logDir = GB_LOGDIR_DEF;
+    }
   }
 
   if (strlen(logDir) > PATH_MAX - GB_MAX_LOGFILENAME) {
     fprintf(stderr, "strlen of logDir Path > PATH_MAX: %s", logDir);
-    return EXIT_FAILURE;
+    ret = -1;
+    goto out;
   }
 
   /* set logfile paths */
+  LOCK(gbConf.lock);
   snprintf(gbConf.logDir, PATH_MAX,
            "%s", logDir);
   snprintf(gbConf.daemonLogFile, PATH_MAX,
@@ -310,10 +334,31 @@ initLogging(void)
            "%s/cmd_history.log", logDir);
 
   if(!glusterBlockLogdirCreate()) {
-    return EXIT_FAILURE;
+    ret = -1;
+    goto unlock;
   }
 
-  return 0;
+  glusterBlockUpdateLruLogdir(gbConf.gfapiLogFile);
+
+ unlock:
+  UNLOCK(gbConf.lock);
+out:
+  GB_FREE(tmpLogDir);
+  return ret;
+}
+
+
+int
+initLogging(void)
+{
+  return initLogDirAndFiles(NULL);
+}
+
+
+bool
+glusterBlockSetLogDir(char *logDir)
+{
+  return initLogDirAndFiles(logDir);
 }
 
 

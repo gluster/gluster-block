@@ -588,17 +588,13 @@ main (int argc, char **argv)
   int wstatus;
 
 
-  if (pthread_mutex_init(&gbConf.lock, NULL) < 0) {
-    exit(EXIT_FAILURE);
-  }
-
   if(initLogging()) {
     exit(EXIT_FAILURE);
   }
 
   fetchGlfsVolServerFromEnv();
 
-  gbCfg = glusterBlockSetupConfig(NULL);
+  gbCfg = glusterBlockSetupConfig();
   if (!gbCfg) {
     LOG("mgmt", GB_LOG_ERROR, "glusterBlockSetupConfig() failed");
     exit(EXIT_FAILURE);
