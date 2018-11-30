@@ -167,10 +167,19 @@ glusterBlockGetOption(const char *key)
         } while (0);
 
 static void
-glusterBlockConfSetOptions(gbConfig *cfg, bool reloading)
+glusterBlockConfSetOptions(gbConfig *cfg, bool getLogDir)
 {
   unsigned int logLevel;
 
+
+  /* set logdir option */
+  GB_PARSE_CFG_STR(cfg, GB_LOG_DIR, GB_LOGDIR_DEF);
+  if (getLogDir) {
+    return;
+  }
+  if (cfg->GB_LOG_DIR) {
+    glusterBlockSetLogDir(cfg->GB_LOG_DIR);
+  }
 
   /* set logLevel option */
   GB_PARSE_CFG_STR(cfg, GB_LOG_LEVEL, "INFO");
@@ -205,6 +214,7 @@ glusterBlockConfFreeStrKeys(gbConfig *cfg)
    * For example:
    * GB_FREE_CFG_STR_KEY(cfg, 'STR KEY');
    */
+   GB_FREE_CFG_STR_KEY(cfg, GB_LOG_DIR);
    GB_FREE_CFG_STR_KEY(cfg, GB_LOG_LEVEL);
 }
 
@@ -435,7 +445,7 @@ glusterBlockParseOption(char **cur, const char *end)
 }
 
 static void
-glusterBlockParseOptions(gbConfig *cfg, char *buf, int len, bool reloading)
+glusterBlockParseOptions(gbConfig *cfg, char *buf, int len, bool getLogDir)
 {
   char *cur = buf, *end = buf + len;
 
@@ -446,11 +456,11 @@ glusterBlockParseOptions(gbConfig *cfg, char *buf, int len, bool reloading)
   }
 
   /* parse the options from gb_options[] to struct gbConfig */
-  glusterBlockConfSetOptions(cfg, reloading);
+  glusterBlockConfSetOptions(cfg, getLogDir);
 }
 
 int
-glusterBlockLoadConfig(gbConfig *cfg, bool reloading)
+glusterBlockLoadConfig(gbConfig *cfg, bool getLogDir)
 {
   ssize_t len = 0;
   char *buf;
@@ -463,11 +473,52 @@ glusterBlockLoadConfig(gbConfig *cfg, bool reloading)
     return -1;
   }
 
-  glusterBlockParseOptions(cfg, buf, len, reloading);
+  glusterBlockParseOptions(cfg, buf, len, getLogDir);
 
   GB_FREE(buf);
   return 0;
 }
+
+
+char *
+glusterBlockDynConfigGetLogDir(void)
+{
+  gbConfig *cfg = NULL;
+  char *logDir = NULL;
+  char *configPath = GB_DEF_CONFIGPATH;
+  int ret;
+
+
+  if (GB_ALLOC(cfg) < 0) {
+    fprintf(stderr, "Alloc GB config failed for configPath: %s!\n", configPath);
+    return NULL;
+  }
+
+  if (GB_STRDUP(cfg->configPath, configPath) < 0) {
+    fprintf(stderr, "failed to copy configPath: %s\n", configPath);
+    goto freeConfig;
+  }
+
+  if (glusterBlockLoadConfig(cfg, true)) {
+    fprintf(stderr, "Loading GB config failed for configPath: %s!\n", configPath);
+    goto freeConfigPath;
+  }
+
+  if (cfg->GB_LOG_DIR) {
+    if (GB_STRDUP(logDir, cfg->GB_LOG_DIR) < 0) {
+      fprintf(stderr, "failed to copy logDir: %s\n", cfg->GB_LOG_DIR);
+      logDir = NULL;
+    }
+  }
+
+freeConfigPath:
+  GB_FREE(cfg->configPath);
+freeConfig:
+  GB_FREE(cfg);
+
+  return logDir;
+}
+
 
 static void *
 glusterBlockDynConfigStart(void *arg)
@@ -530,7 +581,7 @@ glusterBlockDynConfigStart(void *arg)
 
       /* Try to reload the config file */
       if (event->mask & IN_MODIFY || event->mask & IN_IGNORED) {
-        glusterBlockLoadConfig(cfg, true);
+        glusterBlockLoadConfig(cfg, false);
       }
 
       p += sizeof(struct inotify_event) + event->len;
@@ -544,15 +595,12 @@ out:
 }
 
 gbConfig *
-glusterBlockSetupConfig(const char *configPath)
+glusterBlockSetupConfig(void)
 {
   gbConfig *cfg = NULL;
+  char *configPath = GB_DEF_CONFIGPATH;
   int ret;
 
-
-  if (!configPath) {
-    configPath = GB_DEF_CONFIGPATH;
-  }
 
   if (GB_ALLOC(cfg) < 0) {
     LOG("mgmt", GB_LOG_ERROR, "Alloc GB config failed for configPath: %s!\n", configPath);

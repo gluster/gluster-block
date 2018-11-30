@@ -9,7 +9,6 @@
 # least recently used object.
 #GB_GLFS_LRU_COUNT=5
 
-
 # Supported loglevels [ NONE, CRIT, ERROR, WARNING, INFO, DEBUG, TRACE ]
 # And the default logging level is INFO, if you want to change the
 # default level, uncomment it and set your level:
@@ -25,3 +24,7 @@
 
 # Expert use only, just incase if we have any extra args to pass for daemon
 #GB_EXTRA_ARGS=""
+#
+# Supported setting the log directory path from the sysconfig
+# default path is /var/log/gluster-blockd, uncomment it and set your path:
+#GB_LOG_DIR="/var/log/gluster-blockd"
