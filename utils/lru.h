@@ -32,5 +32,7 @@ appendNewEntry(const char *volname, glfs_t *glfs);
 int
 glusterBlockSetLruCount(const size_t lruCount);
 
+void
+glusterBlockUpdateLruLogdir(const char *logDir);
 
 # endif /* _LRU_H */

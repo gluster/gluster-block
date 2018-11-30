@@ -109,6 +109,6 @@ void blockServerDefFree(blockServerDefPtr blkServers);
 
 bool blockhostIsValid(char *status);
 
-int glusterBlockLoadConfig(gbConfig *cfg, bool reloading);
+int glusterBlockLoadConfig(gbConfig *cfg, bool getLogDir);
 
 # endif /* _COMMON_H */
