@@ -225,13 +225,22 @@ glusterBlockReadConfig(gbConfig *cfg, ssize_t *len)
   char *p, *buf, *line = NULL;
   ssize_t m, n, buf_len = GB_BUF_LEN;
   FILE *fp;
+  int i;
 
 
   if (GB_ALLOC_N(buf, buf_len) < 0) {
     return NULL;
   }
 
-  fp = fopen(cfg->configPath, "r");
+  for (i = 0; i < 5; i++) {
+    if ((fp = fopen(cfg->configPath, "r")) == NULL) {
+      /* give a moment for editor to restore
+       * the conf-file after edit and save */
+      sleep(1);
+      continue;
+    }
+    break;
+  }
   if (fp == NULL) {
     LOG("mgmt", GB_LOG_ERROR,
         "Failed to open file '%s', %m\n", cfg->configPath);
