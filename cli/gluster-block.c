@@ -949,6 +949,10 @@ glusterBlockParseArgs(int count, char **options)
     case GB_CLI_HYPHEN_VERSION:
       MSG(stdout, "%s\n", argp_program_version);
       goto out;
+
+    default:
+      ret = -1;
+      goto out;
     }
   }
 

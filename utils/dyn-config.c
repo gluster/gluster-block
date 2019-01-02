@@ -243,7 +243,7 @@ glusterBlockReadConfig(gbConfig *cfg, ssize_t *len)
   }
   if (fp == NULL) {
     LOG("mgmt", GB_LOG_ERROR,
-        "Failed to open file '%s', %m\n", cfg->configPath);
+        "Failed to open file '%s'\n", cfg->configPath);
     GB_FREE(buf);
     return NULL;
   }
@@ -478,7 +478,7 @@ glusterBlockDynConfigStart(void *arg)
   wd = inotify_add_watch(monitor, cfg->configPath, IN_ALL_EVENTS);
   if (wd == -1) {
     LOG("mgmt", GB_LOG_ERROR,
-        "Failed to add \"%s\" to inotify %m\n", cfg->configPath);
+        "Failed to add \"%s\" to inotify (%d)\n", cfg->configPath, monitor);
     return NULL;
   }
 
