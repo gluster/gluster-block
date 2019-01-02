@@ -149,15 +149,15 @@ extern struct gbConf gbConf;
           do {                                                         \
             FILE *fd;                                                  \
             char timestamp[GB_TIME_STRING_BUFLEN] = {0};               \
-            LOCK(gbConf.lock);                                       \
+            LOCK(gbConf.lock);                                         \
             if (level <= gbConf.logLevel) {                            \
-              if (!strcmp(str, "mgmt"))                                \
+              if ((str) == "mgmt")                                     \
                 fd = fopen (gbConf.daemonLogFile, "a");                \
-              else if (!strcmp(str, "cli"))                            \
+              else if ((str) == "cli")                                 \
                 fd = fopen (gbConf.cliLogFile, "a");                   \
-              else if (!strcmp(str, "gfapi"))                          \
+              else if ((str) == "gfapi")                               \
                 fd = fopen (gbConf.gfapiLogFile, "a");                 \
-              else if (!strcmp(str, "cmdlog"))                         \
+              else if ((str) == "cmdlog")                              \
                 fd = fopen (gbConf.cmdhistoryLogFile, "a");            \
               else                                                     \
                 fd = stderr;                                           \
