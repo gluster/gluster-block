@@ -217,7 +217,6 @@ blockFormatErrorResponse(operations op, int json_resp, int errCode,
 {
   json_object *json_obj = NULL;
 
-
   if (!reply) {
     return;
   }
@@ -234,9 +233,9 @@ blockFormatErrorResponse(operations op, int json_resp, int errCode,
     json_object_put(json_obj);
   } else {
     if (op != INFO_SRV) {
-      GB_ASPRINTF (&reply->out, "%s\nRESULT:FAIL\n", errMsg);
+      GB_ASPRINTF (&reply->out, "%s\nRESULT:FAIL\n", (errMsg?errMsg:"null"));
     } else {
-      GB_ASPRINTF (&reply->out, "%s\n", errMsg);
+      GB_ASPRINTF (&reply->out, "%s\n", (errMsg?errMsg:"null"));
     }
   }
 }
@@ -511,7 +510,6 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   CLIENT *clnt = NULL;
   int ret = -1;
   int sockfd = RPC_ANYSOCK;
-  int errsv = 0;
   size_t i;
   blockResponse reply = {0,};
   struct addrinfo *res = NULL;
@@ -640,10 +638,6 @@ glusterBlockCallRPC_1(char *host, void *cobj,
 
   if (res) {
     freeaddrinfo(res);
-  }
-
-  if (errsv) {
-    errno = errsv;
   }
 
   return ret;
@@ -2791,6 +2785,11 @@ getSoTgArraysForAllVolume(struct soTgObj *obj, blockGenConfigCli *blk,
         }
 
         if (!info->prio_path[0]) {
+          if (list) {
+            /* if 'list' is set, it means, it came here continuing the loop */
+            blockServerDefFree(list);
+          }
+
           /* default as the load balancing is enabled */
           list = blockMetaInfoToServerParse(info);
           if (!list) {
@@ -3728,10 +3727,13 @@ blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
     if (infoErrCode == ENOENT) {
       blockFormatErrorResponse(CREATE_SRV, blk->json_resp,
                                (errCode?errCode:GB_DEFAULT_ERRCODE),
-                               savereply->errMsg, reply);
+                               (savereply?savereply->errMsg:NULL), reply);
     }
     goto out;
   }
+
+  if (!savereply)
+    goto out;
 
   for (i = 0; i < info->nhosts; i++) {
     tmp = savereply->obj->d_attempt;
@@ -4513,12 +4515,15 @@ block_create_v2_1_svc_st(blockCreate2 *blk, struct svc_req *rqstp)
 
   if (len > 0 && len <= HOST_NAME_MAX) {
     if (strcmp(blk->xdata.xdata_val, "localhost")) {
-      GB_ALLOC_N(volServer, len);
+      if (GB_ALLOC_N(volServer, len) < 0)
+        goto err;
       strncpy(volServer, blk->xdata.xdata_val, len);
     }
   }
-
   return block_create_common(&blk_v1, rbsize, volServer, blk->prio_path);
+
+err:
+  return NULL;
 }
 
 
@@ -5015,11 +5020,12 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
 
   tgmdfd = glfs_opendir (glfs, GB_METADIR);
   if (!tgmdfd) {
-    errCode = errno;
+    unsigned int errorCode = errno;
     GB_ASPRINTF (&errMsg, "Not able to open metadata directory for volume "
-                 "%s[%s]", blk->volume, strerror(errCode));
+                 "%s[%s]", blk->volume, strerror(errorCode));
     LOG("mgmt", GB_LOG_ERROR, "glfs_opendir(%s): on volume %s failed[%s]",
-        GB_METADIR, blk->volume, strerror(errCode));
+        GB_METADIR, blk->volume, strerror(errorCode));
+    errCode = errorCode;
     goto out;
   }
 
