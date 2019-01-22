@@ -42,6 +42,8 @@
 
 extern const char *argp_program_version;
 
+struct timeval TIMEOUT;           /* cli process to daemon cli thread timeout */
+
 typedef enum clioperations {
   CREATE_CLI = 1,
   LIST_CLI   = 2,
@@ -52,6 +54,41 @@ typedef enum clioperations {
   REPLACE_CLI = 7,
   GENCONF_CLI = 8
 } clioperations;
+
+
+gbConfig *
+glusterBlockCLILoadConfig(void)
+{
+  gbConfig *cfg = NULL;
+  int ret;
+
+  if (GB_ALLOC(cfg) < 0) {
+    LOG("cli", GB_LOG_ERROR,
+        "Alloc GB config failed for configPath: %s!\n", GB_DEF_CONFIGPATH);
+    return NULL;
+  }
+
+  if (GB_STRDUP(cfg->configPath, GB_DEF_CONFIGPATH) < 0) {
+    LOG("cli", GB_LOG_ERROR,
+        "failed to copy configPath: %s\n", GB_DEF_CONFIGPATH);
+    goto freeConfig;
+  }
+
+  if (glusterBlockLoadConfig(cfg, false)) {
+    LOG("cli", GB_LOG_ERROR,
+        "Loading GB config failed for configPath: %s!\n", GB_DEF_CONFIGPATH);
+    goto freeConfigPath;
+  }
+
+  return cfg;
+
+ freeConfigPath:
+  GB_FREE(cfg->configPath);
+ freeConfig:
+  GB_FREE(cfg);
+
+  return NULL;
+}
 
 
 static int
@@ -71,6 +108,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   blockGenConfigCli *genconfig_obj;
   blockResponse reply = {0,};
   char          errMsg[2048] = {0};
+  gbConfig *conf = NULL;
 
 
   if (strlen(GB_UNIX_ADDRESS) > SUN_PATH_MAX) {
@@ -108,6 +146,20 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
     snprintf (errMsg, sizeof (errMsg), "%s, unix addr %s",
               clnt_spcreateerror("client create failed"), GB_UNIX_ADDRESS);
     goto out;
+  }
+
+  conf = glusterBlockCLILoadConfig();
+  if (!conf) {
+      LOG("cli", GB_LOG_ERROR,
+          "glusterBlockCLILoadConfig() failed, for block %s create on volume %s"
+          " with hosts %s\n", create_obj->block_name, create_obj->volume,
+          create_obj->block_hosts);
+      goto out;
+  }
+
+  TIMEOUT.tv_sec = conf->GB_CLI_TIMEOUT;
+  if (!TIMEOUT.tv_sec) {
+    TIMEOUT.tv_sec = CLI_TIMEOUT_DEF;
   }
 
   switch(opt) {
@@ -210,6 +262,11 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
 
   if (sockfd != RPC_ANYSOCK) {
     close (sockfd);
+  }
+
+  if (conf) {
+    GB_FREE(conf->configPath);
+    GB_FREE(conf);
   }
 
   return ret;

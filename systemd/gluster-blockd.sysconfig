@@ -19,5 +19,9 @@
 # default volfile server is set to localhost
 #GB_BHV_VOLSERVER="localhost"
 
+# CLI rpc timeout,
+# it is the time in seconds that cli has to wait for daemon to respond
+#GB_CLI_TIMEOUT=300
+
 # Expert use only, just incase if we have any extra args to pass for daemon
 #GB_EXTRA_ARGS=""

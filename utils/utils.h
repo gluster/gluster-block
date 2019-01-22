@@ -57,7 +57,7 @@
 
 # define  GB_METASTORE_RESERVE   10485760   /* 10 MiB reserve for block-meta */
 
-# define  GB_DEF_CONFIGPATH      "/etc/sysconfig/gluster-blockd"; /* the default config file */
+# define  GB_DEF_CONFIGPATH      "/etc/sysconfig/gluster-blockd" /* the default config file */
 
 # define  GB_TIME_STRING_BUFLEN  \
           (4 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 6 + 1 +   5)
@@ -132,6 +132,7 @@
 struct gbConf {
   size_t glfsLruCount;
   unsigned int logLevel;
+  size_t cliTimeout;
   char logDir[PATH_MAX];
   char daemonLogFile[PATH_MAX];
   char cliLogFile[PATH_MAX];
@@ -574,9 +575,12 @@ typedef struct gbConfig {
   bool isDynamic;
   char *GB_LOG_LEVEL;
   ssize_t GB_GLFS_LRU_COUNT;
+  ssize_t GB_CLI_TIMEOUT;  /* seconds */
 } gbConfig;
 
 int glusterBlockSetLogLevel(unsigned int logLevel);
+
+//int glusterBlockSetCliTimeout(size_t timeout);
 
 int glusterBlockCLIOptEnumParse(const char *opt);
 

@@ -19,7 +19,8 @@
 struct gbConf gbConf = {
   .glfsLruCount = LRU_COUNT_DEF,
   .logLevel = GB_LOG_INFO,
-  .logDir = GB_LOGDIR
+  .logDir = GB_LOGDIR,
+  .cliTimeout = CLI_TIMEOUT_DEF
 };
 
 const char *argp_program_version = ""                                 \
@@ -48,6 +49,24 @@ glusterBlockSetLogLevel(unsigned int logLevel)
 
   return 0;
 }
+
+
+/* TODO: use gbConf in cli too, for logLevel/LogDir and other future options
+int
+glusterBlockSetCliTimeout(size_t timeout)
+{
+  if (timeout < 0) {
+    MSG(stderr, "unknown GB_CLI_TIMEOUT: '%zu'\n", timeout);
+    return -1;
+  }
+  LOCK(gbConf.lock);
+  gbConf.cliTimeout = timeout;
+  UNLOCK(gbConf.lock);
+
+  return 0;
+}
+*/
+
 
 int
 glusterBlockCLIOptEnumParse(const char *opt)

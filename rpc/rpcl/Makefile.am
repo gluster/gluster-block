@@ -11,13 +11,15 @@ CLEANFILES = *~ $(BUILT_SOURCES)
 
 block.h: block.x
 	rpcgen -hM -o $(top_builddir)/rpc/rpcl/$@ $^
+	$(SED) -i '0,/#endif/s//#endif\nextern struct timeval TIMEOUT;/' \
+	          $(top_builddir)/rpc/rpcl/$@
 
 block_xdr.c: block.x
 	rpcgen -cM -o $(top_builddir)/rpc/rpcl/$@ $^
 
 block_clnt.c: block.x
 	rpcgen -lM -o $(top_builddir)/rpc/rpcl/$@ $^
-	$(SED) -i 's|TIMEOUT = { 25, 0 }|TIMEOUT = { 300, 0 }|' $(top_builddir)/rpc/rpcl/$@
+	$(SED) -i '/TIMEOUT = { 25, 0 }/d' $(top_builddir)/rpc/rpcl/$@
 
 block_svc.c: block.x
 	rpcgen -mM -o $(top_builddir)/rpc/rpcl/$@ $^
