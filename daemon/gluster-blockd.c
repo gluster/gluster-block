@@ -37,6 +37,8 @@
 extern const char *argp_program_version;
 static gbConfig *gbCfg;
 
+struct timeval TIMEOUT = {CLI_TIMEOUT_DEF, 0};  /* remote rpc call timeout, 5 mins */
+
 static void
 glusterBlockDHelp(void)
 {

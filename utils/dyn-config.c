@@ -184,6 +184,16 @@ glusterBlockConfSetOptions(gbConfig *cfg, bool reloading)
   if (cfg->GB_GLFS_LRU_COUNT) {
     glusterBlockSetLruCount(cfg->GB_GLFS_LRU_COUNT);
   }
+
+  GB_PARSE_CFG_INT(cfg, GB_CLI_TIMEOUT, CLI_TIMEOUT_DEF);
+  /* NOTE: we don't use CLI_TIMEOUT in daemon at the moment
+   * TODO: use gbConf in cli too, for logLevel/LogDir and other future options
+   *
+   * if (cfg->GB_CLI_TIMEOUT) {
+   *  glusterBlockSetCliTimeout(cfg->GB_CLI_TIMEOUT);
+   * }
+   */
+
   /* add your new config options */
 }
 
@@ -438,7 +448,7 @@ glusterBlockParseOptions(gbConfig *cfg, char *buf, int len, bool reloading)
   glusterBlockConfSetOptions(cfg, reloading);
 }
 
-static int
+int
 glusterBlockLoadConfig(gbConfig *cfg, bool reloading)
 {
   ssize_t len = 0;
