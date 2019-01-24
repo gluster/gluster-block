@@ -109,6 +109,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   blockResponse reply = {0,};
   char          errMsg[2048] = {0};
   gbConfig *conf = NULL;
+  char *cli_timeout;
 
 
   if (strlen(GB_UNIX_ADDRESS) > SUN_PATH_MAX) {
@@ -159,7 +160,12 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
 
   TIMEOUT.tv_sec = conf->GB_CLI_TIMEOUT;
   if (!TIMEOUT.tv_sec) {
-    TIMEOUT.tv_sec = CLI_TIMEOUT_DEF;
+    cli_timeout = getenv("GB_CLI_TIMEOUT");
+    if (cli_timeout) {
+      sscanf(cli_timeout, "%ld", &TIMEOUT.tv_sec);
+    } else {
+      TIMEOUT.tv_sec = CLI_TIMEOUT_DEF;
+    }
   }
 
   switch(opt) {
