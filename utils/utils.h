@@ -366,6 +366,7 @@ extern struct gbConf gbConf;
 
 typedef enum gbCliCmdlineOption {
   GB_CLI_UNKNOWN = 0,
+  GB_CLI_TIMEOUT,
   GB_CLI_CREATE,
   GB_CLI_LIST,
   GB_CLI_INFO,
@@ -385,6 +386,7 @@ typedef enum gbCliCmdlineOption {
 
 static const char *const gbCliCmdlineOptLookup[] = {
   [GB_CLI_UNKNOWN]        = "NONE",
+  [GB_CLI_TIMEOUT]        = "timeout",
   [GB_CLI_CREATE]         = "create",
   [GB_CLI_LIST]           = "list",
   [GB_CLI_INFO]           = "info",

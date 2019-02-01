@@ -43,6 +43,7 @@
 extern const char *argp_program_version;
 
 struct timeval TIMEOUT;           /* cli process to daemon cli thread timeout */
+static size_t cliOptTimeout;
 
 typedef enum clioperations {
   CREATE_CLI = 1,
@@ -158,14 +159,15 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
       goto out;
   }
 
-  TIMEOUT.tv_sec = conf->GB_CLI_TIMEOUT;
-  if (!TIMEOUT.tv_sec) {
-    cli_timeout = getenv("GB_CLI_TIMEOUT");
-    if (cli_timeout) {
-      sscanf(cli_timeout, "%ld", &TIMEOUT.tv_sec);
-    } else {
-      TIMEOUT.tv_sec = CLI_TIMEOUT_DEF;
-    }
+  /* follow precedence */
+  if (conf->GB_CLI_TIMEOUT) {
+    TIMEOUT.tv_sec = conf->GB_CLI_TIMEOUT;
+  } else if (cliOptTimeout) {
+    TIMEOUT.tv_sec = cliOptTimeout;
+  } else if ((cli_timeout = getenv("GB_CLI_TIMEOUT"))) {
+    sscanf(cli_timeout, "%ld", &TIMEOUT.tv_sec);
+  } else {
+    TIMEOUT.tv_sec = CLI_TIMEOUT_DEF;
   }
 
   switch(opt) {
@@ -285,7 +287,7 @@ glusterBlockHelp(void)
   MSG(stdout, "%s",
       PACKAGE_NAME" ("PACKAGE_VERSION")\n"
       "usage:\n"
-      "  gluster-block <command> <volname[/blockname]> [<args>] [--json*]\n"
+      "  gluster-block [timeout <seconds>] <command> <volname[/blockname]> [<args>] [--json*]\n"
       "\n"
       "commands:\n"
       "  create  <volname/blockname> [ha <count>]\n"
@@ -321,8 +323,13 @@ glusterBlockHelp(void)
       "  version\n"
       "        show version info and exit.\n"
       "\n"
-      "supported JSON formats:\n"
-      "  --json|--json-plain|--json-spaced|--json-pretty\n"
+      "common cli options: (fixed formats)\n"
+      "  timeout <seconds>\n"
+      "        it is the time in seconds that cli can wait for daemon to respond.\n"
+      "        [default: timeout 300]\n"
+      "  --json*\n"
+      "        used to request the output result in json format [default: plain text]\n"
+      "        supported JSON formats: --json|--json-plain|--json-spaced|--json-pretty\n"
       );
 }
 
@@ -450,7 +457,7 @@ getCommandString(char **cmd, int argcount, char **options)
 static int
 glusterBlockModify(int argcount, char **options, int json)
 {
-  size_t optind = 2;
+  size_t optind = 1;
   blockModifyCli mobj = {0, };
   blockModifySizeCli msobj = {0, };
   char volume[255] = {0};
@@ -459,7 +466,7 @@ glusterBlockModify(int argcount, char **options, int json)
   int ret = -1;
 
 
-  if (argcount < 5 || argcount > 6) {
+  if (argcount < 4 || argcount > 5) {
     MSG(stderr, "Inadequate arguments for modify:\n%s\n", GB_MODIFY_HELP_STR);
     return -1;
   }
@@ -552,7 +559,7 @@ glusterBlockModify(int argcount, char **options, int json)
 static int
 glusterBlockCreate(int argcount, char **options, int json)
 {
-  size_t optind = 2;
+  size_t optind = 1;
   int ret = -1;
   ssize_t sparse_ret;
   blockCreateCli cobj = {0, };
@@ -717,10 +724,10 @@ glusterBlockList(int argcount, char **options, int json)
   int ret = -1;
 
 
-  GB_ARGCHECK_OR_RETURN(argcount, 3, "list", GB_LIST_HELP_STR);
+  GB_ARGCHECK_OR_RETURN(argcount, 2, "list", GB_LIST_HELP_STR);
   cobj.json_resp = json;
 
-  GB_STRCPYSTATIC(cobj.volume, options[2]);
+  GB_STRCPYSTATIC(cobj.volume, options[1]);
 
   ret = glusterBlockCliRPC_1(&cobj, LIST_CLI);
   if (ret) {
@@ -736,11 +743,11 @@ static int
 glusterBlockDelete(int argcount, char **options, int json)
 {
   blockDeleteCli dobj = {0};
-  size_t optind = 2;
+  size_t optind = 1;
   int ret = -1;
 
 
-  if (argcount < 3 || argcount > 6) {
+  if (argcount < 2 || argcount > 5) {
     MSG(stderr, "Inadequate arguments for delete:\n%s\n", GB_DELETE_HELP_STR);
     return -1;
   }
@@ -806,10 +813,10 @@ glusterBlockInfo(int argcount, char **options, int json)
   int ret = -1;
 
 
-  GB_ARGCHECK_OR_RETURN(argcount, 3, "info", GB_INFO_HELP_STR);
+  GB_ARGCHECK_OR_RETURN(argcount, 2, "info", GB_INFO_HELP_STR);
   cobj.json_resp = json;
 
-  if (glusterBlockParseVolumeBlock (options[2], cobj.volume, cobj.block_name,
+  if (glusterBlockParseVolumeBlock (options[1], cobj.volume, cobj.block_name,
                                     sizeof(cobj.volume), sizeof(cobj.block_name),
                                     GB_INFO_HELP_STR, "info")) {
     goto out;
@@ -833,32 +840,33 @@ glusterBlockReplace(int argcount, char **options, int json)
 {
   blockReplaceCli robj = {0};
   int ret = -1;
+  int optind = 1;
 
 
-  if (argcount < 5 || argcount > 6) {
+  if (argcount < 4 || argcount > 5) {
     MSG(stderr, "Inadequate arguments for replace:\n%s\n", GB_REPLACE_HELP_STR);
     return -1;
   }
 
-  if (glusterBlockParseVolumeBlock(options[2], robj.volume, robj.block_name,
+  if (glusterBlockParseVolumeBlock(options[optind++], robj.volume, robj.block_name,
                                    sizeof(robj.volume), sizeof(robj.block_name),
                                    GB_REPLACE_HELP_STR, "replace")) {
     goto out;
   }
 
-  if (!glusterBlockIsAddrAcceptable(options[3])) {
+  if (!glusterBlockIsAddrAcceptable(options[optind])) {
     MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
-        options[3], GB_REPLACE_HELP_STR);
+        options[optind], GB_REPLACE_HELP_STR);
     goto out;
   }
-  GB_STRCPYSTATIC(robj.old_node, options[3]);
+  GB_STRCPYSTATIC(robj.old_node, options[optind++]);
 
-  if (!glusterBlockIsAddrAcceptable(options[4])) {
+  if (!glusterBlockIsAddrAcceptable(options[optind])) {
     MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
-        options[4], GB_REPLACE_HELP_STR);
+        options[optind], GB_REPLACE_HELP_STR);
     goto out;
   }
-  GB_STRCPYSTATIC(robj.new_node, options[4]);
+  GB_STRCPYSTATIC(robj.new_node, options[optind++]);
 
   if (!strcmp(robj.old_node, robj.new_node)) {
     MSG(stderr, "<old-node> (%s) and <new-node> (%s) cannot be same\n%s\n",
@@ -868,9 +876,9 @@ glusterBlockReplace(int argcount, char **options, int json)
 
   robj.json_resp = json;
 
-  if (argcount == 6) {
-    if (strcmp(options[5], "force")) {
-      MSG(stderr, "unknown option '%s' for replace:\n%s\n", options[5], GB_REPLACE_HELP_STR);
+  if (argcount == 5) {
+    if (strcmp(options[optind], "force")) {
+      MSG(stderr, "unknown option '%s' for replace:\n%s\n", options[optind], GB_REPLACE_HELP_STR);
       return -1;
     } else {
       robj.force = true;
@@ -896,27 +904,28 @@ glusterBlockGenConfig(int argcount, char **options, int json)
 {
   blockGenConfigCli robj = {0};
   int ret = -1;
+  int optind = 1;
 
 
-  GB_ARGCHECK_OR_RETURN(argcount, 5, "genconfig", GB_GENCONF_HELP_STR);
+  GB_ARGCHECK_OR_RETURN(argcount, 4, "genconfig", GB_GENCONF_HELP_STR);
 
-  if (!glusterBlockIsVolListAcceptable(options[2])) {
+  if (!glusterBlockIsVolListAcceptable(options[optind])) {
     MSG(stderr, "volume list(%s) should be delimited by '%c' character only\n%s\n",
-        options[2], GB_VOLS_DELIMITER, GB_GENCONF_HELP_STR);
+        options[optind], GB_VOLS_DELIMITER, GB_GENCONF_HELP_STR);
     goto out;
   }
 
-  GB_STRCPYSTATIC(robj.volume, options[2]);
+  GB_STRCPYSTATIC(robj.volume, options[optind++]);
 
-  if (!strcmp(options[3], "enable-tpg")) {
-    if (!glusterBlockIsAddrAcceptable(options[4])) {
+  if (!strcmp(options[optind++], "enable-tpg")) {
+    if (!glusterBlockIsAddrAcceptable(options[optind])) {
       MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
-          options[3], GB_REPLACE_HELP_STR);
+          options[optind -1], GB_REPLACE_HELP_STR);
       goto out;
     }
-    GB_STRCPYSTATIC(robj.addr, options[4]);
+    GB_STRCPYSTATIC(robj.addr, options[optind]);
   } else {
-      MSG(stderr, "unknown option '%s' for genconfig:\n%s\n", options[3], GB_GENCONF_HELP_STR);
+      MSG(stderr, "unknown option '%s' for genconfig:\n%s\n", options[optind -1], GB_GENCONF_HELP_STR);
       return -1;
   }
   robj.json_resp = json;
@@ -933,29 +942,10 @@ glusterBlockGenConfig(int argcount, char **options, int json)
 
 
 static int
-glusterBlockParseArgs(int count, char **options)
+glusterBlockParseArgs(int count, char **options, size_t opt, int json)
 {
   int ret = 0;
-  size_t opt = 0;
-  int json = GB_JSON_NONE;
 
-
-  opt = glusterBlockCLIOptEnumParse(options[1]);
-  if (!opt || opt >= GB_CLI_OPT_MAX) {
-    MSG(stderr, "Unknown option: %s\n", options[1]);
-    return -1;
-  }
-
-  if (opt > 0 && opt < GB_CLI_HELP) {
-    json = jsonResponseFormatParse(options[count-1]);
-    if (json == GB_JSON_MAX) {
-      MSG(stderr, "expecting '--json*', got '%s'\n",
-          options[count-1]);
-      return -1;
-    } else if (json != GB_JSON_NONE) {
-      count--;/*Commands don't need to handle json*/
-    }
-  }
 
   while (1) {
     switch (opt) {
@@ -1034,14 +1024,58 @@ glusterBlockParseArgs(int count, char **options)
 int
 main(int argc, char *argv[])
 {
+  size_t opt = 0;
+  int count = 1;
+  int args = argc;
+  int json = GB_JSON_NONE;
+
+
   if (argc <= 1) {
     glusterBlockHelp();
-    exit(EXIT_FAILURE);
+    goto fail;
   }
 
   if(initLogging()) {
-    exit(EXIT_FAILURE);
+    goto fail;
   }
 
-  return glusterBlockParseArgs(argc, argv);
+  while (1) {
+    opt = glusterBlockCLIOptEnumParse(argv[count]);
+    if (opt < 1 || opt >= GB_CLI_OPT_MAX) {
+      MSG(stderr, "Unknown option: %s\n", argv[count]);
+      goto fail;
+    }
+    if (opt == GB_CLI_TIMEOUT) {
+      if (args <= 3) {     /* some command is manditory */
+        glusterBlockHelp();
+        goto fail;
+      }
+
+      if (isNumber(argv[2])) {
+        sscanf(argv[2], "%ld", &cliOptTimeout);
+      } else {
+        MSG(stderr, "%s\n", "'timeout' option is incorrect, check usage.");
+        MSG(stderr, "%s\n", "hint: timeout argument accept only time in seconds.");
+        goto fail;
+      }
+      args = args - 2;
+      count = count + 2;
+      continue;
+    }
+
+    json = jsonResponseFormatParse(argv[argc-1]);
+    if (json == GB_JSON_MAX) {
+      MSG(stderr, "expecting '--json*', got '%s'\n",
+          argv[argc-1]);
+      return -1;
+    } else if (json != GB_JSON_NONE) {
+      args = args - 1; /*Commands don't need to handle json*/
+    }
+    break;
+  }
+
+  return glusterBlockParseArgs(args - 1, &argv[count], opt, json);
+
+ fail:
+  exit(EXIT_FAILURE);
 }
