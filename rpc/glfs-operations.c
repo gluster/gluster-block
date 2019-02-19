@@ -774,7 +774,9 @@ blockGetPrioPath(struct glfs* glfs, char *volume, blockServerDefPtr list,
     }
   }
 
-  ret = 0;
+  if (list->nhosts) {
+    ret = 0;
+  }
 
  out:
   if (pfd && glfs_close(pfd) != 0) {

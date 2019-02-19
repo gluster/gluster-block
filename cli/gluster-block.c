@@ -580,6 +580,13 @@ glusterBlockCreate(int argcount, char **options, int json)
     case GB_CLI_CREATE_HA:
       if (isNumber(options[optind])) {
         sscanf(options[optind++], "%u", &cobj.mpath);
+        if (!cobj.mpath) {
+          MSG(stderr, "%s\n", "'ha' cannot be zero.");
+          MSG(stderr, "%s\n", GB_CREATE_HELP_STR);
+          LOG("cli", GB_LOG_ERROR, "failed parsing ha as 0 for block <%s/%s>",
+              cobj.volume, cobj.block_name);
+          goto out;
+        }
       } else {
         MSG(stderr, "%s\n", "'ha' option is incorrect");
         MSG(stderr, "%s\n", GB_CREATE_HELP_STR);
