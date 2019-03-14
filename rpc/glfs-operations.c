@@ -11,6 +11,7 @@
 
 # include "common.h"
 # include "glfs-operations.h"
+# include "config.h"
 
 # define  GB_LB_ATTR_PREFIX  "user.block"
 
@@ -212,7 +213,11 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
     ret = -1;
     goto out;
   } else {
+#if GFAPI_VERSION760
+    ret = glfs_ftruncate(tgfd, blk->size, NULL, NULL);
+#else
     ret = glfs_ftruncate(tgfd, blk->size);
+#endif
     if (ret) {
       *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
@@ -312,7 +317,11 @@ glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk,
       goto close;
     }
 
+#if GFAPI_VERSION760
+    ret = glfs_ftruncate(tgfd, blk->size, NULL, NULL);
+#else
     ret = glfs_ftruncate(tgfd, blk->size);
+#endif
     if (ret) {
       *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,

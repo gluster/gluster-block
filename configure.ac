@@ -81,8 +81,12 @@ AC_CHECK_HEADERS([stdio.h stdlib.h string.h stdbool.h stddef.h \
 
 # Checks for libraries.
 # glusterfs-api versions have a prefix of "7."
-PKG_CHECK_MODULES([GFAPI], [glusterfs-api >= 7.3.6],,
-                  [AC_MSG_ERROR([gfapi library >= 3.6 is required to build gluster-block])])
+PKG_CHECK_MODULES([GFAPI], [glusterfs-api >= 7.6],
+                  [AC_DEFINE(GFAPI_VERSION760, 1, [Define to 1 if gfapi >=7.6.0])],
+                  [PKG_CHECK_MODULES([GFAPI], [glusterfs-api >= 7.3.6],,
+                                     [AC_MSG_ERROR([gfapi library >= 3.6 is required to build gluster-block])])
+                  ]
+                 )
 AC_SUBST(GFAPI_CFLAGS)
 AC_SUBST(GFAPI_LIBS)
 
