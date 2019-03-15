@@ -165,6 +165,7 @@ removeDuplicateSubstr(char **line)
   char *temp = *line;
   char *out;
   char *element;
+  size_t len;
 
 
   if (!temp) {
@@ -172,7 +173,8 @@ removeDuplicateSubstr(char **line)
   }
 
   /* Allocate size for out including trailing space and \0. */
-  if (GB_ALLOC_N(out, strlen(temp) + strlen(" ") + 1) < 0) {
+  len = strlen(temp) + strlen(" ") + 1;
+  if (GB_ALLOC_N(out, len) < 0) {
     return;
   }
 
@@ -180,8 +182,8 @@ removeDuplicateSubstr(char **line)
   element = strtok(temp, " ");
   while (element) {
     if (!strstr(out, element)) {
-      strncat(out, element, strlen(element));
-      strncat(out, " ", 1);
+      GB_STRCAT(out, element, len);
+      GB_STRCAT(out, " ", 2);
     }
     element = strtok(NULL, " ");
   }
