@@ -233,7 +233,8 @@ glusterBlockReadConfig(gbConfig *cfg, ssize_t *len)
 {
   int save = errno;
   char *p, *buf, *line = NULL;
-  ssize_t m, n, buf_len = GB_BUF_LEN;
+  ssize_t m, buf_len = GB_BUF_LEN;
+  size_t n;
   FILE *fp;
   int i;
 

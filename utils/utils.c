@@ -428,11 +428,26 @@ gbStrcpy(char *dest, const char *src, size_t destbytes,
     if (n > (destbytes - 1))
       return NULL;
 
-    ret = strncpy(dest, src, n);
-    /* strncpy NULL terminates if the last character is \0.  Therefore
-     * force the last byte to be \0
-     */
+    ret = memcpy(dest, src, n);
     dest[n] = '\0';
+
+    return ret;
+}
+
+
+char *
+gbStrcat(char *dest, const char *src, size_t destbytes,
+         const char *filename, const char *funcname, size_t linenr)
+{
+    char *ret;
+    size_t n = strlen(src);
+    size_t m = strlen(dest);
+
+    if (n > (destbytes - 1))
+      return NULL;
+
+    ret = memcpy(dest + m, src, n);
+    dest[m + n] = '\0';
 
     return ret;
 }

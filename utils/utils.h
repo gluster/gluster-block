@@ -357,6 +357,10 @@ extern struct gbConf gbConf;
             gbStrcpy((dst), (src), (destbytes),                      \
                      __FILE__, __FUNCTION__, __LINE__)
 
+# define  GB_STRCAT(dst, src, destbytes)                             \
+            gbStrcat((dst), (src), (destbytes),                      \
+                     __FILE__, __FUNCTION__, __LINE__)
+
 # define  GB_STRCPYSTATIC(dst, src)                                  \
             GB_STRCPY((dst), (src), (sizeof(dst)))
 
@@ -621,6 +625,9 @@ int gbStrdup(char **dest, const char *src,
              const char *filename, const char *funcname, size_t linenr);
 
 char* gbStrcpy(char *dest, const char *src, size_t destbytes,
+               const char *filename, const char *funcname, size_t linenr);
+
+char *gbStrcat(char *dest, const char *src, size_t destbytes,
                const char *filename, const char *funcname, size_t linenr);
 
 void gbFree(void *ptrptr);
