@@ -4516,7 +4516,7 @@ block_create_v2_1_svc_st(blockCreate2 *blk, struct svc_req *rqstp)
   convertTypeCreate2ToCreate(blk, &blk_v1);
 
   if (len > 0 && len <= HOST_NAME_MAX) {
-    if (strcmp(blk->xdata.xdata_val, "localhost")) {
+    if (strncmp(blk->xdata.xdata_val, "localhost", 9)) {
       if (GB_ALLOC_N(volServer, len) < 0)
         goto err;
       strncpy(volServer, blk->xdata.xdata_val, len);
