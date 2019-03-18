@@ -338,6 +338,53 @@ gbRunner(char *cmd)
 }
 
 
+char*
+gbRunnerGetOutput(char *cmd)
+{
+  FILE *fp;
+  char *tptr;
+  char *buf = NULL;
+
+
+  LOG("mgmt", GB_LOG_DEBUG, "command, %s", cmd);
+
+  if (GB_ALLOC_N(buf, 1024) < 0) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "gbRunnerGetOutput: error allocating memory (%s)", strerror(errno));
+    return NULL;
+  }
+
+  fp = popen(cmd, "r");
+  if (fp) {
+    size_t newLen = fread(buf, sizeof(char), 1024, fp);
+    if (ferror(fp) != 0) {
+      LOG("mgmt", GB_LOG_ERROR,
+          "reading command output for %s failed (%s)", cmd, strerror(errno));
+      buf[0] = '\0';
+      goto fail;
+    } else {
+      buf[newLen++] = '\0';
+      tptr = strchr(buf,'\n');
+      if (tptr) {
+        *tptr = '\0';
+      }
+      goto out;
+    }
+  } else {
+    LOG("mgmt", GB_LOG_ERROR,
+        "popen(%s): failed: %s", cmd, strerror(errno));
+    goto fail;
+  }
+
+fail:
+  GB_FREE(buf);
+
+ out:
+  pclose(fp);
+  return buf;
+}
+
+
 int
 gbAlloc(void *ptrptr, size_t size,
         const char *filename, const char *funcname, size_t linenr)
