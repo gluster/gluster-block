@@ -4,4 +4,5 @@ service:
 - docker
 
 script:
-- docker build -f ./extras/docker/Dockerfile.buildtest .
+- docker build -f ./extras/docker/Dockerfile.fedora29 .
+- docker build -f ./extras/docker/Dockerfile.centos7 .
