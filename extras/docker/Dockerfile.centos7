@@ -1,7 +1,6 @@
-# Dockerfile for testing the build of gluster-block
+# Dockerfile for testing the build of gluster-block based on centos7
 
-# build on f27 until we have figured out the sunrpc / libtirpc thing...
-FROM fedora:27
+FROM centos:centos7
 
 ENV BUILDDIR=/build
 RUN mkdir -p $BUILDDIR
@@ -11,7 +10,10 @@ COPY . $BUILDDIR
 
 # prepare the system
 RUN true \
- && dnf -y install \
+ && yum -y update && yum clean all \
+ && true
+RUN true \
+ && yum -y install \
            git autoconf automake gcc libtool make file \
            glusterfs-api-devel libuuid-devel json-c-devel \
  && true
@@ -19,7 +21,7 @@ RUN true \
 # build
 RUN true \
  && ./autogen.sh \
- && ./configure \
+ && ./configure --enable-tirpc=no \
  && make \
  && make check \
  && make install \
