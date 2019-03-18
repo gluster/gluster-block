@@ -43,6 +43,10 @@ AC_ARG_WITH(sysconfigdir,
             [sysconfigdir='/etc/sysconfig'])
 AC_SUBST(sysconfigdir)
 
+AC_ARG_ENABLE([libtirpc],
+              AC_HELP_STRING([--enable-libtirpc],
+                             [enable use of tirpc [default: yes]]))
+
 AM_INIT_AUTOMAKE([-Wall -Werror foreign nostdinc])
 AC_CONFIG_HEADERS([config.h])
 
@@ -84,7 +88,7 @@ AC_CHECK_HEADERS([stdio.h stdlib.h string.h stdbool.h stddef.h \
                   unistd.h errno.h memory.h time.h             \
                   netdb.h netinet/in.h sys/socket.h            \
                   pthread.h uuid/uuid.h glusterfs/api/glfs.h   \
-                  rpc/pmap_clnt.h rpc/rpc.h ])
+                  rpc/pmap_clnt.h ])
 
 # Checks for libraries.
 # glusterfs-api versions have a prefix of "7."
@@ -102,10 +106,16 @@ PKG_CHECK_MODULES([JSONC], [json-c],,
 AC_SUBST(JSONC_CFLAGS)
 AC_SUBST(JSONC_LIBS)
 
-PKG_CHECK_MODULES([TIRPC], [libtirpc],,
-                  [AC_MSG_ERROR([tirpc library is required to build gluster-block])])
-AC_SUBST(TIRPC_CFLAGS)
-AC_SUBST(TIRPC_LIBS)
+if test "$enable_tirpc" != "no"; then
+    enable_tirpc="yes";
+    AC_CHECK_HEADERS([rpc/rpc.h])
+    PKG_CHECK_MODULES([TIRPC], [libtirpc >= 0.2.4],
+                      [AC_DEFINE([HAVE_LIBTIRPC], [1],
+                                 [Define to 1 if you have and wish to use libtirpc.])],
+                      [AC_MSG_ERROR([libtirpc is required to build gluster-block])])
+    AC_SUBST(TIRPC_CFLAGS)
+    AC_SUBST(TIRPC_LIBS)
+fi
 
 AC_CHECK_LIB([uuid], [uuid_generate], [UUID="-luuid"],
              AC_MSG_ERROR([uuid library is required to build gluster-block]))
@@ -154,6 +164,7 @@ cat <<EOF
   Prefix.........: $prefix
   C Compiler.....: $CC $CFLAGS $CPPFLAGS
   Linker.........: $LD $LDFLAGS $LIBS
+  Using Tirpc....: $enable_tirpc
 ---------------------------------------------
 
 Check the above options and compile with:

@@ -86,12 +86,6 @@ glusterBlockCliThreadProc (void *vargp)
     goto out;
   }
 
-  if ((sockfd = socket(AF_UNIX, SOCK_STREAM, IPPROTO_IP)) < 0) {
-    LOG("mgmt", GB_LOG_ERROR, "UNIX socket creation failed (%s)",
-        strerror (errno));
-    goto out;
-  }
-
   saun.sun_family = AF_UNIX;
   GB_STRCPYSTATIC(saun.sun_path, GB_UNIX_ADDRESS);
 
@@ -101,12 +95,20 @@ glusterBlockCliThreadProc (void *vargp)
     goto out;
   }
 
+#ifndef HAVE_LIBTIRPC
+  if ((sockfd = socket(AF_UNIX, SOCK_STREAM, IPPROTO_IP)) < 0) {
+    LOG("mgmt", GB_LOG_ERROR, "UNIX socket creation failed (%s)",
+        strerror (errno));
+    goto out;
+  }
+
   if (bind(sockfd, (struct sockaddr *) &saun,
            sizeof(struct sockaddr_un)) < 0) {
     LOG("mgmt", GB_LOG_ERROR, "bind on '%s' failed (%s)",
         GB_UNIX_ADDRESS, strerror (errno));
     goto out;
   }
+#endif  /* HAVE_LIBTIRPC */
 
   transp = svcunix_create(sockfd, 0, 0, GB_UNIX_ADDRESS);
   if (!transp) {
@@ -170,6 +172,14 @@ glusterBlockServerThreadProc(void *vargp)
              GB_TCP_PORT, strerror (errno));
     goto out;
   }
+
+#ifdef HAVE_LIBTIRPC
+  if (listen(sockfd, 128) < 0) {
+    snprintf(errMsg, sizeof (errMsg), "listen on port %d failed (%s)",
+             GB_TCP_PORT, strerror (errno));
+    goto out;
+  }
+#endif  /* HAVE_LIBTIRPC */
 
   transp = svctcp_create(sockfd, 0, 0);
   if (!transp) {
