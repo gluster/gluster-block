@@ -123,6 +123,8 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
                         int *errCode, char **errMsg)
 {
   struct glfs_fd *tgfd;
+  struct glfs_stat prestat = {0,};
+  struct glfs_stat poststat = {0,};
   struct stat st;
   char *tmp;
   int ret = -1;
@@ -212,7 +214,7 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
     ret = -1;
     goto out;
   } else {
-    ret = glfs_ftruncate(tgfd, blk->size);
+    ret = glfs_ftruncate(tgfd, blk->size, &prestat, &poststat);
     if (ret) {
       *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
@@ -278,6 +280,8 @@ glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk,
   char fpath[PATH_MAX] = {0};
   struct glfs_fd *tgfd;
   struct stat sb = {0, };
+  struct glfs_stat prestat = {0,};
+  struct glfs_stat poststat = {0,};
   int ret;
 
   snprintf(fpath, sizeof fpath, "%s/%s", GB_STOREDIR, blk->gbid);
@@ -312,7 +316,7 @@ glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk,
       goto close;
     }
 
-    ret = glfs_ftruncate(tgfd, blk->size);
+    ret = glfs_ftruncate(tgfd, blk->size, &prestat, &poststat);
     if (ret) {
       *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
