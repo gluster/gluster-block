@@ -597,6 +597,11 @@ typedef struct gbConfig {
   ssize_t GB_CLI_TIMEOUT;  /* seconds */
 } gbConfig;
 
+typedef enum gbDependencies {
+  TCMURUNNER       = 1,
+  TARGETCLI        = 2,
+} gbDependencies;
+
 int glusterBlockSetLogLevel(unsigned int logLevel);
 
 //int glusterBlockSetCliTimeout(size_t timeout);
@@ -624,6 +629,8 @@ int initLogging(void);
 int gbRunnerExitStatus(int exitStatus);
 
 int gbRunner(char *cmd);
+
+char* gbRunnerGetOutput(char *cmd);
 
 int gbAlloc(void *ptrptr, size_t size,
             const char *filename, const char *funcname, size_t linenr);

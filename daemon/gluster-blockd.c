@@ -26,6 +26,7 @@
 # include  "block.h"
 # include  "block_svc.h"
 # include  "capabilities.h"
+# include  "version.h"
 
 # define   GB_TGCLI_GLOBALS     "targetcli set "                               \
                                 "global auto_add_default_portal=false "        \
@@ -352,29 +353,14 @@ static void
 gbMinKernelVersionCheck(void)
 {
   struct utsname verStr = {'\0', };
-  char distro[32] = {'\0', };
+  char *distro = NULL;
   size_t vNum[VERNUM_BUFLEN] = {0, };
-  FILE *fp = NULL;
   int i = 0;
   char *tptr;
 
 
-  fp = popen(GB_DISTRO_CHECK, "r");
-  if (fp) {
-    size_t newLen = fread(distro, sizeof(char), 32, fp);
-    if (ferror(fp)) {
-      LOG("mgmt", GB_LOG_ERROR, "fread(%s) failed: %s",
-          GB_DISTRO_CHECK, strerror(errno));
-      goto fail;
-    }
-    distro[newLen++] = '\0';
-    tptr = strchr(distro,'\n');
-    if (tptr) {
-      *tptr = '\0';
-    }
-  } else {
-    LOG("mgmt", GB_LOG_ERROR, "popen(%s): failed: %s",
-        GB_DISTRO_CHECK, strerror(errno));
+  distro = gbRunnerGetOutput(GB_DISTRO_CHECK);
+  if (!distro) {
     goto fail;
   }
 
@@ -424,7 +410,7 @@ gbMinKernelVersionCheck(void)
   LOG("mgmt", GB_LOG_INFO, "Distro %s. Current kernel version: '%s'.",
       distro, verStr.release);
 
-  pclose(fp);
+  GB_FREE(distro);
   return;
 
  out:
@@ -434,8 +420,103 @@ gbMinKernelVersionCheck(void)
       distro, tptr, verStr.release);
 
  fail:
-  pclose(fp);
+  GB_FREE(distro);
 
+  exit(EXIT_FAILURE);
+}
+
+
+static bool
+gbDependencyVersionCompare(int dependencyName, char *version)
+{
+  size_t vNum[VERNUM_BUFLEN] = {0, };
+  char *verStr;
+  int i = 0, j;
+  char *token, *tmp;
+  bool done = false;
+  bool ret = false;
+
+
+  if (GB_STRDUP(verStr, version) < 0) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "gbDependencyVersionCompare: failed to strdup (%s)", strerror(errno));
+    return ret;
+  }
+
+  token = strtok(verStr, ".-");
+  while( token != NULL ) {
+    done = false;
+    for (j = 0; j < strlen(token); j++) { /* say if version is 2.1.fb49, parse fb49 */
+      if (isdigit(token[j])) {
+        vNum[i] = atoi(token);
+      } else {
+        tmp = token;
+        for(; *tmp; ++tmp) {
+          if (isdigit(*tmp)) {
+            vNum[i] = atoi(tmp);  /* feed 49 from fb49, so done = true */
+            done = true;
+            break;
+          }
+        }
+      }
+      if (done) {
+        break;
+      }
+    }
+    token = strtok(NULL, ".-");
+    i++;
+  }
+
+  switch (dependencyName) {
+  case TCMURUNNER:
+    if (DEPENDENCY_VERSION(vNum[0], vNum[1], vNum[2]) >= GB_MIN_TCMURUNNER_VERSION_CODE) {
+        ret = true;
+    }
+    break;
+  case TARGETCLI:
+    if (DEPENDENCY_VERSION(vNum[0], vNum[1], vNum[2]) >= GB_MIN_TARGETCLI_VERSION_CODE) {
+        ret = true;
+    }
+    break;
+  }
+
+  GB_FREE(verStr);
+  return ret;
+}
+
+
+static void
+gbDependenciesVersionCheck(void)
+{
+  char *out = NULL;
+
+
+  out = gbRunnerGetOutput("tcmu-runner --version 2>&1 | awk -F' ' '{printf $NF}'");
+  if (!gbDependencyVersionCompare(TCMURUNNER, out)) {
+    LOG ("mgmt", GB_LOG_ERROR,
+         "current tcmu-runner version is %s, gluster-block need atleast - %s",
+         out, GB_MIN_TCMURUNNER_VERSION);
+    goto out;
+  }
+  LOG("mgmt", GB_LOG_INFO, "starting with tcmu-runner version - %s", out);
+  GB_FREE(out);
+
+  out = gbRunnerGetOutput("targetcli --version 2>&1 | awk -F' ' '{printf $NF}'");
+  if (!gbDependencyVersionCompare(TARGETCLI, out)) {
+    LOG ("mgmt", GB_LOG_ERROR,
+         "current targetcli version is %s, gluster-block need atleast - %s",
+         out, GB_MIN_TARGETCLI_VERSION);
+    goto out;
+  }
+  LOG("mgmt", GB_LOG_INFO, "starting with targetcli version - %s", out);
+  GB_FREE(out);
+
+  return;
+
+ out:
+  GB_FREE(out);
+  LOG("mgmt", GB_LOG_ERROR, "%s",
+      "Please install the recommended dependency version and try again.");
   exit(EXIT_FAILURE);
 }
 
@@ -447,9 +528,6 @@ blockNodeSanityCheck(void)
   char *global_opts;
 
 
-  /* Check minimum recommended kernel version */
-  gbMinKernelVersionCheck();
-
   /* Check if tcmu-runner is running */
   ret = gbRunner("ps aux ww | grep -w '[t]cmu-runner' > /dev/null");
   if (ret) {
@@ -459,16 +537,21 @@ blockNodeSanityCheck(void)
 
   /* Check targetcli has user:glfs handler listed */
   ret = gbRunner("targetcli /backstores/user:glfs ls > /dev/null");
-  if (ret) {
+  if (ret == EKEYEXPIRED) {
+    LOG("mgmt", GB_LOG_ERROR, "%s",
+        "targetcli not found, please install targetcli and try again.");
+    return EKEYEXPIRED;
+  } else if (ret) {
     LOG("mgmt", GB_LOG_ERROR, "%s",
         "tcmu-runner running, but targetcli doesn't list user:glfs handler");
     return  ENODEV;
   }
 
-  if (ret == EKEYEXPIRED) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "targetcli not found");
-    return EKEYEXPIRED;
-  }
+  /* Check minimum recommended kernel version */
+  gbMinKernelVersionCheck();
+
+  /* Check if dependencies meet minimum recommended versions */
+  gbDependenciesVersionCheck();
 
   if (GB_ASPRINTF(&global_opts, GB_TGCLI_GLOBALS, gbConf.configShellLogFile) == -1) {
     return ENOMEM;
@@ -477,8 +560,7 @@ blockNodeSanityCheck(void)
   ret = gbRunner(global_opts);
   GB_FREE(global_opts);
   if (ret) {
-    LOG("mgmt", GB_LOG_ERROR, "%s",
-        "targetcli set global attr failed");
+    LOG("mgmt", GB_LOG_ERROR, "%s", "targetcli set global attr failed");
     return  -1;
   }
 
