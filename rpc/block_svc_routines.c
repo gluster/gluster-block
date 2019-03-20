@@ -4200,6 +4200,7 @@ block_replace_1_svc_st(blockReplace *blk, struct svc_req *rqstp)
 
   if (GB_ALLOC_N(reply->out, 8192) < 0) {
     GB_FREE(reply);
+    reply = NULL;
     goto out;
   }
 
@@ -4462,6 +4463,7 @@ block_create_common(blockCreate *blk, char *rbsize, char *volServer, char *prio_
 
   if (GB_ALLOC_N(reply->out, 8192) < 0) {
     GB_FREE(reply);
+    reply = NULL;
     goto out;
   }
 
@@ -4749,6 +4751,7 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
 
   if (GB_ALLOC_N(reply->out, 8192) < 0) {
     GB_FREE(reply);
+    reply = NULL;
     goto out;
   }
 
@@ -4836,6 +4839,7 @@ block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
 
   if (GB_ALLOC_N(reply->out, 8192) < 0) {
     GB_FREE(reply);
+    reply = NULL;
     goto out;
   }
 
@@ -4959,6 +4963,7 @@ block_modify_size_1_svc_st(blockModifySize *blk, struct svc_req *rqstp)
 
   if (GB_ALLOC_N(reply->out, 8192) < 0) {
     GB_FREE(reply);
+    reply = NULL;
     goto out;
   }
 
