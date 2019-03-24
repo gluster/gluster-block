@@ -1035,7 +1035,7 @@ main(int argc, char *argv[])
     goto fail;
   }
 
-  if(initLogging()) {
+  if(initLogging(NULL)) {
     goto fail;
   }
 

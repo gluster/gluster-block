@@ -29,6 +29,7 @@
 
 # include  "list.h"
 
+# define  GB_LOGROTATE_PATH      "/etc/logrotate.d/gluster-block"
 # define  GB_LOGDIR_DEF          DATADIR "/log/gluster-block"
 # define  GB_INFODIR             DATADIR "/run"
 
@@ -611,7 +612,7 @@ void fetchGlfsVolServerFromEnv(void);
 
 bool glusterBlockSetLogDir(char *logDir);
 
-int initLogging(void);
+int initLogging(const char *dom);
 
 int gbRunnerExitStatus(int exitStatus);
 

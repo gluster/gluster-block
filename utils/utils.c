@@ -272,12 +272,102 @@ void fetchGlfsVolServerFromEnv()
   LOG("mgmt", GB_LOG_INFO, "Block Hosting Volfile Server Set to: %s", gbConf.volServer);
 }
 
+
+static int glusterLogrotateConfigSet(const char *dom, char *logDir)
+{
+  char *buf = NULL, *line = NULL, *p;
+  int ret, m, len;
+  size_t n;
+  FILE *fp;
+
+  fp = fopen(GB_LOGROTATE_PATH, "r+");
+  if (fp == NULL) {
+    ret = -errno;
+    if (dom) {
+      LOG(dom, GB_LOG_ERROR, "Failed to open file '%s', %m\n", GB_LOGROTATE_PATH);
+    } else {
+      fprintf(stderr, "Failed to open file '%s', %m\n", GB_LOGROTATE_PATH);
+    }
+    return ret;
+  }
+
+  ret = fseek(fp, 0L, SEEK_END);
+  if (ret == -1) {
+    ret = -errno;
+    if (dom) {
+      LOG(dom, GB_LOG_ERROR, "Failed to seek file '%s', %m\n", GB_LOGROTATE_PATH);
+    } else {
+      fprintf(stderr, "Failed to seek file '%s', %m\n", GB_LOGROTATE_PATH);
+    }
+    goto error;
+  }
+
+  len = ftell(fp);
+  if (len == -1) {
+    ret = -errno;
+    if (dom) {
+      LOG(dom, GB_LOG_ERROR, "Failed to get the length of file '%s', %m\n", GB_LOGROTATE_PATH);
+    } else {
+      fprintf(stderr, "Failed to get the length of file '%s', %m\n", GB_LOGROTATE_PATH);
+    }
+    goto error;
+  }
+
+  /* to make sure we have enough size */
+  len += strlen(logDir) + 1;
+  if (GB_ALLOC_N(buf, len) < 0) {
+    ret = -ENOMEM;
+    goto error;
+  }
+
+  p = buf;
+  fseek(fp, 0L, SEEK_SET);
+  while ((m = getline(&line, &n, fp)) != -1) {
+    if (strstr(line, "*.log") && strchr(line, '{')) {
+      m = sprintf(p, "%s/*.log {\n", logDir);
+    } else {
+      m = sprintf(p, "%s", line);
+    }
+    if (m < 0) {
+      ret = m;
+      goto error;
+    }
+
+    p += m;
+  }
+  *p = '\0';
+  len = p - buf;
+
+  fseek(fp, 0L, SEEK_SET);
+  truncate(GB_LOGROTATE_PATH, 0L);
+  ret = fwrite(buf, 1, len, fp);
+  if (ret != len) {
+    if (dom) {
+      LOG(dom, GB_LOG_ERROR, "Failed to update '%s', %m\n", GB_LOGROTATE_PATH);
+    } else {
+      fprintf(stderr, "Failed to update '%s', %m\n", GB_LOGROTATE_PATH);
+    }
+    goto error;
+  }
+
+  ret = 0;
+ error:
+  if (fp) {
+    fclose(fp);
+  }
+  GB_FREE(buf);
+  GB_FREE(line);
+  return ret;
+}
+
+
 static int
-initLogDirAndFiles(char *newLogDir)
+initLogDirAndFiles(const char *dom, char *newLogDir)
 {
   char *logDir = NULL;
   char *tmpLogDir = NULL;
   int ret = 0;
+  bool def = false;
 
 
   /*
@@ -297,6 +387,7 @@ initLogDirAndFiles(char *newLogDir)
     }
 
     if (!logDir) {
+      def = true;
       logDir = GB_LOGDIR_DEF;
     }
   }
@@ -329,22 +420,27 @@ initLogDirAndFiles(char *newLogDir)
 
  unlock:
   UNLOCK(gbConf.lock);
+
+  if (!def) {
+    glusterLogrotateConfigSet(dom, gbConf.logDir);
+  }
+
   GB_FREE(tmpLogDir);
   return ret;
 }
 
 
 int
-initLogging(void)
+initLogging(const char *dom)
 {
-  return initLogDirAndFiles(NULL);
+  return initLogDirAndFiles(dom, NULL);
 }
 
 
 bool
 glusterBlockSetLogDir(char *logDir)
 {
-  return initLogDirAndFiles(logDir);
+  return initLogDirAndFiles("mgmt", logDir);
 }
 
 

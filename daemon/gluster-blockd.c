@@ -439,7 +439,7 @@ main (int argc, char **argv)
   int errnosv = 0;
 
 
-  if(initLogging()) {
+  if(initLogging("mgmt")) {
     exit(EXIT_FAILURE);
   }
 
