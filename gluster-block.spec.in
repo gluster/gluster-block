@@ -87,7 +87,7 @@ rm -rf ${RPM_BUILD_ROOT}
 %attr(0755,-,-) %{_initddir}/gluster-blockd
 %endif
 %config(noreplace) %{_sysconfdir}/sysconfig/gluster-blockd
-%config(noreplace) %{_sysconfdir}/logrotate.d/gluster-block
+%config(noreplace) %{_sysconfdir}/logrotate.d/gluster-blockd
 %dir %attr(0755,-,-) %{_libexecdir}/gluster-block
      %attr(0755,-,-) %{_libexecdir}/gluster-block/wait-for-bricks.sh
      %attr(0755,-,-) %{_libexecdir}/gluster-block/upgrade_activities.sh
@@ -95,6 +95,9 @@ rm -rf ${RPM_BUILD_ROOT}
      %attr(0644,-,-) %{_sharedstatedir}/gluster-block/gluster-block-caps.info
 
 %changelog
+* Fri Apr 26 2019 Xiubo Li <xiubli@redhat.com>
+- Rename logrotate configure file
+
 * Mon Apr 22 2019 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - update targetcli and tcmu-runner dependency version
 

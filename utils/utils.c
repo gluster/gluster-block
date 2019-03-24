@@ -256,11 +256,11 @@ glusterBlockLogdirCreate(void)
   } else if (errno == ENOENT) {
     GB_ASPRINTF(&buf, "mkdir -p %s -m 0755 > /dev/null", gbConf.logDir);
     if (gbRunner(buf) == -1) {
-      fprintf(stderr, "mkdir(%s) failed (%s)", gbConf.logDir, strerror (errno));
+      MSG(stderr, "mkdir(%s) failed (%s)", gbConf.logDir, strerror (errno));
       return 0;  /* False */
     }
   } else {
-    fprintf(stderr, "opendir(%s) failed (%s)", gbConf.logDir, strerror (errno));
+    MSG(stderr, "opendir(%s) failed (%s)", gbConf.logDir, strerror (errno));
     return 0;  /* False */
   }
 
@@ -269,7 +269,8 @@ glusterBlockLogdirCreate(void)
 }
 
 
-void fetchGlfsVolServerFromEnv()
+void
+fetchGlfsVolServerFromEnv()
 {
   char *volServer;
 
@@ -283,13 +284,121 @@ void fetchGlfsVolServerFromEnv()
   LOG("mgmt", GB_LOG_INFO, "Block Hosting Volfile Server Set to: %s", gbConf.volServer);
 }
 
+
+static int
+glusterLogrotateConfigSet(char *logDir)
+{
+  char *buf = NULL, *line = NULL, *p, *dom = NULL;
+  int ret, m, len;
+  size_t n;
+  FILE *fp;
+
+
+  if (gbCtx == GB_CLI_MODE) {
+    dom = "cli";
+  } else if (gbCtx == GB_DAEMON_MODE) {
+    dom = "mgmt";
+  }
+
+  if (!dom) {
+    return -EINVAL;
+  }
+
+  fp = fopen(GB_LOGROTATE_PATH, "r+");
+  if (fp == NULL) {
+    ret = -errno;
+    LOG(dom, GB_LOG_ERROR, "Failed to open file '%s', %s", GB_LOGROTATE_PATH,
+        strerror (errno));
+    return ret;
+  }
+
+  ret = fseek(fp, 0L, SEEK_END);
+  if (ret == -1) {
+    ret = -errno;
+    LOG(dom, GB_LOG_ERROR, "Failed to seek file '%s', %s", GB_LOGROTATE_PATH,
+        strerror (errno));
+    goto error;
+  }
+
+  len = ftell(fp);
+  if (len == -1) {
+    ret = -errno;
+    LOG(dom, GB_LOG_ERROR, "Failed to get the length of file '%s', %s",
+        GB_LOGROTATE_PATH, strerror (errno));
+    goto error;
+  }
+
+  /* to make sure we have enough size */
+  len += strlen(logDir) + 1;
+  if (GB_ALLOC_N(buf, len) < 0) {
+    ret = -ENOMEM;
+    goto error;
+  }
+
+  p = buf;
+  fseek(fp, 0L, SEEK_SET);
+  while ((m = getline(&line, &n, fp)) != -1) {
+    if (strstr(line, "*.log") && strchr(line, '{')) {
+      m = sprintf(p, "%s/*.log {\n", logDir);
+    } else {
+      m = sprintf(p, "%s", line);
+    }
+    if (m < 0) {
+      ret = m;
+      goto error;
+    }
+
+    p += m;
+  }
+  *p = '\0';
+  len = p - buf;
+
+  fseek(fp, 0L, SEEK_SET);
+  if (truncate(GB_LOGROTATE_PATH, 0L) == -1) {
+    LOG(dom, GB_LOG_ERROR, "Failed to truncate '%s', %s", GB_LOGROTATE_PATH,
+        strerror (errno));
+    goto error;
+  }
+  ret = fwrite(buf, 1, len, fp);
+  if (ret != len) {
+    LOG(dom, GB_LOG_ERROR, "Failed to update '%s', %s", GB_LOGROTATE_PATH,
+        strerror (errno));
+    goto error;
+  }
+
+  ret = 0;
+ error:
+  if (fp) {
+    fclose(fp);
+  }
+  GB_FREE(buf);
+  GB_FREE(line);
+  return ret;
+}
+
+
 static int
 initLogDirAndFiles(char *newLogDir)
 {
   char *logDir = NULL;
   char *tmpLogDir = NULL;
+  char *dom = NULL;
   int ret = 0;
+  bool def = false;
+  int logLevel;
 
+
+  if (gbCtx == GB_CLI_MODE) {
+    dom = "cli";
+    logLevel = GB_LOG_DEBUG;
+  } else if (gbCtx == GB_DAEMON_MODE) {
+    dom = "mgmt";
+    logLevel = GB_LOG_CRIT;
+  }
+
+  if (!dom) {
+    return -EINVAL;
+  }
 
   /*
    * The priority of the logdir setting is:
@@ -308,12 +417,16 @@ initLogDirAndFiles(char *newLogDir)
     }
 
     if (!logDir) {
+      def = true;
       logDir = GB_LOGDIR_DEF;
     }
   }
 
+  LOG(dom, logLevel,
+      "trying to change logDir from %s to %s", gbConf.logDir, logDir);
+
   if (strlen(logDir) > PATH_MAX - GB_MAX_LOGFILENAME) {
-    fprintf(stderr, "strlen of logDir Path > PATH_MAX: %s", logDir);
+    LOG(dom, GB_LOG_ERROR, "strlen of logDir Path > PATH_MAX: %s", logDir);
     ret = -1;
     goto out;
   }
@@ -335,13 +448,21 @@ initLogDirAndFiles(char *newLogDir)
 
   if(!glusterBlockLogdirCreate()) {
     ret = -1;
-    goto unlock;
   }
+  UNLOCK(gbConf.lock);
+
+  if (ret == -1) {
+    goto out;
+  }
+
+  LOG(dom, logLevel, "logDir now is %s", gbConf.logDir);
 
   glusterBlockUpdateLruLogdir(gbConf.gfapiLogFile);
 
- unlock:
-  UNLOCK(gbConf.lock);
+  if (!def) {
+    glusterLogrotateConfigSet(gbConf.logDir);
+  }
+
 out:
   GB_FREE(tmpLogDir);
   return ret;

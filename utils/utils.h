@@ -29,6 +29,7 @@
 
 # include  "list.h"
 
+# define  GB_LOGROTATE_PATH      "/etc/logrotate.d/gluster-blockd"
 # define  GB_LOGDIR_DEF          DATADIR "/log/gluster-block"
 # define  GB_INFODIR             DATADIR "/run"
 
@@ -109,7 +110,7 @@
 
 # define FMT_WARN(fmt...) do { if (0) printf (fmt); } while (0)
 
-# define GB_ASPRINTF(ptr, fmt...) ({FMT_WARN (fmt);                 \
+# define GB_ASPRINTF(ptr, fmt...) ({FMT_WARN (fmt);                \
                 int __ret=asprintf(ptr, ##fmt);__ret;})
 
 # define LOCK(x)                                                     \
