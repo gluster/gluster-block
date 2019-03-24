@@ -11,8 +11,8 @@ install-data-local:
 	$(INSTALL_DATA) -m 755 $(top_srcdir)/extras/upgrade_activities.sh            \
 		$(DESTDIR)$(GLUSTER_BLOCKD_LIBEXECDIR)/upgrade_activities.sh;            \
 	$(MKDIR_P) $(DESTDIR)$(GLUSTER_BLOCKD_LOGROTATEDIR);                         \
-	$(INSTALL_DATA) -m 644 gluster-block.logrotate                               \
-		$(DESTDIR)$(GLUSTER_BLOCKD_LOGROTATEDIR)/gluster-block;
+	$(INSTALL_DATA) -m 644 gluster-blockd.logrotate                               \
+		$(DESTDIR)$(GLUSTER_BLOCKD_LOGROTATEDIR)/gluster-blockd;
 
 uninstall-local:
 	rm -f $(DESTDIR)$(GLUSTER_BLOCKD_LIBEXECDIR)/wait-for-bricks.sh              \
