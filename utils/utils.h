@@ -58,7 +58,8 @@
 
 # define  GB_METASTORE_RESERVE   10485760   /* 10 MiB reserve for block-meta */
 
-# define  GB_DEF_CONFIGPATH      "/etc/sysconfig/gluster-blockd" /* the default config file */
+# define  GB_DEF_CONFIGDIR       "/etc/sysconfig" /* the default config file directory */
+# define  GB_DEF_CONFIGPATH      GB_DEF_CONFIGDIR"/gluster-blockd" /* the default config file */
 
 # define  GB_TIME_STRING_BUFLEN  \
           (4 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 6 + 1 +   5)
