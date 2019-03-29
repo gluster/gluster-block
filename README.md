@@ -263,3 +263,6 @@ RESULT: SUCCESS
 </pre>
 
 <b>NOTE:</b> gluster-block cannot track iSCSI targets created manually using targetcli.
+
+## Demo about "how to gluster-block ?":
+[![asciicast](https://asciinema.org/a/237565.svg)](https://asciinema.org/a/237565)
