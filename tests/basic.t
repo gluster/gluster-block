@@ -16,10 +16,10 @@
 #********************************************************************#
 
 
-HOST=$(hostname)
-VOLNAME="block-test"
-BLKNAME="sample-block"
-BRKDIR="/tmp/block/"
+HOST=$(hostname -I | awk '{print $1}')
+VOLNAME="hosting-volume"
+BLKNAME="block-volume"
+BRKDIR="/brick"
 
 
 function TEST()
