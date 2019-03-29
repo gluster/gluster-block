@@ -109,7 +109,7 @@ commands:
                               [storage <filename>]
                               [ring-buffer <size-in-MB-units>]
                               <host1[,host2,...]> [size]
-        create block device [defaults: ha 1, auth disable, prealloc no, size in bytes,
+        create block device [defaults: ha 1, auth disable, prealloc full, size in bytes,
 	                     ring-buffer default size dependends on kernel]
 
   list    <volname>

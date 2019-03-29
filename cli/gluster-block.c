@@ -296,7 +296,7 @@ glusterBlockHelp(void)
       "                              [storage <filename>]\n"
       "                              [ring-buffer <size-in-MB-units>]\n"
       "                              <host1[,host2,...]> [size]\n"
-      "        create block device [defaults: ha 1, auth disable, prealloc no, size in bytes,\n"
+      "        create block device [defaults: ha 1, auth disable, prealloc full, size in bytes,\n"
       "                             ring-buffer default size dependends on kernel]\n"
       "\n"
       "  list    <volname>\n"
@@ -571,10 +571,10 @@ glusterBlockCreate(int argcount, char **options, int json)
     MSG(stderr, "Inadequate arguments for create:\n%s\n", GB_CREATE_HELP_STR);
     return -1;
   }
+  /* set defaults */
   cobj.json_resp = json;
-
-  /* default mpath */
   cobj.mpath = 1;
+  cobj.prealloc = 1;
 
   if (glusterBlockParseVolumeBlock(options[optind++], cobj.volume, cobj.block_name,
                                     sizeof(cobj.volume), sizeof(cobj.block_name),
