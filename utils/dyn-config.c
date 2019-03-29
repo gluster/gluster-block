@@ -474,7 +474,7 @@ glusterBlockDynConfigStart(void *arg)
 {
   gbConfig *cfg = arg;
   int monitor, wd, len;
-  char buf[GB_BUF_LEN];
+  char *buf = NULL;
   struct inotify_event *event;
   char *p;
 
@@ -496,6 +496,11 @@ glusterBlockDynConfigStart(void *arg)
   LOG("mgmt", GB_LOG_INFO,
       "Inotify is watching \"%s\", wd: %d, mask: IN_ALL_EVENTS\n",
       cfg->configPath, wd);
+
+  if (GB_ALLOC_N(buf, GB_BUF_LEN) < 0) {
+    LOG("cmdlog", GB_LOG_ERROR, "%s", "Could not allocate memory for buf\n");
+    goto out;
+  }
 
   while (1) {
     len = read(monitor, buf, GB_BUF_LEN);
@@ -532,6 +537,9 @@ glusterBlockDynConfigStart(void *arg)
     }
   }
 
+out:
+  GB_FREE(buf);
+  inotify_rm_watch(monitor, wd);
   return NULL;
 }
 
