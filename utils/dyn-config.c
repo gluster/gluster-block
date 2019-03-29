@@ -475,7 +475,10 @@ glusterBlockDynConfigStart(void *arg)
   gbConfig *cfg = arg;
   int monitor, wd, len;
   char buf[GB_BUF_LEN];
+  char cfgDir[PATH_MAX];
   struct inotify_event *event;
+  struct timespec mtim = {0, }; /* Time of last modification.  */
+  struct stat statbuf;
   char *p;
 
 
@@ -486,16 +489,26 @@ glusterBlockDynConfigStart(void *arg)
     return NULL;
   }
 
-  wd = inotify_add_watch(monitor, cfg->configPath, IN_ALL_EVENTS);
+  snprintf(cfgDir, PATH_MAX, GB_DEF_CONFIGDIR);
+
+  /* Editors (vim, nano ..) follow different approaches to save conf file.
+   * The two commonly followed techniques are to overwrite the existing
+   * file, or to write to a new file (.swp, .tmp ..) and move it to actual
+   * file name later. In the later case, the inotify fails, because the
+   * file it's been intended to watch no longer exists, as the new file
+   * is a different file with just a same name.
+   * To handle both the file save approaches mentioned above, it is better
+   * we watch the directory and filter for MODIFY events.
+   */
+  wd = inotify_add_watch(monitor, cfgDir, IN_MODIFY);
   if (wd == -1) {
     LOG("mgmt", GB_LOG_ERROR,
-        "Failed to add \"%s\" to inotify (%d)\n", cfg->configPath, monitor);
+        "Failed to add \"%s\" to inotify (%d)\n", cfgDir, monitor);
     return NULL;
   }
 
   LOG("mgmt", GB_LOG_INFO,
-      "Inotify is watching \"%s\", wd: %d, mask: IN_ALL_EVENTS\n",
-      cfg->configPath, wd);
+      "Inotify is watching \"%s\", wd: %d, mask: IN_MODIFY\n", cfgDir, wd);
 
   while (1) {
     len = read(monitor, buf, GB_BUF_LEN);
@@ -504,7 +517,7 @@ glusterBlockDynConfigStart(void *arg)
       continue;
     }
 
-    for (p = buf; p < buf + len;) {
+    for (p = buf; p < buf + len; p += sizeof(*event) + event->len) {
       event = (struct inotify_event *)p;
 
       LOG("mgmt", GB_LOG_INFO, "event->mask: 0x%x\n", event->mask);
@@ -513,25 +526,25 @@ glusterBlockDynConfigStart(void *arg)
         continue;
       }
 
-      /*
-       * If force to write to the unwritable or crashed
-       * config file, the vi/vim will try to move and
-       * delete the config file and then recreate it again
-       * via the *.swp
-       */
-      if ((event->mask & IN_IGNORED) && !access(cfg->configPath, F_OK)) {
-        wd = inotify_add_watch(monitor, cfg->configPath, IN_ALL_EVENTS);
+      /* If stat fails we will skip the modify time check */
+      if (!stat(cfg->configPath, &statbuf)) {
+          if (statbuf.st_mtim.tv_sec == mtim.tv_sec &&
+              statbuf.st_mtim.tv_nsec == mtim.tv_nsec) {
+              continue;
+          }
       }
+
+      mtim.tv_sec = statbuf.st_mtim.tv_sec;
+      mtim.tv_nsec = statbuf.st_mtim.tv_nsec;
 
       /* Try to reload the config file */
-      if (event->mask & IN_MODIFY || event->mask & IN_IGNORED) {
+      if (event->mask & IN_MODIFY) {
         glusterBlockLoadConfig(cfg, true);
       }
-
-      p += sizeof(struct inotify_event) + event->len;
     }
   }
 
+  inotify_rm_watch(monitor, wd);
   return NULL;
 }
 
