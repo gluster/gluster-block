@@ -71,6 +71,10 @@ TEST gluster vol create ${VOLNAME} ${HOST}:${BRKDIR} force
 # Start the volume
 TEST gluster vol start ${VOLNAME}
 
+
+# Test gfapi access
+TEST ./tests/gfapi-test ${VOLNAME} ${HOST}
+
 # Start gluster-blockd.service
 systemctl daemon-reload
 TEST systemctl restart gluster-blockd.service
