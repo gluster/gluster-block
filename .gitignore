@@ -40,3 +40,5 @@ rpc/rpcl/block.h
 rpc/rpcl/block_clnt.c
 rpc/rpcl/block_svc.c
 rpc/rpcl/block_xdr.c
+
+tests/gfapi-test

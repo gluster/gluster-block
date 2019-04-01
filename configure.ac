@@ -52,7 +52,8 @@ AC_CONFIG_FILES([gluster-block.spec
                  systemd/gluster-block-target.service
                  systemd/gluster-blockd.initd
                  docs/Makefile
-                 extras/Makefile])
+                 extras/Makefile
+                 tests/Makefile])
 AC_CONFIG_MACRO_DIR([m4])
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 
