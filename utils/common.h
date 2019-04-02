@@ -16,6 +16,7 @@
 # include "block.h"
 
 # define   GB_VOLS_DELIMITER    ','
+# define   CLI_TIMEOUT_DEF      300
 
 
 typedef struct blockServerDef {
@@ -107,5 +108,7 @@ bool isNumber(char number[]);
 void blockServerDefFree(blockServerDefPtr blkServers);
 
 bool blockhostIsValid(char *status);
+
+int glusterBlockLoadConfig(gbConfig *cfg, bool reloading);
 
 # endif /* _COMMON_H */

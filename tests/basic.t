@@ -16,10 +16,10 @@
 #********************************************************************#
 
 
-HOST=$(hostname)
-VOLNAME="block-test"
-BLKNAME="sample-block"
-BRKDIR="/tmp/block/"
+HOST=$(hostname -I | awk '{print $1}')
+VOLNAME="hosting-volume"
+BLKNAME="block-volume"
+BRKDIR="/brick"
 
 
 function TEST()
@@ -70,6 +70,10 @@ TEST gluster vol create ${VOLNAME} ${HOST}:${BRKDIR} force
 
 # Start the volume
 TEST gluster vol start ${VOLNAME}
+
+
+# Test gfapi access
+TEST ./tests/gfapi-test ${VOLNAME} ${HOST}
 
 # Start gluster-blockd.service
 systemctl daemon-reload

@@ -11,6 +11,7 @@
 
 # include "common.h"
 # include "glfs-operations.h"
+# include "config.h"
 
 # define  GB_LB_ATTR_PREFIX  "user.block"
 
@@ -32,17 +33,17 @@ glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg)
     GB_ASPRINTF (errMsg, "Not able to Initialize volume %s [%s]", volume,
                  strerror(*errCode));
     LOG("gfapi", GB_LOG_ERROR, "glfs_new(%s) from %s failed[%s]", volume,
-        "localhost", strerror(*errCode));
+        gbConf.volServer, strerror(*errCode));
     return NULL;
   }
 
-  ret = glfs_set_volfile_server(glfs, "tcp", "localhost", 24007);
+  ret = glfs_set_volfile_server(glfs, "tcp", gbConf.volServer, 24007);
   if (ret) {
     *errCode = errno;
     GB_ASPRINTF (errMsg, "Not able to add Volfile server for volume %s[%s]",
                  volume, strerror(*errCode));
     LOG("gfapi", GB_LOG_ERROR, "glfs_set_volfile_server(%s) of %s "
-        "failed[%s]", "localhost", volume, strerror(*errCode));
+        "failed[%s]", gbConf.volServer, volume, strerror(*errCode));
     goto out;
   }
 
@@ -212,7 +213,11 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
     ret = -1;
     goto out;
   } else {
+#if GFAPI_VERSION760
+    ret = glfs_ftruncate(tgfd, blk->size, NULL, NULL);
+#else
     ret = glfs_ftruncate(tgfd, blk->size);
+#endif
     if (ret) {
       *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
@@ -312,7 +317,11 @@ glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk,
       goto close;
     }
 
+#if GFAPI_VERSION760
+    ret = glfs_ftruncate(tgfd, blk->size, NULL, NULL);
+#else
     ret = glfs_ftruncate(tgfd, blk->size);
+#endif
     if (ret) {
       *errCode = errno;
       LOG("gfapi", GB_LOG_ERROR,
@@ -774,7 +783,9 @@ blockGetPrioPath(struct glfs* glfs, char *volume, blockServerDefPtr list,
     }
   }
 
-  ret = 0;
+  if (list->nhosts) {
+    ret = 0;
+  }
 
  out:
   if (pfd && glfs_close(pfd) != 0) {

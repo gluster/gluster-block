@@ -57,7 +57,7 @@
 
 # define  GB_METASTORE_RESERVE   10485760   /* 10 MiB reserve for block-meta */
 
-# define  GB_DEF_CONFIGPATH      "/etc/sysconfig/gluster-blockd"; /* the default config file */
+# define  GB_DEF_CONFIGPATH      "/etc/sysconfig/gluster-blockd" /* the default config file */
 
 # define  GB_TIME_STRING_BUFLEN  \
           (4 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 6 + 1 +   5)
@@ -121,21 +121,18 @@
             pthread_mutex_unlock(&x);                                \
           } while (0)
 
-# define ERROR(fmt, ...)                                             \
-         do {                                                        \
-           fprintf(stderr, "Error: " fmt " [at %s+%d :<%s>]\n",      \
-                   __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__);   \
-          } while (0)
-
-# define  MSG(fmt, ...)                                              \
+# define  MSG(fd, fmt, ...)                                          \
           do {                                                       \
-            fprintf(stdout, fmt, __VA_ARGS__);                       \
+            if (fd <= 0)       /* including STDIN_FILENO 0 */        \
+              fd = stderr;                                           \
+            fprintf(fd, fmt, __VA_ARGS__);                           \
           } while (0)
 
 
 struct gbConf {
   size_t glfsLruCount;
   unsigned int logLevel;
+  size_t cliTimeout;
   char logDir[PATH_MAX];
   char daemonLogFile[PATH_MAX];
   char cliLogFile[PATH_MAX];
@@ -143,6 +140,8 @@ struct gbConf {
   char configShellLogFile[PATH_MAX];
   pthread_mutex_t lock;
   char cmdhistoryLogFile[PATH_MAX];
+  bool noRemoteRpc;
+  char volServer[HOST_NAME_MAX];
 };
 
 extern struct gbConf gbConf;
@@ -151,15 +150,15 @@ extern struct gbConf gbConf;
           do {                                                         \
             FILE *fd;                                                  \
             char timestamp[GB_TIME_STRING_BUFLEN] = {0};               \
-            LOCK(gbConf.lock);                                       \
+            LOCK(gbConf.lock);                                         \
             if (level <= gbConf.logLevel) {                            \
-              if (!strcmp(str, "mgmt"))                                \
+              if ((str) == "mgmt")                                     \
                 fd = fopen (gbConf.daemonLogFile, "a");                \
-              else if (!strcmp(str, "cli"))                            \
+              else if ((str) == "cli")                                 \
                 fd = fopen (gbConf.cliLogFile, "a");                   \
-              else if (!strcmp(str, "gfapi"))                          \
+              else if ((str) == "gfapi")                               \
                 fd = fopen (gbConf.gfapiLogFile, "a");                 \
-              else if (!strcmp(str, "cmdlog"))                         \
+              else if ((str) == "cmdlog")                              \
                 fd = fopen (gbConf.cmdhistoryLogFile, "a");            \
               else                                                     \
                 fd = stderr;                                           \
@@ -279,12 +278,17 @@ extern struct gbConf gbConf;
             snprintf(tmp, 1024, "%s/%s", vol?vol:"", blk->block_name); \
             if (fp) {                                                  \
               size_t newLen = fread(sr->out, sizeof(char), 8192, fp);  \
-              if (ferror( fp ) != 0)                                   \
+              if (ferror( fp ) != 0) {                                 \
                 LOG("mgmt", GB_LOG_ERROR,                              \
                     "reading command %s output for %s failed(%s)", tmp,\
                     cmd, strerror(errno));                             \
-              else                                                     \
+                sr->out[0] = '\0';                                     \
+                sr->exit = -1;                                         \
+                pclose(fp);                                            \
+                break;                                                 \
+              } else {                                                 \
                 sr->out[newLen++] = '\0';                              \
+              }                                                        \
               sr->exit = blockValidateCommandOutput(sr->out, opt,      \
                                                     (void*)blk);       \
               pclose(fp);                                              \
@@ -353,6 +357,10 @@ extern struct gbConf gbConf;
             gbStrcpy((dst), (src), (destbytes),                      \
                      __FILE__, __FUNCTION__, __LINE__)
 
+# define  GB_STRCAT(dst, src, destbytes)                             \
+            gbStrcat((dst), (src), (destbytes),                      \
+                     __FILE__, __FUNCTION__, __LINE__)
+
 # define  GB_STRCPYSTATIC(dst, src)                                  \
             GB_STRCPY((dst), (src), (sizeof(dst)))
 
@@ -362,6 +370,7 @@ extern struct gbConf gbConf;
 
 typedef enum gbCliCmdlineOption {
   GB_CLI_UNKNOWN = 0,
+  GB_CLI_TIMEOUT,
   GB_CLI_CREATE,
   GB_CLI_LIST,
   GB_CLI_INFO,
@@ -381,6 +390,7 @@ typedef enum gbCliCmdlineOption {
 
 static const char *const gbCliCmdlineOptLookup[] = {
   [GB_CLI_UNKNOWN]        = "NONE",
+  [GB_CLI_TIMEOUT]        = "timeout",
   [GB_CLI_CREATE]         = "create",
   [GB_CLI_LIST]           = "list",
   [GB_CLI_INFO]           = "info",
@@ -427,6 +437,7 @@ typedef enum gbDaemonCmdlineOption {
   GB_DAEMON_USAGE          = 3,
   GB_DAEMON_GLFS_LRU_COUNT = 4,
   GB_DAEMON_LOG_LEVEL      = 5,
+  GB_DAEMON_NO_REMOTE_RPC  = 6,
 
   GB_DAEMON_OPT_MAX
 } gbDaemonCmdlineOption;
@@ -438,6 +449,7 @@ static const char *const gbDaemonCmdlineOptLookup[] = {
   [GB_DAEMON_USAGE]          = "usage",
   [GB_DAEMON_GLFS_LRU_COUNT] = "glfs-lru-count",
   [GB_DAEMON_LOG_LEVEL]      = "log-level",
+  [GB_DAEMON_NO_REMOTE_RPC]  = "no-remote-rpc",
 
   [GB_DAEMON_OPT_MAX]        = NULL,
 };
@@ -569,9 +581,12 @@ typedef struct gbConfig {
   bool isDynamic;
   char *GB_LOG_LEVEL;
   ssize_t GB_GLFS_LRU_COUNT;
+  ssize_t GB_CLI_TIMEOUT;  /* seconds */
 } gbConfig;
 
 int glusterBlockSetLogLevel(unsigned int logLevel);
+
+//int glusterBlockSetCliTimeout(size_t timeout);
 
 int glusterBlockCLIOptEnumParse(const char *opt);
 
@@ -588,6 +603,8 @@ int blockMetaStatusEnumParse(const char *opt);
 int blockRemoteCreateRespEnumParse(const char *opt);
 
 void logTimeNow(char* buf, size_t bufSize);
+
+void fetchGlfsVolServerFromEnv(void);
 
 int initLogging(void);
 
@@ -608,6 +625,9 @@ int gbStrdup(char **dest, const char *src,
              const char *filename, const char *funcname, size_t linenr);
 
 char* gbStrcpy(char *dest, const char *src, size_t destbytes,
+               const char *filename, const char *funcname, size_t linenr);
+
+char *gbStrcat(char *dest, const char *src, size_t destbytes,
                const char *filename, const char *funcname, size_t linenr);
 
 void gbFree(void *ptrptr);

@@ -67,20 +67,25 @@ managing the command ring buffers
 <b>Daemon</b>: run gluster-blockd on all the nodes
 ```script
 # gluster-blockd --help
-gluster-blockd (0.2)
+gluster-blockd (0.3)
 usage:
-  gluster-blockd [--glfs-lru-count <COUNT>] [--log-level <LOGLEVEL>]
+  gluster-blockd [--glfs-lru-count <COUNT>]
+                 [--log-level <LOGLEVEL>]
+                 [--no-remote-rpc]
 
 commands:
   --glfs-lru-count <COUNT>
-        glfs objects cache capacity [max: 512] [default: 5]
+        Glfs objects cache capacity [max: 512] [default: 5]
   --log-level <LOGLEVEL>
         Logging severity. Valid options are,
         TRACE, DEBUG, INFO, WARNING, ERROR and NONE [default: INFO]
+  --no-remote-rpc
+        Ignore remote rpc communication, capabilities check and
+        other node sanity checks
   --help
-        show this message and exit.
+        Show this message and exit.
   --version
-        show version info and exit.
+        Show version info and exit.
 ```
 
 You can run gluster-blockd as systemd service, note '/etc/sysconfig/gluster-blockd' is the configuration file where you can choose to edit various options, while systemd will take care of parsing them all and supply to daemon.
@@ -93,7 +98,7 @@ You can run gluster-blockd as systemd service, note '/etc/sysconfig/gluster-bloc
 <b>CLI</b>: you can choose to run gluster-block(cli) from any node which has gluster-blockd running
 ```script
 # gluster-block --help
-gluster-block (0.2.1)
+gluster-block (0.3)
 usage:
   gluster-block <command> <volname[/blockname]> [<args>] [--json*]
 
@@ -101,8 +106,11 @@ commands:
   create  <volname/blockname> [ha <count>]
                               [auth <enable|disable>]
                               [prealloc <full|no>]
-                              <host1[,host2,...]> <size>
-        create block device [defaults: ha 1, auth disable, prealloc no]
+                              [storage <filename>]
+                              [ring-buffer <size-in-MB-units>]
+                              <host1[,host2,...]> [size]
+        create block device [defaults: ha 1, auth disable, prealloc full, size in bytes,
+	                     ring-buffer default size dependends on kernel]
 
   list    <volname>
         list available block devices.
@@ -110,11 +118,17 @@ commands:
   info    <volname/blockname>
         details about block device.
 
-  delete  <volname/blockname>
+  delete  <volname/blockname> [unlink-storage <yes|no>] [force]
         delete block device.
 
-  modify  <volname/blockname> <auth enable|disable>
+  modify  <volname/blockname> [auth <enable|disable>] [size <size>] [force]
         modify block device.
+
+  replace <volname/blockname> <old-node> <new-node> [force]
+        replace operations.
+
+  genconfig <volname[,volume2,volume3,...]> enable-tpg <host>
+        generate the block volumes target configuration.
 
   help
         show this message and exit.
@@ -186,6 +200,8 @@ Below we set mapth in Active/Passive mode; Note currently Active/Active is not s
 
 Please add the below configuration at the end of /etc/multipath.conf file.
 # LIO iSCSI
+
+For both the versions with and without load-balance support:
 devices {
         device {
                 vendor "LIO-ORG"
@@ -197,6 +213,21 @@ devices {
                 prio "const"
                 no_path_retry 120
                 rr_weight "uniform"
+        }
+}
+
+For versions with load-balance support:
+devices {
+        device {
+                vendor "LIO-ORG"
+                user_friendly_names "yes" # names like mpatha
+                path_grouping_policy "failover" # one path per group
+                hardware_handler "1 alua"
+                path_selector "round-robin 0"
+                failback immediate
+                path_checker "tur"
+                prio "alua"
+                no_path_retry 120
         }
 }
 
@@ -232,3 +263,6 @@ RESULT: SUCCESS
 </pre>
 
 <b>NOTE:</b> gluster-block cannot track iSCSI targets created manually using targetcli.
+
+## Demo about "how to gluster-block ?":
+[![asciicast](https://asciinema.org/a/237565.svg)](https://asciinema.org/a/237565)

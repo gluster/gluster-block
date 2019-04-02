@@ -37,24 +37,31 @@
 extern const char *argp_program_version;
 static gbConfig *gbCfg;
 
+struct timeval TIMEOUT = {CLI_TIMEOUT_DEF, 0};  /* remote rpc call timeout, 5 mins */
+
 static void
 glusterBlockDHelp(void)
 {
-  MSG("%s",
+  MSG(stdout, "%s",
       "gluster-blockd ("PACKAGE_VERSION")\n"
       "usage:\n"
-      "  gluster-blockd [--glfs-lru-count <COUNT>] [--log-level <LOGLEVEL>]\n"
+      "  gluster-blockd [--glfs-lru-count <COUNT>]\n"
+      "                 [--log-level <LOGLEVEL>]\n"
+      "                 [--no-remote-rpc]\n"
       "\n"
       "commands:\n"
       "  --glfs-lru-count <COUNT>\n"
-      "        glfs objects cache capacity [max: 512] [default: 5]\n"
+      "        Glfs objects cache capacity [max: 512] [default: 5]\n"
       "  --log-level <LOGLEVEL>\n"
       "        Logging severity. Valid options are,\n"
       "        TRACE, DEBUG, INFO, WARNING, ERROR and NONE [default: INFO]\n"
+      "  --no-remote-rpc\n"
+      "        Ignore remote rpc communication, capabilities check and\n"
+      "        other node sanity checks\n"
       "  --help\n"
-      "        show this message and exit.\n"
+      "        Show this message and exit.\n"
       "  --version\n"
-      "        show version info and exit.\n"
+      "        Show version info and exit.\n"
       "\n"
      );
 }
@@ -187,7 +194,7 @@ glusterBlockServerThreadProc(void *vargp)
 
   if (errMsg[0]) {
     LOG ("mgmt", GB_LOG_ERROR, "%s", errMsg);
-    MSG("%s\n", errMsg);
+    MSG(stderr, "%s\n", errMsg);
     exit(EXIT_FAILURE);
   }
   return NULL;
@@ -207,7 +214,7 @@ glusterBlockDParseArgs(int count, char **options)
   while (optind < count) {
     opt = glusterBlockDaemonOptEnumParse(options[optind++]);
     if (!opt || opt >= GB_DAEMON_OPT_MAX) {
-      MSG("unknown option: %s\n", options[optind-1]);
+      MSG(stderr, "unknown option: %s\n", options[optind-1]);
       return -1;
     }
 
@@ -215,7 +222,7 @@ glusterBlockDParseArgs(int count, char **options)
     case GB_DAEMON_HELP:
     case GB_DAEMON_USAGE:
       if (count != 2) {
-        MSG("undesired options for: '%s'\n", options[optind-1]);
+        MSG(stderr, "undesired options for: '%s'\n", options[optind-1]);
         ret = -1;
       }
       glusterBlockDHelp();
@@ -223,19 +230,19 @@ glusterBlockDParseArgs(int count, char **options)
 
     case GB_DAEMON_VERSION:
       if (count != 2) {
-        MSG("undesired options for: '%s'\n", options[optind-1]);
+        MSG(stderr, "undesired options for: '%s'\n", options[optind-1]);
         ret = -1;
       }
-      MSG("%s\n", argp_program_version);
+      MSG(stdout, "%s\n", argp_program_version);
       exit(ret);
 
     case GB_DAEMON_GLFS_LRU_COUNT:
       if (count - optind  < 1) {
-        MSG("option '%s' needs argument <COUNT>\n", options[optind-1]);
+        MSG(stderr, "option '%s' needs argument <COUNT>\n", options[optind-1]);
         return -1;
       }
       if (sscanf(options[optind], "%zu", &lruCount) != 1) {
-        MSG("option '%s' expect argument type integer <COUNT>\n",
+        MSG(stderr, "option '%s' expect argument type integer <COUNT>\n",
             options[optind-1]);
         return -1;
       }
@@ -247,7 +254,7 @@ glusterBlockDParseArgs(int count, char **options)
 
     case GB_DAEMON_LOG_LEVEL:
       if (count - optind  < 1) {
-        MSG("option '%s' needs argument <LOG-LEVEL>\n", options[optind-1]);
+        MSG(stderr, "option '%s' needs argument <LOG-LEVEL>\n", options[optind-1]);
         return -1;
       }
       logLevel = blockLogLevelEnumParse(options[optind]);
@@ -256,6 +263,11 @@ glusterBlockDParseArgs(int count, char **options)
         return ret;
       }
       break;
+
+    case GB_DAEMON_NO_REMOTE_RPC:
+      gbConf.noRemoteRpc = true;
+      break;
+
     }
 
     optind++;
@@ -269,7 +281,7 @@ static void
 gbMinKernelVersionCheck(void)
 {
   struct utsname verStr = {'\0', };
-  char out[32] = {'\0', };
+  char distro[32] = {'\0', };
   size_t vNum[VERNUM_BUFLEN] = {0, };
   FILE *fp = NULL;
   int i = 0;
@@ -278,14 +290,14 @@ gbMinKernelVersionCheck(void)
 
   fp = popen(GB_DISTRO_CHECK, "r");
   if (fp) {
-    size_t newLen = fread(out, sizeof(char), 32, fp);
+    size_t newLen = fread(distro, sizeof(char), 32, fp);
     if (ferror(fp)) {
       LOG("mgmt", GB_LOG_ERROR, "fread(%s) failed: %s",
           GB_DISTRO_CHECK, strerror(errno));
       goto fail;
     }
-    out[newLen++] = '\0';
-    tptr = strchr(out,'\n');
+    distro[newLen++] = '\0';
+    tptr = strchr(distro,'\n');
     if (tptr) {
       *tptr = '\0';
     }
@@ -316,7 +328,7 @@ gbMinKernelVersionCheck(void)
     }
   }
 
-  if (strstr(out, "fedora")) {
+  if (strstr(distro, "fedora")) {
     tptr = "4.12.0-1"; /* Minimum recommended fedora kernel version */
     if (KERNEL_VERSION(vNum[0], vNum[1], vNum[2]) < KERNEL_VERSION(4, 12, 0)) {
       goto out;
@@ -325,21 +337,21 @@ gbMinKernelVersionCheck(void)
         goto out;
       }
     }
-  } else if (strstr(out, "rhel")) {
-    tptr = "3.10.0-862.11.1"; /* Minimum recommended rhel kernel version */
+  } else if (strstr(distro, "rhel")) {
+    tptr = "3.10.0-862.14.4"; /* Minimum recommended rhel kernel version */
     if (KERNEL_VERSION(vNum[0], vNum[1], vNum[2]) < KERNEL_VERSION(3, 10, 0)) {
       goto out;
     } else if (KERNEL_VERSION(vNum[0], vNum[1], vNum[2]) == KERNEL_VERSION(3, 10, 0)) {
-      if (KERNEL_VERSION(vNum[3], vNum[4], vNum[5]) < KERNEL_VERSION(862, 11, 1)) {
+      if (KERNEL_VERSION(vNum[3], vNum[4], vNum[5]) < KERNEL_VERSION(862, 14, 4)) {
         goto out;
       }
     }
   } else {
-    LOG("mgmt", GB_LOG_INFO, "Distro %s. Skipping kernel version check.", out);
+    LOG("mgmt", GB_LOG_INFO, "Distro %s. Skipping kernel version check.", distro);
   }
 
   LOG("mgmt", GB_LOG_INFO, "Distro %s. Current kernel version: '%s'.",
-      out, verStr.release);
+      distro, verStr.release);
 
   pclose(fp);
   return;
@@ -348,7 +360,7 @@ gbMinKernelVersionCheck(void)
   LOG("mgmt", GB_LOG_ERROR,
       "Distro %s. Minimum recommended kernel version: '%s' and "
       "current kernel version: '%s'. Hint: Upgrade your kernel and try again.",
-      out, tptr, verStr.release);
+      distro, tptr, verStr.release);
 
  fail:
   pclose(fp);
@@ -435,6 +447,8 @@ main (int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
+  fetchGlfsVolServerFromEnv();
+
   gbCfg = glusterBlockSetupConfig(NULL);
   if (!gbCfg) {
     LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockSetupConfig() failed");
@@ -463,15 +477,19 @@ main (int argc, char **argv)
     exit(errnosv);
   }
 
-  errnosv = blockNodeSanityCheck();
-  if (errnosv) {
-    exit(errnosv);
-  }
+  if (!gbConf.noRemoteRpc) {
+    errnosv = blockNodeSanityCheck();
+    if (errnosv) {
+      exit(errnosv);
+    }
 
-  if (initDaemonCapabilities()) {
-    exit(EXIT_FAILURE);
+    if (initDaemonCapabilities()) {
+      exit(EXIT_FAILURE);
+    }
+    LOG("mgmt", GB_LOG_INFO, "%s", "capabilities fetched successfully");
+  } else {
+    LOG("mgmt", GB_LOG_DEBUG, "%s", "gluster-blockd running in noRemoteRpc mode");
   }
-  LOG("mgmt", GB_LOG_INFO, "%s", "capabilities fetched successfully");
 
   initCache();
 
@@ -479,13 +497,17 @@ main (int argc, char **argv)
   signal(SIGPIPE, SIG_IGN);
 
   pmap_unset(GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS);
-  pmap_unset(GLUSTER_BLOCK, GLUSTER_BLOCK_VERS);
+  if (!gbConf.noRemoteRpc) {
+    pmap_unset(GLUSTER_BLOCK, GLUSTER_BLOCK_VERS);
+  }
 
   pthread_create(&cli_thread, NULL, glusterBlockCliThreadProc, NULL);
-  pthread_create(&server_thread, NULL, glusterBlockServerThreadProc, NULL);
-
+  if (!gbConf.noRemoteRpc) {
+    pthread_create(&server_thread, NULL, glusterBlockServerThreadProc, NULL);
+    pthread_join(server_thread, NULL);
+  }
   pthread_join(cli_thread, NULL);
-  pthread_join(server_thread, NULL);
+
 
   LOG("mgmt", GB_LOG_ERROR, "svc_run returned (%s)", strerror (errno));
 

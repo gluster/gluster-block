@@ -94,18 +94,18 @@ glusterBlockParseSize(const char *dom, char *value)
   case 'b':
   case '\0':
     if (sizef < GB_DEFAULT_SECTOR_SIZE) {
-        MSG("minimum acceptable block size is %d bytes\n", GB_DEFAULT_SECTOR_SIZE);
+        MSG(stderr, "minimum acceptable block size is %d bytes\n", GB_DEFAULT_SECTOR_SIZE);
         LOG(dom, GB_LOG_ERROR, "minimum acceptable block size is %d bytes",
             GB_DEFAULT_SECTOR_SIZE);
-	return -1;
+        return -1;
     }
 
     if (sizef % GB_DEFAULT_SECTOR_SIZE) {
-      MSG("The size %lld will align to sector size %d bytes\n",
+      MSG(stdout, "The size %ld will align to sector size %d bytes\n",
           sizef, GB_DEFAULT_SECTOR_SIZE);
       LOG(dom, GB_LOG_ERROR,
-          "The target device size %lld is will align to the sector size %d",
-	  sizef, GB_DEFAULT_SECTOR_SIZE);
+          "The target device size %ld will align to the sector size %d",
+          sizef, GB_DEFAULT_SECTOR_SIZE);
       sizef = round_down(sizef, GB_DEFAULT_SECTOR_SIZE);
     }
     break;

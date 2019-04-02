@@ -10,6 +10,8 @@ libgb_la_CFLAGS = $(GFAPI_CFLAGS) -DDATADIR=\"$(localstatedir)\"               \
 
 libgb_la_LIBADD = $(GFAPI_LIBS)
 
+libgb_la_LDFLAGS = -lpthread
+
 libgb_ladir = $(includedir)/gluster-block/utils
 
 EXTRA_DIST = gluster-block-caps.info

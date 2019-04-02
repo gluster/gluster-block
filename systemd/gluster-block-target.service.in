@@ -14,4 +14,6 @@ BindsTo=tcmu-runner.service
 After=glusterd.service tcmu-runner.service
 
 [Service]
+ExecStop=
+ExecStop=/usr/bin/ps cax | /usr/bin/grep -wq '[t]cmu-runner' && /usr/bin/targetctl clear
 TimeoutStartSec=600

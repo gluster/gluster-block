@@ -26,7 +26,7 @@ int
 glusterBlockSetLruCount(const size_t lruCount)
 {
   if (!lruCount || (lruCount > LRU_COUNT_MAX)) {
-    MSG("glfsLruCount should be [0 < COUNT < %d]\n",
+    MSG(stderr, "glfsLruCount should be [0 < COUNT < %d]\n",
         LRU_COUNT_MAX);
     LOG("mgmt", GB_LOG_ERROR,
         "glfsLruCount should be [0 < COUNT < %d]\n",

@@ -16,8 +16,12 @@
 # include "lru.h"
 # include "config.h"
 
-
-struct gbConf gbConf = {LRU_COUNT_DEF, GB_LOG_INFO, GB_LOGDIR, '\0', '\0', '\0', '\0', '\0'};
+struct gbConf gbConf = {
+  .glfsLruCount = LRU_COUNT_DEF,
+  .logLevel = GB_LOG_INFO,
+  .logDir = GB_LOGDIR,
+  .cliTimeout = CLI_TIMEOUT_DEF
+};
 
 const char *argp_program_version = ""                                 \
   PACKAGE_NAME" ("PACKAGE_VERSION")"                                  \
@@ -34,8 +38,8 @@ int
 glusterBlockSetLogLevel(unsigned int logLevel)
 {
   if (logLevel >= GB_LOG_MAX) {
-    MSG("unknown LOG-LEVEL: '%d'\n", logLevel);
-      return -1;
+    MSG(stderr, "unknown LOG-LEVEL: '%d'\n", logLevel);
+    return -1;
   }
   LOCK(gbConf.lock);
   gbConf.logLevel = logLevel;
@@ -45,6 +49,24 @@ glusterBlockSetLogLevel(unsigned int logLevel)
 
   return 0;
 }
+
+
+/* TODO: use gbConf in cli too, for logLevel/LogDir and other future options
+int
+glusterBlockSetCliTimeout(size_t timeout)
+{
+  if (timeout < 0) {
+    MSG(stderr, "unknown GB_CLI_TIMEOUT: '%zu'\n", timeout);
+    return -1;
+  }
+  LOCK(gbConf.lock);
+  gbConf.cliTimeout = timeout;
+  UNLOCK(gbConf.lock);
+
+  return 0;
+}
+*/
+
 
 int
 glusterBlockCLIOptEnumParse(const char *opt)
@@ -234,6 +256,21 @@ glusterBlockLogdirCreate(void)
 }
 
 
+void fetchGlfsVolServerFromEnv()
+{
+  char *volServer;
+
+
+  volServer = getenv("GB_BHV_VOLSERVER");
+  if (!volServer) {
+    volServer = "localhost";
+  }
+  snprintf(gbConf.volServer, HOST_NAME_MAX, "%s", volServer);
+
+  LOG("mgmt", GB_LOG_INFO, "Block Hosting Volfile Server Set to: %s", gbConf.volServer);
+}
+
+
 int
 initLogging(void)
 {
@@ -391,11 +428,26 @@ gbStrcpy(char *dest, const char *src, size_t destbytes,
     if (n > (destbytes - 1))
       return NULL;
 
-    ret = strncpy(dest, src, n);
-    /* strncpy NULL terminates if the last character is \0.  Therefore
-     * force the last byte to be \0
-     */
+    ret = memcpy(dest, src, n);
     dest[n] = '\0';
+
+    return ret;
+}
+
+
+char *
+gbStrcat(char *dest, const char *src, size_t destbytes,
+         const char *filename, const char *funcname, size_t linenr)
+{
+    char *ret;
+    size_t n = strlen(src);
+    size_t m = strlen(dest);
+
+    if (n > (destbytes - 1))
+      return NULL;
+
+    ret = memcpy(dest + m, src, n);
+    dest[m + n] = '\0';
 
     return ret;
 }

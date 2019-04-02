@@ -109,6 +109,7 @@ glusterBlockGetOption(const char *key)
   struct list_head *pos;
   gbConfOption *option;
 
+
   list_for_each(pos, &gb_options) {
     option = list_entry(pos, gbConfOption, list);
       if (!strcmp(option->key, key)) {
@@ -124,7 +125,7 @@ glusterBlockGetOption(const char *key)
  * option in config file, here it will set the
  * default value back.
  */
-#define GB_PARSE_CFG_INT(cfg, key, def) \
+# define GB_PARSE_CFG_INT(cfg, key, def) \
         do { \
           gbConfOption *option; \
           option = glusterBlockGetOption(#key); \
@@ -134,7 +135,7 @@ glusterBlockGetOption(const char *key)
           } \
         } while (0)
 
-#define GB_PARSE_CFG_BOOL(cfg, key, def) \
+# define GB_PARSE_CFG_BOOL(cfg, key, def) \
         do { \
           struct gbConfOption *option; \
           option = glusterBlockGetOption(#key); \
@@ -144,7 +145,7 @@ glusterBlockGetOption(const char *key)
           } \
         } while (0)
 
-#define GB_PARSE_CFG_STR(cfg, key, def) \
+# define GB_PARSE_CFG_STR(cfg, key, def) \
         do { \
           struct gbConfOption *option; \
           char buf[1024]; \
@@ -160,7 +161,7 @@ glusterBlockGetOption(const char *key)
           } \
         } while (0);
 
-#define GB_FREE_CFG_STR_KEY(cfg, key) \
+# define GB_FREE_CFG_STR_KEY(cfg, key) \
         do { \
           GB_FREE(cfg->key); \
         } while (0);
@@ -169,6 +170,7 @@ static void
 glusterBlockConfSetOptions(gbConfig *cfg, bool reloading)
 {
   unsigned int logLevel;
+
 
   /* set logLevel option */
   GB_PARSE_CFG_STR(cfg, GB_LOG_LEVEL, "INFO");
@@ -182,6 +184,16 @@ glusterBlockConfSetOptions(gbConfig *cfg, bool reloading)
   if (cfg->GB_GLFS_LRU_COUNT) {
     glusterBlockSetLruCount(cfg->GB_GLFS_LRU_COUNT);
   }
+
+  GB_PARSE_CFG_INT(cfg, GB_CLI_TIMEOUT, CLI_TIMEOUT_DEF);
+  /* NOTE: we don't use CLI_TIMEOUT in daemon at the moment
+   * TODO: use gbConf in cli too, for logLevel/LogDir and other future options
+   *
+   * if (cfg->GB_CLI_TIMEOUT) {
+   *  glusterBlockSetCliTimeout(cfg->GB_CLI_TIMEOUT);
+   * }
+   */
+
   /* add your new config options */
 }
 
@@ -193,61 +205,99 @@ glusterBlockConfFreeStrKeys(gbConfig *cfg)
    * For example:
    * GB_FREE_CFG_STR_KEY(cfg, 'STR KEY');
    */
+   GB_FREE_CFG_STR_KEY(cfg, GB_LOG_LEVEL);
 }
 
-#define GB_MAX_CFG_FILE_SIZE (32 * 1024)
-static int
-glusterBlockReadConfig(int fd, char *buf, int count)
+static bool
+gluserBlockIsBlankOrCommentLine(char *line, ssize_t len)
 {
-  ssize_t len;
-  int save = errno;
+  char *p = line;
 
-  do {
-    len = read(fd, buf, count);
-  } while (errno == EAGAIN);
 
-  errno = save;
-  return len;
+  while (p <= line + len) {
+    if (isblank(*p) || *p == '\n' || *p == '\r' || *p == '\0') {
+      p++;
+    } else if (*p == '#') {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  return true;
 }
 
-/* end of line */
-#define __EOL(c) (((c) == '\n') || ((c) == '\r'))
+# define GB_BUF_LEN 1024
+static char *
+glusterBlockReadConfig(gbConfig *cfg, ssize_t *len)
+{
+  int save = errno;
+  char *p, *buf, *line = NULL;
+  ssize_t m, buf_len = GB_BUF_LEN;
+  size_t n;
+  FILE *fp;
+  int i;
 
-#define GB_TO_LINE_END(x, y) \
-        do { \
-          while ((x) < (y) && !__EOL(*(x))) \
-	    { (x)++; } \
-        } while (0);
 
-/* skip blank lines */
-#define GB_SKIP_BLANK_LINES(x, y) \
-        do { \
-	  while ((x) < (y) && (isblank(*(x)) || __EOL(*(x)))) \
-	    { (x)++; } \
-        } while (0);
+  if (GB_ALLOC_N(buf, buf_len) < 0) {
+    return NULL;
+  }
 
-/* skip comment line with '#' */
-#define GB_SKIP_COMMENT_LINE(x, y) \
-        do { \
-          while ((x) < (y) && !__EOL(*x)) \
-            { (x)++; } \
-          (x)++; \
-        } while (0);
+  for (i = 0; i < 5; i++) {
+    if ((fp = fopen(cfg->configPath, "r")) == NULL) {
+      /* give a moment for editor to restore
+       * the conf-file after edit and save */
+      sleep(1);
+      continue;
+    }
+    break;
+  }
+  if (fp == NULL) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "Failed to open file '%s'\n", cfg->configPath);
+    GB_FREE(buf);
+    return NULL;
+  }
 
-/* skip comment lines with '#' */
-#define GB_SKIP_COMMENT_LINES(x, y) \
-        do { \
-          while ((x) < (y) && *(x) == '#') \
-	    { GB_SKIP_COMMENT_LINE((x), (y)); } \
-        } while (0);
+  *len = 0;
+  p = buf;
+  while ((m = getline(&line, &n, fp)) != -1) {
+    if (gluserBlockIsBlankOrCommentLine(line, m)) {
+      continue;
+    }
 
-#define MAX_KEY_LEN 64
-#define MAX_VAL_STR_LEN 256
+    if (*len + m >= buf_len) {
+      buf_len += GB_BUF_LEN;
+      if (GB_REALLOC_N(buf, buf_len) < 0) {
+	      GB_FREE(line);
+	      fclose(fp);
+	      GB_FREE(buf);
+	      return NULL;
+      }
+      p = buf + *len;
+    }
+    GB_STRCPY(p, line, m + 1);
+    p += m;
+    *len += m;
+  }
+
+  *len += 1;
+  buf[*len] = '\0';
+
+  fclose(fp);
+  GB_FREE(line);
+  errno = save;
+  return buf;
+}
+
+# define MAX_KEY_LEN 64
+# define MAX_VAL_STR_LEN 256
 
 static gbConfOption *
 glusterBlockRegisterOption(char *key, gbOptionType type)
 {
   struct gbConfOption *option;
+
 
   if (GB_ALLOC(option) < 0) {
     return NULL;
@@ -267,12 +317,22 @@ freeOption:
   return NULL;
 }
 
+/* end of line */
+#define __EOL(c) (((c) == '\n') || ((c) == '\r'))
+
+#define GB_TO_LINE_END(x, y) \
+       do { \
+        while ((x) < (y) && !__EOL(*(x))) \
+          { (x)++; } \
+       } while (0);
+
 static void
 glusterBlockParseOption(char **cur, const char *end)
 {
   struct gbConfOption *option;
   gbOptionType type;
   char *p = *cur, *q = *cur, *r, *s;
+
 
   while (isblank(*p)) {
     p++;
@@ -379,21 +439,8 @@ glusterBlockParseOptions(gbConfig *cfg, char *buf, int len, bool reloading)
 {
   char *cur = buf, *end = buf + len;
 
+
   while (cur < end) {
-    /* skip blanks lines */
-    GB_SKIP_BLANK_LINES(cur, end);
-
-    /* skip comments with '#' */
-    GB_SKIP_COMMENT_LINES(cur, end);
-
-    if (cur >= end) {
-      break;
-    }
-
-    if (!isalpha(*cur)) {
-      continue;
-    }
-
     /* parse the options from config file to gb_options[] */
     glusterBlockParseOption(&cur, end);
   }
@@ -402,49 +449,32 @@ glusterBlockParseOptions(gbConfig *cfg, char *buf, int len, bool reloading)
   glusterBlockConfSetOptions(cfg, reloading);
 }
 
-static int
+int
 glusterBlockLoadConfig(gbConfig *cfg, bool reloading)
 {
-  int ret = -1;
-  int fd, len;
+  ssize_t len = 0;
   char *buf;
 
-  if (GB_ALLOC_N(buf, GB_MAX_CFG_FILE_SIZE) < 0) {
-    return -ENOMEM;
-  }
 
-  fd = open(cfg->configPath, O_RDONLY);
-  if (fd < 0) {
-    LOG("mgmt", GB_LOG_ERROR,
-        "Failed to open file '%s', %m\n", cfg->configPath);
-    goto free_buf;
-  }
-
-  len = glusterBlockReadConfig(fd, buf, GB_MAX_CFG_FILE_SIZE);
-  close(fd);
-  if (len < 0) {
+  buf = glusterBlockReadConfig(cfg, &len);
+  if (buf == NULL) {
     LOG("mgmt", GB_LOG_ERROR,
         "Failed to read file '%s'\n", cfg->configPath);
-    goto free_buf;
+    return -1;
   }
-
-  buf[len] = '\0';
 
   glusterBlockParseOptions(cfg, buf, len, reloading);
 
-  ret = 0;
-free_buf:
   GB_FREE(buf);
-  return ret;
+  return 0;
 }
 
-#define BUF_LEN 1024
 static void *
 glusterBlockDynConfigStart(void *arg)
 {
   gbConfig *cfg = arg;
   int monitor, wd, len;
-  char buf[BUF_LEN];
+  char buf[GB_BUF_LEN];
   struct inotify_event *event;
   char *p;
 
@@ -459,7 +489,7 @@ glusterBlockDynConfigStart(void *arg)
   wd = inotify_add_watch(monitor, cfg->configPath, IN_ALL_EVENTS);
   if (wd == -1) {
     LOG("mgmt", GB_LOG_ERROR,
-        "Failed to add \"%s\" to inotify %m\n", cfg->configPath);
+        "Failed to add \"%s\" to inotify (%d)\n", cfg->configPath, monitor);
     return NULL;
   }
 
@@ -468,7 +498,7 @@ glusterBlockDynConfigStart(void *arg)
       cfg->configPath, wd);
 
   while (1) {
-    len = read(monitor, buf, BUF_LEN);
+    len = read(monitor, buf, GB_BUF_LEN);
     if (len == -1) {
       LOG("mgmt", GB_LOG_WARNING, "Failed to read inotify: %d\n", len);
       continue;
@@ -479,8 +509,9 @@ glusterBlockDynConfigStart(void *arg)
 
       LOG("mgmt", GB_LOG_INFO, "event->mask: 0x%x\n", event->mask);
 
-      if (event->wd != wd)
+      if (event->wd != wd) {
         continue;
+      }
 
       /*
        * If force to write to the unwritable or crashed
@@ -488,12 +519,14 @@ glusterBlockDynConfigStart(void *arg)
        * delete the config file and then recreate it again
        * via the *.swp
        */
-      if ((event->mask & IN_IGNORED) && !access(cfg->configPath, F_OK))
+      if ((event->mask & IN_IGNORED) && !access(cfg->configPath, F_OK)) {
         wd = inotify_add_watch(monitor, cfg->configPath, IN_ALL_EVENTS);
+      }
 
       /* Try to reload the config file */
-      if (event->mask & IN_MODIFY || event->mask & IN_IGNORED)
+      if (event->mask & IN_MODIFY || event->mask & IN_IGNORED) {
         glusterBlockLoadConfig(cfg, true);
+      }
 
       p += sizeof(struct inotify_event) + event->len;
     }
@@ -507,6 +540,7 @@ glusterBlockSetupConfig(const char *configPath)
 {
   gbConfig *cfg = NULL;
   int ret;
+
 
   if (!configPath) {
     configPath = GB_DEF_CONFIGPATH;
@@ -555,6 +589,7 @@ glusterBlockCancelConfigThread(gbConfig *cfg)
   void *join_retval;
   int ret;
 
+
   ret = pthread_cancel(threadId);
   if (ret) {
     LOG("mgmt", GB_LOG_ERROR, "pthread_cancel failed with value %d\n", ret);
@@ -567,8 +602,9 @@ glusterBlockCancelConfigThread(gbConfig *cfg)
     return;
   }
 
-  if (join_retval != PTHREAD_CANCELED)
+  if (join_retval != PTHREAD_CANCELED) {
     LOG("mgmt", GB_LOG_ERROR, "unexpected join retval: %p\n", join_retval);
+  }
 }
 
 void
@@ -576,6 +612,7 @@ glusterBlockDestroyConfig(gbConfig *cfg)
 {
   struct list_head *pos, *q;
   gbConfOption *option;
+
 
   if (!cfg) {
     return;

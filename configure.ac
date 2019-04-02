@@ -15,6 +15,12 @@ AC_INIT([gluster-block],
 
 AC_SUBST([PACKAGE_RELEASE], 1)
 
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES(yes)])
+if make --help 2>&1 | grep -q no-print-directory; then
+    AM_MAKEFLAGS="$AM_MAKEFLAGS --no-print-directory"
+fi
+AC_SUBST(AM_MAKEFLAGS)
+
 AC_ARG_WITH(systemddir,
             AC_HELP_STRING([--with-systemddir=DIR],
                            [systemd service files in DIR @<:@PREFIX/lib/systemd/system@:>@]),
@@ -37,7 +43,7 @@ AC_ARG_WITH(sysconfigdir,
             [sysconfigdir='/etc/sysconfig'])
 AC_SUBST(sysconfigdir)
 
-AM_INIT_AUTOMAKE([-Wall -Werror foreign nostdinc silent-rules])
+AM_INIT_AUTOMAKE([-Wall -Werror foreign nostdinc])
 AC_CONFIG_HEADERS([config.h])
 
 AC_CONFIG_FILES([gluster-block.spec
@@ -52,7 +58,8 @@ AC_CONFIG_FILES([gluster-block.spec
                  systemd/gluster-block-target.service
                  systemd/gluster-blockd.initd
                  docs/Makefile
-                 extras/Makefile])
+                 extras/Makefile
+                 tests/Makefile])
 AC_CONFIG_MACRO_DIR([m4])
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 
@@ -81,8 +88,12 @@ AC_CHECK_HEADERS([stdio.h stdlib.h string.h stdbool.h stddef.h \
 
 # Checks for libraries.
 # glusterfs-api versions have a prefix of "7."
-PKG_CHECK_MODULES([GFAPI], [glusterfs-api >= 7.3.6],,
-                  [AC_MSG_ERROR([gfapi library >= 3.6 is required to build gluster-block])])
+PKG_CHECK_MODULES([GFAPI], [glusterfs-api >= 7.6],
+                  [AC_DEFINE(GFAPI_VERSION760, 1, [Define to 1 if gfapi >=7.6.0])],
+                  [PKG_CHECK_MODULES([GFAPI], [glusterfs-api >= 7.3.6],,
+                                     [AC_MSG_ERROR([gfapi library >= 3.6 is required to build gluster-block])])
+                  ]
+                 )
 AC_SUBST(GFAPI_CFLAGS)
 AC_SUBST(GFAPI_LIBS)
 
