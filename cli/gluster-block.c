@@ -152,10 +152,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
 
   conf = glusterBlockCLILoadConfig();
   if (!conf) {
-      LOG("cli", GB_LOG_ERROR,
-          "glusterBlockCLILoadConfig() failed, for block %s create on volume %s"
-          " with hosts %s", create_obj->block_name, create_obj->volume,
-          create_obj->block_hosts);
+      LOG("cli", GB_LOG_ERROR, "%s", "glusterBlockCLILoadConfig() failed");
       goto out;
   }
 
