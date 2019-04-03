@@ -254,7 +254,7 @@ glusterBlockReadConfig(gbConfig *cfg, ssize_t *len)
   }
   if (fp == NULL) {
     LOG("mgmt", GB_LOG_ERROR,
-        "Failed to open file '%s'\n", cfg->configPath);
+        "Failed to open file '%s'", cfg->configPath);
     GB_FREE(buf);
     return NULL;
   }
@@ -429,7 +429,7 @@ glusterBlockParseOption(char **cur, const char *end)
     break;
   default:
     LOG("mgmt", GB_LOG_ERROR,
-        "option type %d not supported!\n", option->type);
+        "option type %d not supported!", option->type);
     break;
   }
 }
@@ -459,7 +459,7 @@ glusterBlockLoadConfig(gbConfig *cfg, bool reloading)
   buf = glusterBlockReadConfig(cfg, &len);
   if (buf == NULL) {
     LOG("mgmt", GB_LOG_ERROR,
-        "Failed to read file '%s'\n", cfg->configPath);
+        "Failed to read file '%s'", cfg->configPath);
     return -1;
   }
 
@@ -484,7 +484,7 @@ glusterBlockDynConfigStart(void *arg)
   monitor = inotify_init();
   if (monitor == -1) {
     LOG("mgmt", GB_LOG_ERROR,
-        "Failed to init inotify %d\n", monitor);
+        "Failed to init inotify %d", monitor);
     return NULL;
   }
 
@@ -500,24 +500,24 @@ glusterBlockDynConfigStart(void *arg)
   wd = inotify_add_watch(monitor, GB_DEF_CONFIGDIR, IN_MODIFY);
   if (wd == -1) {
     LOG("mgmt", GB_LOG_ERROR,
-        "Failed to add \"%s\" to inotify (%d)\n", GB_DEF_CONFIGDIR, monitor);
+        "Failed to add \"%s\" to inotify (%d)", GB_DEF_CONFIGDIR, monitor);
     return NULL;
   }
 
   LOG("mgmt", GB_LOG_INFO,
-      "Inotify is watching \"%s\", wd: %d, mask: IN_MODIFY\n", GB_DEF_CONFIGDIR, wd);
+      "Inotify is watching \"%s\", wd: %d, mask: IN_MODIFY", GB_DEF_CONFIGDIR, wd);
 
   while (1) {
     len = read(monitor, buf, GB_BUF_LEN);
     if (len == -1) {
-      LOG("mgmt", GB_LOG_WARNING, "Failed to read inotify: %d\n", len);
+      LOG("mgmt", GB_LOG_WARNING, "Failed to read inotify: %d", len);
       continue;
     }
 
     for (p = buf; p < buf + len; p += sizeof(*event) + event->len) {
       event = (struct inotify_event *)p;
 
-      LOG("mgmt", GB_LOG_INFO, "event->mask: 0x%x\n", event->mask);
+      LOG("mgmt", GB_LOG_INFO, "event->mask: 0x%x", event->mask);
 
       if (event->wd != wd) {
         continue;
@@ -557,17 +557,17 @@ glusterBlockSetupConfig(const char *configPath)
   }
 
   if (GB_ALLOC(cfg) < 0) {
-    LOG("mgmt", GB_LOG_ERROR, "Alloc GB config failed for configPath: %s!\n", configPath);
+    LOG("mgmt", GB_LOG_ERROR, "Alloc GB config failed for configPath: %s!", configPath);
     return NULL;
   }
 
   if (GB_STRDUP(cfg->configPath, configPath) < 0) {
-    LOG("mgmt", GB_LOG_ERROR, "failed to copy configPath: %s\n", configPath);
+    LOG("mgmt", GB_LOG_ERROR, "failed to copy configPath: %s", configPath);
     goto freeConfig;
   }
 
   if (glusterBlockLoadConfig(cfg, false)) {
-    LOG("mgmt", GB_LOG_ERROR, "Loading GB config failed for configPath: %s!\n", configPath);
+    LOG("mgmt", GB_LOG_ERROR, "Loading GB config failed for configPath: %s!", configPath);
     goto freeConfigPath;
   }
 
@@ -578,7 +578,7 @@ glusterBlockSetupConfig(const char *configPath)
   ret = pthread_create(&cfg->threadId, NULL, glusterBlockDynConfigStart, cfg);
   if (ret) {
     LOG("mgmt", GB_LOG_WARNING,
-        "Dynamic config started failed, fallling back to static %d!\n", ret);
+        "Dynamic config started failed, fallling back to static %d!", ret);
   } else {
     cfg->isDynamic = true;
   }
@@ -602,18 +602,18 @@ glusterBlockCancelConfigThread(gbConfig *cfg)
 
   ret = pthread_cancel(threadId);
   if (ret) {
-    LOG("mgmt", GB_LOG_ERROR, "pthread_cancel failed with value %d\n", ret);
+    LOG("mgmt", GB_LOG_ERROR, "pthread_cancel failed with value %d", ret);
     return;
   }
 
   ret = pthread_join(threadId, &join_retval);
   if (ret) {
-    LOG("mgmt", GB_LOG_ERROR, "pthread_join failed with value %d\n", ret);
+    LOG("mgmt", GB_LOG_ERROR, "pthread_join failed with value %d", ret);
     return;
   }
 
   if (join_retval != PTHREAD_CANCELED) {
-    LOG("mgmt", GB_LOG_ERROR, "unexpected join retval: %p\n", join_retval);
+    LOG("mgmt", GB_LOG_ERROR, "unexpected join retval: %p", join_retval);
   }
 }
 
