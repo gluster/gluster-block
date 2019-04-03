@@ -29,7 +29,7 @@ glusterBlockSetLruCount(const size_t lruCount)
     MSG(stderr, "glfsLruCount should be [0 < COUNT < %d]\n",
         LRU_COUNT_MAX);
     LOG("mgmt", GB_LOG_ERROR,
-        "glfsLruCount should be [0 < COUNT < %d]\n",
+        "glfsLruCount should be [0 < COUNT < %d]",
         LRU_COUNT_MAX);
     return -1;
   }
@@ -39,7 +39,7 @@ glusterBlockSetLruCount(const size_t lruCount)
   UNLOCK(gbConf.lock);
 
   LOG("mgmt", GB_LOG_CRIT,
-      "glfsLruCount now is %lu\n", lruCount);
+      "glfsLruCount now is %lu", lruCount);
   return 0;
 }
 

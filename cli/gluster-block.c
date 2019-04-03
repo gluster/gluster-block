@@ -65,19 +65,19 @@ glusterBlockCLILoadConfig(void)
 
   if (GB_ALLOC(cfg) < 0) {
     LOG("cli", GB_LOG_ERROR,
-        "Alloc GB config failed for configPath: %s!\n", GB_DEF_CONFIGPATH);
+        "Alloc GB config failed for configPath: %s!", GB_DEF_CONFIGPATH);
     return NULL;
   }
 
   if (GB_STRDUP(cfg->configPath, GB_DEF_CONFIGPATH) < 0) {
     LOG("cli", GB_LOG_ERROR,
-        "failed to copy configPath: %s\n", GB_DEF_CONFIGPATH);
+        "failed to copy configPath: %s", GB_DEF_CONFIGPATH);
     goto freeConfig;
   }
 
   if (glusterBlockLoadConfig(cfg, false)) {
     LOG("cli", GB_LOG_ERROR,
-        "Loading GB config failed for configPath: %s!\n", GB_DEF_CONFIGPATH);
+        "Loading GB config failed for configPath: %s!", GB_DEF_CONFIGPATH);
     goto freeConfigPath;
   }
 
@@ -154,7 +154,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   if (!conf) {
       LOG("cli", GB_LOG_ERROR,
           "glusterBlockCLILoadConfig() failed, for block %s create on volume %s"
-          " with hosts %s\n", create_obj->block_name, create_obj->volume,
+          " with hosts %s", create_obj->block_name, create_obj->volume,
           create_obj->block_hosts);
       goto out;
   }
@@ -175,7 +175,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
     create_obj = cobj;
     if (block_create_cli_1(create_obj, &reply, clnt) != RPC_SUCCESS) {
       LOG("cli", GB_LOG_ERROR,
-          "%s block %s create on volume %s with hosts %s failed\n",
+          "%s block %s create on volume %s with hosts %s failed",
           clnt_sperror(clnt, "block_create_cli_1"), create_obj->block_name,
           create_obj->volume, create_obj->block_hosts);
       goto out;

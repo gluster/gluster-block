@@ -45,7 +45,7 @@ glusterBlockSetLogLevel(unsigned int logLevel)
   gbConf.logLevel = logLevel;
   UNLOCK(gbConf.lock);
   LOG("mgmt", GB_LOG_CRIT,
-      "logLevel now is %s\n", LogLevelLookup[logLevel]);
+      "logLevel now is %s", LogLevelLookup[logLevel]);
 
   return 0;
 }
