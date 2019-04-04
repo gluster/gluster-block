@@ -45,6 +45,8 @@ extern const char *argp_program_version;
 struct timeval TIMEOUT;           /* cli process to daemon cli thread timeout */
 static size_t cliOptTimeout;
 
+gbProcessCtx gbCtx = GB_CLI_MODE; /* set process mode */
+
 typedef enum clioperations {
   CREATE_CLI = 1,
   LIST_CLI   = 2,

@@ -455,6 +455,16 @@ static const char *const gbDaemonCmdlineOptLookup[] = {
   [GB_DAEMON_OPT_MAX]        = NULL,
 };
 
+typedef enum gbProcessCtx {
+  GB_UNKNOWN_MODE         = 0,
+  GB_CLI_MODE             = 1,
+  GB_DAEMON_MODE          = 2,
+
+  GB_CTX_MODE_MAX
+} gbProcessCtx;
+
+extern gbProcessCtx gbCtx;
+
 typedef enum LogLevel {
   GB_LOG_NONE       = 0,
   GB_LOG_CRIT       = 1,
