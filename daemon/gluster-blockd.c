@@ -34,6 +34,9 @@
 
 # define   GB_DISTRO_CHECK      "grep -P '(^ID=)' /etc/os-release"
 
+
+gbProcessCtx gbCtx = GB_DAEMON_MODE; /* set process mode */
+
 extern const char *argp_program_version;
 static gbConfig *gbCfg;
 
