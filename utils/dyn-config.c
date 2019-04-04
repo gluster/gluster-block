@@ -517,7 +517,7 @@ glusterBlockDynConfigStart(void *arg)
     for (p = buf; p < buf + len; p += sizeof(*event) + event->len) {
       event = (struct inotify_event *)p;
 
-      LOG("mgmt", GB_LOG_INFO, "event->mask: 0x%x", event->mask);
+      LOG("mgmt", GB_LOG_DEBUG, "event->mask: 0x%x", event->mask);
 
       if (event->wd != wd) {
         continue;
