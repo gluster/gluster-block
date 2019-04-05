@@ -180,9 +180,11 @@ glusterBlockConfSetOptions(gbConfig *cfg, bool reloading)
   }
 
   /* set lruCount option */
-  GB_PARSE_CFG_INT(cfg, GB_GLFS_LRU_COUNT, LRU_COUNT_DEF);
-  if (cfg->GB_GLFS_LRU_COUNT) {
-    glusterBlockSetLruCount(cfg->GB_GLFS_LRU_COUNT);
+  if (gbCtx != GB_CLI_MODE ) {
+    GB_PARSE_CFG_INT(cfg, GB_GLFS_LRU_COUNT, LRU_COUNT_DEF);
+    if (cfg->GB_GLFS_LRU_COUNT) {
+      glusterBlockSetLruCount(cfg->GB_GLFS_LRU_COUNT);
+    }
   }
 
   GB_PARSE_CFG_INT(cfg, GB_CLI_TIMEOUT, CLI_TIMEOUT_DEF);
