@@ -164,10 +164,11 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   } else if (cliOptTimeout) {
     TIMEOUT.tv_sec = cliOptTimeout;
   } else if ((cli_timeout = getenv("GB_CLI_TIMEOUT"))) {
-    sscanf(cli_timeout, "%ld", &TIMEOUT.tv_sec);
+    sscanf(cli_timeout, "%lu", &TIMEOUT.tv_sec);
   } else {
     TIMEOUT.tv_sec = CLI_TIMEOUT_DEF;
   }
+  LOG("cli", GB_LOG_DEBUG, "cli timeout now is %lu", TIMEOUT.tv_sec);
 
   switch(opt) {
   case CREATE_CLI:
