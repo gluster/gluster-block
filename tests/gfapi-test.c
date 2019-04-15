@@ -89,8 +89,8 @@ main(int argc, char *argv[])
 
 out:
   if (tgfd) {
-    glfs_unlink(fs, GB_TEST_FILE);
     glfs_close(tgfd);
+    glfs_unlink(fs, GB_TEST_FILE);
   }
   glfs_fini(fs);
 
