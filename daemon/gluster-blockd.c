@@ -18,6 +18,7 @@
 # include  <signal.h>
 # include  <sys/utsname.h>
 # include  <linux/version.h>
+# include  <sys/wait.h>
 
 # include  "config.h"
 # include  "common.h"
@@ -42,6 +43,61 @@ extern const char *argp_program_version;
 static gbConfig *gbCfg;
 
 struct timeval TIMEOUT = {CLI_TIMEOUT_DEF, 0};  /* remote rpc call timeout, 5 mins */
+
+typedef struct globalData {
+  int    pfd;  /* pidfile file descriptor */
+  pid_t  chpid;
+} globalData;
+
+globalData ctx = {0,};
+
+
+void
+glusterBlockCleanGlobals(void)
+{
+  struct flock lock = {0, };
+
+
+  lock.l_type = F_UNLCK;
+  if (fcntl(ctx.pfd, F_SETLK, &lock) == -1) {
+    LOG("mgmt", GB_LOG_ERROR, "fcntl(UNLCK) on pidfile %s failed[%s]",
+        GB_LOCK_FILE, strerror(errno));
+  }
+
+  if (ctx.pfd) {
+    close(ctx.pfd);
+  }
+  glusterBlockDestroyConfig(gbCfg);
+}
+
+
+void
+onSigServerHandler(int signum)
+{
+  LOG("mgmt", GB_LOG_DEBUG,
+      "server process with (pid: %lu) received (signal: %s)",
+      getpid(), strsignal(signum));
+
+  svc_exit();
+
+  return;
+}
+
+
+void
+onSigCliHandler(int signum)
+{
+  LOG("mgmt", GB_LOG_DEBUG,
+      "cli process with (pid: %lu) received (signal: %s)",
+      getpid(), strsignal(signum));
+
+  kill(ctx.chpid, signum);  /* Pass the signal to server process */
+
+  svc_exit();
+
+  return;
+}
+
 
 static void
 glusterBlockDHelp(void)
@@ -71,8 +127,8 @@ glusterBlockDHelp(void)
 }
 
 
-void *
-glusterBlockCliThreadProc (void *vargp)
+void
+glusterBlockCliProcess(void)
 {
   register SVCXPRT *transp = NULL;
   struct sockaddr_un saun = {0, };
@@ -137,12 +193,12 @@ glusterBlockCliThreadProc (void *vargp)
     close(sockfd);
   }
 
-  return NULL;
+  return;
 }
 
 
-void *
-glusterBlockServerThreadProc(void *vargp)
+void
+glusterBlockServerProcess(void)
 {
   register SVCXPRT *transp = NULL;
   struct sockaddr_in sain = {0, };
@@ -211,7 +267,8 @@ glusterBlockServerThreadProc(void *vargp)
     MSG(stderr, "%s\n", errMsg);
     exit(EXIT_FAILURE);
   }
-  return NULL;
+
+  exit(EXIT_SUCCESS);
 }
 
 
@@ -446,11 +503,8 @@ initDaemonCapabilities(void)
 int
 main (int argc, char **argv)
 {
-  int fd;
-  pthread_t cli_thread;
-  pthread_t server_thread;
   struct flock lock = {0, };
-  int errnosv = 0;
+  int wstatus;
 
 
   if (pthread_mutex_init(&gbConf.lock, NULL) < 0) {
@@ -466,7 +520,7 @@ main (int argc, char **argv)
   gbCfg = glusterBlockSetupConfig(NULL);
   if (!gbCfg) {
     LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockSetupConfig() failed");
-    return -1;
+    exit(EXIT_FAILURE);
   }
 
   if (glusterBlockDParseArgs(argc, argv)) {
@@ -475,30 +529,27 @@ main (int argc, char **argv)
   }
 
   /* is gluster-blockd running ? */
-  fd = creat(GB_LOCK_FILE, S_IRUSR | S_IWUSR);
-  if (fd == -1) {
+  ctx.pfd = creat(GB_LOCK_FILE, S_IRUSR | S_IWUSR);
+  if (ctx.pfd == -1) {
     LOG("mgmt", GB_LOG_ERROR, "creat(%s) failed[%s]",
         GB_LOCK_FILE, strerror(errno));
     goto out;
   }
 
   lock.l_type = F_WRLCK;
-  if (fcntl(fd, F_SETLK, &lock) == -1) {
-    errnosv = errno;
+  if (fcntl(ctx.pfd, F_SETLK, &lock) == -1) {
     LOG("mgmt", GB_LOG_ERROR, "%s",
         "gluster-blockd is already running...");
-    close(fd);
-    exit(errnosv);
+    goto out;
   }
 
   if (!gbConf.noRemoteRpc) {
-    errnosv = blockNodeSanityCheck();
-    if (errnosv) {
-      exit(errnosv);
+    if (blockNodeSanityCheck()) {
+      goto out;
     }
 
     if (initDaemonCapabilities()) {
-      exit(EXIT_FAILURE);
+      goto out;
     }
     LOG("mgmt", GB_LOG_INFO, "%s", "capabilities fetched successfully");
   } else {
@@ -515,26 +566,51 @@ main (int argc, char **argv)
     pmap_unset(GLUSTER_BLOCK, GLUSTER_BLOCK_VERS);
   }
 
-  pthread_create(&cli_thread, NULL, glusterBlockCliThreadProc, NULL);
-  if (!gbConf.noRemoteRpc) {
-    pthread_create(&server_thread, NULL, glusterBlockServerThreadProc, NULL);
-    pthread_join(server_thread, NULL);
+  ctx.chpid = fork();
+  if (ctx.chpid == -1) {
+    LOG("mgmt", GB_LOG_ERROR, "failed forking: (%s)", strerror(errno));
+    goto out;
+  } else if (ctx.chpid == 0) {
+    LOG("mgmt", GB_LOG_INFO, "server process pid: (%lu)", getpid());
+
+    /* Handle signals */
+    signal(SIGINT,  onSigServerHandler);
+    signal(SIGTERM, onSigServerHandler);
+
+    glusterBlockServerProcess();
+
+    exit (EXIT_FAILURE); /* server process svc_run exits */
+  } else {
+    LOG("mgmt", GB_LOG_INFO, "cli process pid: (%lu)", getpid());
+
+    /* Handle signals */
+    signal(SIGINT,  onSigCliHandler);
+    signal(SIGTERM, onSigCliHandler);
+    signal(SIGALRM, onSigCliHandler);
+
+    glusterBlockCliProcess();
+
+    /* wait for server process to exit */
+    waitpid(ctx.chpid, &wstatus, 0);
+
+    glusterBlockCleanGlobals();
+
+    if (WIFEXITED(wstatus)) {  /* did server process terminated normally ? */
+      LOG("mgmt", GB_LOG_DEBUG,
+          "exit status of server process was (%d)", WEXITSTATUS(wstatus));
+
+      LOG("mgmt", GB_LOG_CRIT, "%s", "Exiting ...");
+
+      if (WEXITSTATUS(wstatus) == EXIT_SUCCESS) {
+        exit(EXIT_SUCCESS);
+      }
+    }
+
+    exit(EXIT_FAILURE);
   }
-  pthread_join(cli_thread, NULL);
-
-
-  LOG("mgmt", GB_LOG_ERROR, "svc_run returned (%s)", strerror (errno));
-
-  lock.l_type = F_UNLCK;
-  if (fcntl(fd, F_SETLK, &lock) == -1) {
-    LOG("mgmt", GB_LOG_ERROR, "fcntl(UNLCK) on pidfile %s failed[%s]",
-        GB_LOCK_FILE, strerror(errno));
-  }
-
-  close(fd);
 
  out:
-  glusterBlockDestroyConfig(gbCfg);
-  exit (1);
+  glusterBlockCleanGlobals();
+  exit (EXIT_FAILURE);
   /* NOTREACHED */
 }
