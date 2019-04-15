@@ -19,6 +19,7 @@
 HOST=$(hostname -I | awk '{print $1}')
 VOLNAME="hosting-volume"
 BLKNAME="block-volume"
+SBLKNAME="sblock-volume"
 BRKDIR="/brick"
 
 
@@ -65,49 +66,125 @@ if [ $? -eq 1 ]; then
   TEST glusterd
 fi
 
-# Create gluster volume
+##### Create Gluster Volume Test Start #####
 TEST gluster vol create ${VOLNAME} ${HOST}:${BRKDIR} force
 
 # Start the volume
 TEST gluster vol start ${VOLNAME}
+##### End #####
 
 
-# Test gfapi access
+##### Gfapi Access Test Start #####
 TEST ./tests/gfapi-test ${VOLNAME} ${HOST}
+##### End #####
 
-# Start gluster-blockd.service
+
+##### Restart gluster-blockd.service Test Start #####
 systemctl daemon-reload
 TEST systemctl restart gluster-blockd.service
-sleep 1;
+sleep 5
+##### End #####
+
+
+##### gluster-block 'version' and 'help' Test Start #####
+TEST gluster-block version
+TEST gluster-block help
+##### End #####
+
+
+##### Block 'create' and 'delete' Test Start #####
+# Simple block create/delete
+TEST gluster-block create ${VOLNAME}/${BLKNAME} ${HOST} 1MiB
+TEST gluster-block delete ${VOLNAME}/${BLKNAME}
+
+# Simple block create/delete with 'timeout' set
+TEST gluster-block timeout 350 create ${VOLNAME}/${BLKNAME} ${HOST} 1MiB
+TEST gluster-block timeout 350 delete ${VOLNAME}/${BLKNAME}
+
+# Block create with 'auth enable' set/delete
+TEST gluster-block create ${VOLNAME}/${BLKNAME} auth enable ${HOST} 1MiB
+TEST gluster-block delete ${VOLNAME}/${BLKNAME}
+
+# Block create with 'auth disable' set/delete
+TEST gluster-block create ${VOLNAME}/${BLKNAME} auth disable ${HOST} 1MiB
+TEST gluster-block delete ${VOLNAME}/${BLKNAME}
+
+# Block create with 'ha' set/delete
+TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 ${HOST} 1MiB
+TEST gluster-block delete ${VOLNAME}/${BLKNAME}
+
+# Block create with 'prealloc full' set/delete
+TEST gluster-block create ${VOLNAME}/${BLKNAME} prealloc full ${HOST} 1MiB
+TEST gluster-block delete ${VOLNAME}/${BLKNAME}
+
+# Block create with 'prealloc no' set/delete
+TEST gluster-block create ${VOLNAME}/${BLKNAME} prealloc no ${HOST} 1MiB
+TEST gluster-block delete ${VOLNAME}/${BLKNAME}
+
+# Block create with 'ring-buffer' set/delete
+TEST gluster-block create ${VOLNAME}/${BLKNAME} ring-buffer 32 ${HOST} 1MiB
+TEST gluster-block delete ${VOLNAME}/${BLKNAME}
+
+# Block create with 'storage' set and delete with 'unlink-storage no' set
+TEST gluster-block create ${VOLNAME}/${BLKNAME} ${HOST} 1MiB
+LINK=`eval gluster-block info ${VOLNAME}/${BLKNAME} | grep GBID | awk -F' ' '{print $2}'`
+TEST gluster-block create ${VOLNAME}/${SBLKNAME} storage ${LINK} ${HOST}
+
+TEST gluster-block delete ${VOLNAME}/${SBLKNAME} unlink-storage no
+TEST gluster-block delete ${VOLNAME}/${BLKNAME}
+##### End #####
+
 
 # Block create
-TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 ${HOST} 1GiB
+TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 ${HOST} 1MiB
 
-# Modify Block with auth enable
+##### Genconfig Block Test Start #####
+TEST gluster-block genconfig ${VOLNAME} enable-tpg ${HOST}
+##### End #####
+
+
+###### Modify Block Test Start #####
+# Enable 'auth'
 TEST gluster-block modify ${VOLNAME}/${BLKNAME} auth enable
 
-# Block list
+# Increase size 5 times
+n=2
+while [ $n -le 6 ]
+do
+    TEST gluster-block modify ${VOLNAME}/${BLKNAME} size ${n}MiB
+    (( n++ ))
+    sleep 1
+done
+
+# Decrease size 5 times
+n=5
+while [ $n != 0 ]
+do
+    TEST gluster-block modify ${VOLNAME}/${BLKNAME} size ${n}MiB force
+    (( n-- ))
+    sleep 1
+done
+
+# Disable 'auth'
+TEST gluster-block modify ${VOLNAME}/${BLKNAME} auth disable
+##### End #####
+
+
+##### Block 'list' and 'info' Test Start #####
+# List blocks
 TEST gluster-block list ${VOLNAME}
 
 # Block info
 TEST gluster-block info ${VOLNAME}/${BLKNAME}
-
-# Modify Block with auth disable
-TEST gluster-block modify ${VOLNAME}/${BLKNAME} auth disable
+##### End #####
 
 # Block delete
 gluster-block delete ${VOLNAME}/${BLKNAME}
 
-# Block create with auth set
-TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 auth enable ${HOST} 1GiB
-
-# Block delete
-TEST gluster-block delete ${VOLNAME}/${BLKNAME}
-
 echo -e "\n*** JSON responses ***\n"
 
 # Block create and expect json response
-TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 ${HOST} 1GiB --json-pretty
+TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 ${HOST} 1MiB --json-pretty
 
 # Modify Block with auth enable and expect json response
 TEST gluster-block modify ${VOLNAME}/${BLKNAME} auth enable --json-pretty
@@ -125,6 +202,6 @@ TEST gluster-block modify ${VOLNAME}/${BLKNAME} auth disable --json-pretty
 TEST gluster-block delete ${VOLNAME}/${BLKNAME} --json-pretty
 
 # Block create with auth set and expect json response
-TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 auth enable ${HOST} 1GiB --json-pretty
+TEST gluster-block create ${VOLNAME}/${BLKNAME} ha 1 auth enable ${HOST} 1MiB --json-pretty
 
 cleanup;
