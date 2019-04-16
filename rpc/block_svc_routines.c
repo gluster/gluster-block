@@ -1222,7 +1222,6 @@ glusterBlockDeleteRemoteAsync(char *blockname,
   char *s_tmp = NULL;
   int ret = -1;
   size_t i;
-  MetaInfo *info_new = NULL;
   int cleanupsuccess = 0;
 
 
@@ -1276,26 +1275,8 @@ glusterBlockDeleteRemoteAsync(char *blockname,
       if (args[i].exit == GB_BLOCK_NOT_FOUND) {
         cleanupsuccess++;
       }
-    }
-  }
-
-  /* get new MetaInfo and compare */
-  if (GB_ALLOC(info_new) < 0) {
-    goto out;
-  }
-
-  ret = blockGetMetaInfo(glfs, blockname, info_new, NULL);
-  if (ret) {
-    goto out;
-  }
-  ret = -1;
-
-  for (i = 0; i < info_new->nhosts; i++) {
-    switch (blockMetaStatusEnumParse(info_new->list[i]->status)) {
-      case GB_CONFIG_INPROGRESS:  /* un touched */
-      case GB_CLEANUP_SUCCESS:
+    } else {
         cleanupsuccess++;
-        break;
     }
   }
 
@@ -1309,7 +1290,6 @@ glusterBlockDeleteRemoteAsync(char *blockname,
   GB_FREE(d_success);
   GB_FREE(args);
   GB_FREE(tid);
-  GB_FREE(info_new);
 
   return ret;
 }
