@@ -1471,6 +1471,7 @@ glusterBlockModifyArgsFill(blockModify *mobj, MetaInfo *info,
       if (args) {
         args[count].glfs = glfs;
         args[count].obj = (void *)mobj;
+        args[count].volume = info->volume;
         args[count].addr = info->list[i]->addr;
       }
       count++;
@@ -1567,6 +1568,7 @@ glusterBlockModifySizeArgsFill(blockModifySize *mobj, MetaInfo *info,
       if (args) {
         args[count].glfs = glfs;
         args[count].obj = (void *)mobj;
+        args[count].volume = info->volume;
         args[count].addr = info->list[i]->addr;
       }
       count++;
@@ -4144,7 +4146,7 @@ blockValidateCommandOutput(const char *out, int opt, void *data)
   case MODIFY_SIZE_SRV:
     /* dev_size set validation */
     GB_OUT_VALIDATE_OR_GOTO(out, out, "dev_size set failed for block: %s", msblk,
-                            msblk->block_name,
+                            msblk->volume,
                             "Parameter dev_size is now '%zu'.", msblk->size);
 
     ret = 0;

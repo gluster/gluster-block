@@ -306,7 +306,7 @@ glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk,
     }
 
     /* skip changing file size */
-    if (blk->size ==  sb.st_size) {
+    if (blk->size == sb.st_size) {
       ret = 0;
       goto close;
     }
