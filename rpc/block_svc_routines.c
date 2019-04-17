@@ -3455,7 +3455,7 @@ blockModifySizeCliFormatResponse(blockModifySizeCli *blk, struct blockModifySize
 
   hr_size = glusterBlockFormatSize("mgmt", mobj->size);
   if (!hr_size) {
-    GB_ASPRINTF (&errMsg, "%s", "failed in glusterBlockFormatSize");
+    GB_ASPRINTF (&errMsg, "failed in glusterBlockFormatSize");
     blockFormatErrorResponse(MODIFY_SIZE_SRV, blk->json_resp, ENOMEM,
                              errMsg, reply);
     GB_FREE(errMsg);
@@ -4781,7 +4781,7 @@ block_version_1_svc_st(void *data, struct svc_req *rqstp)
   int i;
 
 
-  LOG("mgmt", GB_LOG_DEBUG, "%s", "version check request");
+  LOG("mgmt", GB_LOG_DEBUG, "version check request");
 
   if (GB_ALLOC(reply) < 0) {
     return NULL;
@@ -5160,7 +5160,7 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
   if (!hr_size) {
     hr_size = glusterBlockFormatSize("mgmt", info->size);
     if (!hr_size) {
-      GB_ASPRINTF (&errMsg, "%s", "failed in glusterBlockFormatSize");
+      GB_ASPRINTF (&errMsg, "failed in glusterBlockFormatSize");
       blockFormatErrorResponse(INFO_SRV, blk->json_resp, ENOMEM,
                                errMsg, reply);
       GB_FREE(errMsg);
