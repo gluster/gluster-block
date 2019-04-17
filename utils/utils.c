@@ -38,7 +38,7 @@ int
 glusterBlockSetLogLevel(unsigned int logLevel)
 {
   if (logLevel >= GB_LOG_MAX) {
-    MSG(stderr, "unknown LOG-LEVEL: '%d'\n", logLevel);
+    MSG(stderr, "unknown LOG-LEVEL: '%d'", logLevel);
     return -1;
   }
   LOCK(gbConf.lock);
@@ -62,7 +62,7 @@ int
 glusterBlockSetCliTimeout(size_t timeout)
 {
   if (timeout < 0) {
-    MSG(stderr, "unknown GB_CLI_TIMEOUT: '%zu'\n", timeout);
+    MSG(stderr, "unknown GB_CLI_TIMEOUT: '%zu'", timeout);
     return -1;
   }
   LOCK(gbConf.lock);
@@ -289,7 +289,7 @@ initLogging(void)
   }
 
   if (strlen(logDir) > PATH_MAX - GB_MAX_LOGFILENAME) {
-    fprintf(stderr, "strlen of logDir Path > PATH_MAX: %s\n", logDir);
+    fprintf(stderr, "strlen of logDir Path > PATH_MAX: %s", logDir);
     return EXIT_FAILURE;
   }
 
