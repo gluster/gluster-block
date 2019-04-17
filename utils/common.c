@@ -57,7 +57,7 @@ glusterBlockParseSize(const char *dom, char *value)
 
   sizef = strtod(value, &postfix);
   if (sizef <= 0) {
-    LOG(dom, GB_LOG_ERROR, "%s", "size cannot be negative number or zero");
+    LOG(dom, GB_LOG_ERROR, "size cannot be negative number or zero");
     return -1;
   }
 
@@ -94,14 +94,14 @@ glusterBlockParseSize(const char *dom, char *value)
   case 'b':
   case '\0':
     if (sizef < GB_DEFAULT_SECTOR_SIZE) {
-        MSG(stderr, "minimum acceptable block size is %d bytes\n", GB_DEFAULT_SECTOR_SIZE);
+        MSG(stderr, "minimum acceptable block size is %d bytes", GB_DEFAULT_SECTOR_SIZE);
         LOG(dom, GB_LOG_ERROR, "minimum acceptable block size is %d bytes",
             GB_DEFAULT_SECTOR_SIZE);
         return -1;
     }
 
     if (sizef % GB_DEFAULT_SECTOR_SIZE) {
-      MSG(stdout, "The size %ld will align to sector size %d bytes\n",
+      MSG(stdout, "The size %ld will align to sector size %d bytes",
           sizef, GB_DEFAULT_SECTOR_SIZE);
       LOG(dom, GB_LOG_ERROR,
           "The target device size %ld will align to the sector size %d",
@@ -124,7 +124,7 @@ glusterBlockParseSize(const char *dom, char *value)
   return sizef;
 
 fail:
-  LOG(dom, GB_LOG_ERROR, "%s",
+  LOG(dom, GB_LOG_ERROR,
       "Unknown size unit. "
       "You may use b/B, k/K(iB), m/M(iB), g/G(iB), and t/T(iB) suffixes for "
       "bytes, kibibytes, mebibytes, gibibytes, and tebibytes.");
@@ -148,7 +148,7 @@ glusterBlockFormatSize(const char *dom, size_t bytes)
   }
 
   if (GB_ASPRINTF(&buf, "%.1f %s", (float)bytes + (float)rem / 1024.0, units[i]) < 0) {
-    LOG(dom, GB_LOG_ERROR, "%s", "glusterBlockFormatSize() failed");
+    LOG(dom, GB_LOG_ERROR, "glusterBlockFormatSize() failed");
     buf = NULL;
   }
 

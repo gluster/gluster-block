@@ -124,9 +124,19 @@
 
 # define  MSG(fd, fmt, ...)                                          \
           do {                                                       \
+            int len;                                                 \
+            char *buf;                                               \
             if (fd <= 0)       /* including STDIN_FILENO 0 */        \
               fd = stderr;                                           \
-            fprintf(fd, fmt, __VA_ARGS__);                           \
+            len = GB_ASPRINTF(&buf, fmt, ##__VA_ARGS__);             \
+            if (len != -1) {                                         \
+              if (buf[len - 1] != '\n')                              \
+                buf[len - 1] = '\n';                                 \
+              fprintf(fd, "%s", buf);                                \
+              free(buf);                                             \
+            } else {                                                 \
+              fprintf(fd, fmt "\n", ##__VA_ARGS__);                  \
+            }                                                        \
           } while (0)
 
 
@@ -172,7 +182,7 @@ extern struct gbConf gbConf;
               logTimeNow(timestamp, GB_TIME_STRING_BUFLEN);            \
               fprintf(fd, "[%s] %s: " fmt " [at %s+%d :<%s>]\n",       \
                       timestamp, LogLevelLookup[level],                \
-                      __VA_ARGS__, __FILE__, __LINE__, __FUNCTION__);  \
+                      ##__VA_ARGS__, __FILE__, __LINE__, __FUNCTION__);\
               if (fd != stderr)                                        \
                 fclose(fd);                                            \
             }                                                          \
@@ -225,7 +235,7 @@ extern struct gbConf gbConf;
               ret = -1;                                                 \
               goto label;                                               \
             }                                                           \
-            if (GB_ASPRINTF(&write, __VA_ARGS__) < 0) {                 \
+            if (GB_ASPRINTF(&write, ##__VA_ARGS__) < 0) {               \
               ret = -1;                                                 \
             }                                                           \
             if (!ret) {                                                 \
@@ -309,7 +319,7 @@ extern struct gbConf gbConf;
            char vol_blk[1024];                                         \
            snprintf(vol_blk, 1024, "%s/%s", vol?vol:"",                \
                     blk->block_name);                                  \
-           if (GB_ASPRINTF(&tmp, __VA_ARGS__) == -1)                   \
+           if (GB_ASPRINTF(&tmp, ##__VA_ARGS__) == -1)                 \
              goto label;                                               \
            if (!strstr(out, tmp)) {                                    \
              GB_FREE(tmp);                                             \

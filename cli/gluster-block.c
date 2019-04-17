@@ -35,7 +35,7 @@
 # define  GB_ARGCHECK_OR_RETURN(argcount, count, cmd, helpstr)        \
           do {                                                        \
             if (argcount != count) {                                  \
-              MSG(stderr, "Inadequate arguments for %s:\n%s\n", cmd, helpstr); \
+              MSG(stderr, "Inadequate arguments for %s:\n%s", cmd, helpstr); \
               return -1;                                              \
             }                                                         \
           } while(0)
@@ -156,7 +156,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
 
   conf = glusterBlockCLILoadConfig();
   if (!conf) {
-      LOG("cli", GB_LOG_ERROR, "%s", "glusterBlockCLILoadConfig() failed");
+      LOG("cli", GB_LOG_ERROR, "glusterBlockCLILoadConfig() failed");
       goto out;
   }
 
@@ -254,9 +254,9 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
     }
   } else if (errMsg[0]) {
     LOG("cli", GB_LOG_ERROR, "%s", errMsg);
-    MSG(stderr, "%s\n", errMsg);
+    MSG(stderr, "%s", errMsg);
   } else {
-    MSG(stderr, "%s\n", "Did not receive any response from gluster-block daemon."
+    MSG(stderr, "Did not receive any response from gluster-block daemon."
         " Please check log files to find the reason");
     ret = -1;
   }
@@ -286,7 +286,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
 static void
 glusterBlockHelp(void)
 {
-  MSG(stdout, "%s",
+  MSG(stdout,
       PACKAGE_NAME" ("PACKAGE_VERSION")\n"
       "usage:\n"
       "  gluster-block [timeout <seconds>] <command> <volname[/blockname]> [<args>] [--json*]\n"
@@ -408,9 +408,9 @@ glusterBlockParseVolumeBlock(char *volumeblock, char *volume, char *block,
   /* part before '/' is the volume name */
   sep = strchr(tmp, '/');
   if (!sep) {
-    MSG(stderr, "argument '<volname/blockname>'(%s) is incorrect\n",
+    MSG(stderr, "argument '<volname/blockname>'(%s) is incorrect",
         volumeblock);
-    MSG(stderr, "%s\n", helpstr);
+    MSG(stderr, "%s", helpstr);
     LOG("cli", GB_LOG_ERROR, "%s failed while parsing <volname/blockname>", op);
     goto out;
   }
@@ -418,13 +418,13 @@ glusterBlockParseVolumeBlock(char *volumeblock, char *volume, char *block,
 
   if (!glusterBlockIsNameAcceptable(tmp)) {
     MSG(stderr, "volume name(%s) should contain only aplhanumeric,'-', '_' characters "
-        "and should be less than 255 characters long\n", volume);
+        "and should be less than 255 characters long", volume);
     goto out;
   }
   /* part after / is blockname */
   if (!glusterBlockIsNameAcceptable(sep+1)) {
     MSG(stderr, "block name(%s) should contain only aplhanumeric,'-', '_' characters "
-        "and should be less than 255 characters long\n", block);
+        "and should be less than 255 characters long", block);
     goto out;
   }
   GB_STRCPY(volume, tmp, vol_len);
@@ -447,7 +447,7 @@ getCommandString(char **cmd, int argcount, char **options)
   }
 
   if (GB_ALLOC_N(*cmd, (total_length + 1))) {
-    LOG("cmdlog", GB_LOG_ERROR, "%s", "Could not allocate memory for command string");
+    LOG("cmdlog", GB_LOG_ERROR, "Could not allocate memory for command string");
     return;
   }
   for (i = 1; i < argcount; i++) {
@@ -469,7 +469,7 @@ glusterBlockModify(int argcount, char **options, int json)
 
 
   if (argcount < 4 || argcount > 5) {
-    MSG(stderr, "Inadequate arguments for modify:\n%s\n", GB_MODIFY_HELP_STR);
+    MSG(stderr, "Inadequate arguments for modify:\n%s", GB_MODIFY_HELP_STR);
     return -1;
   }
 
@@ -486,15 +486,15 @@ glusterBlockModify(int argcount, char **options, int json)
     if(ret >= 0) {
       mobj.auth_mode = ret;
     } else {
-      MSG(stderr, "%s\n", "'auth' option is incorrect");
-      MSG(stderr, "%s\n", GB_MODIFY_HELP_STR);
+      MSG(stderr, "'auth' option is incorrect");
+      MSG(stderr, GB_MODIFY_HELP_STR);
       LOG("cli", GB_LOG_ERROR, "Modify failed while parsing argument "
                                "to auth  for <%s/%s>", volume, block);
       goto out;
     }
 
     if ((argcount - optind)) {
-      MSG(stderr, "unknown/unsupported option '%s' for modify auth:\n%s\n",
+      MSG(stderr, "unknown/unsupported option '%s' for modify auth:\n%s",
           options[optind], GB_MODIFY_HELP_STR);
       ret = -1;
       goto out;
@@ -514,8 +514,8 @@ glusterBlockModify(int argcount, char **options, int json)
     optind++;
     sparse_ret = glusterBlockParseSize("cli", options[optind++]);
     if (sparse_ret < 0) {
-      MSG(stderr, "%s\n", "'<size>' is incorrect");
-      MSG(stderr, "%s\n", GB_MODIFY_HELP_STR);
+      MSG(stderr, "'<size>' is incorrect");
+      MSG(stderr, GB_MODIFY_HELP_STR);
       LOG("cli", GB_LOG_ERROR, "Modify failed while parsing size for block <%s/%s>",
           volume, block);
       goto out;
@@ -527,7 +527,7 @@ glusterBlockModify(int argcount, char **options, int json)
     }
 
     if ((argcount - optind)) {
-      MSG(stderr, "unknown option '%s' for modify size:\n%s\n",
+      MSG(stderr, "unknown option '%s' for modify size:\n%s",
           options[optind], GB_MODIFY_HELP_STR);
       ret = -1;
       goto out;
@@ -546,7 +546,7 @@ glusterBlockModify(int argcount, char **options, int json)
           msobj.block_name, msobj.volume);
     }
   } else {
-    MSG(stderr, "unknown option '%s' for modify:\n%s\n",
+    MSG(stderr, "unknown option '%s' for modify:\n%s",
         options[optind], GB_MODIFY_HELP_STR);
     ret = -1;
   }
@@ -570,7 +570,7 @@ glusterBlockCreate(int argcount, char **options, int json)
 
 
   if (argcount <= optind) {
-    MSG(stderr, "Inadequate arguments for create:\n%s\n", GB_CREATE_HELP_STR);
+    MSG(stderr, "Inadequate arguments for create:\n%s", GB_CREATE_HELP_STR);
     return -1;
   }
   /* set defaults */
@@ -590,15 +590,15 @@ glusterBlockCreate(int argcount, char **options, int json)
       if (isNumber(options[optind])) {
         sscanf(options[optind++], "%u", &cobj.mpath);
         if (!cobj.mpath) {
-          MSG(stderr, "%s\n", "'ha' cannot be zero.");
-          MSG(stderr, "%s\n", GB_CREATE_HELP_STR);
+          MSG(stderr, "'ha' cannot be zero.");
+          MSG(stderr, GB_CREATE_HELP_STR);
           LOG("cli", GB_LOG_ERROR, "failed parsing ha as 0 for block <%s/%s>",
               cobj.volume, cobj.block_name);
           goto out;
         }
       } else {
-        MSG(stderr, "%s\n", "'ha' option is incorrect");
-        MSG(stderr, "%s\n", GB_CREATE_HELP_STR);
+        MSG(stderr, "'ha' option is incorrect");
+        MSG(stderr, GB_CREATE_HELP_STR);
         LOG("cli", GB_LOG_ERROR, "failed while parsing ha for block <%s/%s>",
             cobj.volume, cobj.block_name);
         goto out;
@@ -609,8 +609,8 @@ glusterBlockCreate(int argcount, char **options, int json)
       if(ret >= 0) {
         cobj.auth_mode = ret;
       } else {
-        MSG(stderr, "%s\n", "'auth' option is incorrect");
-        MSG(stderr, "%s\n", GB_CREATE_HELP_STR);
+        MSG(stderr, "'auth' option is incorrect");
+        MSG(stderr, GB_CREATE_HELP_STR);
         LOG("cli", GB_LOG_ERROR, "Create failed while parsing argument "
                                  "to auth  for <%s/%s>",
                                  cobj.volume, cobj.block_name);
@@ -623,8 +623,8 @@ glusterBlockCreate(int argcount, char **options, int json)
         cobj.prealloc = ret;
         PREALLOC_OPT=true;
       } else {
-        MSG(stderr, "%s\n", "'prealloc' option is incorrect");
-        MSG(stderr, "%s\n", GB_CREATE_HELP_STR);
+        MSG(stderr, "'prealloc' option is incorrect");
+        MSG(stderr, GB_CREATE_HELP_STR);
         LOG("cli", GB_LOG_ERROR, "Create failed while parsing argument "
                                  "to prealloc  for <%s/%s>",
                                  cobj.volume, cobj.block_name);
@@ -639,16 +639,16 @@ glusterBlockCreate(int argcount, char **options, int json)
       if (isNumber(options[optind])) {
         sscanf(options[optind++], "%u", &cobj.rb_size);
         if (cobj.rb_size < 1 || cobj.rb_size > 64) {
-          MSG(stderr, "%s\n", "'ring-buffer' should be in range [1MB - 64MB]");
-          MSG(stderr, "%s\n", GB_CREATE_HELP_STR);
+          MSG(stderr, "'ring-buffer' should be in range [1MB - 64MB]");
+          MSG(stderr, GB_CREATE_HELP_STR);
           LOG("cli", GB_LOG_ERROR,
               "failed while parsing ring-buffer range [1MB - 64MB] for block <%s/%s>",
               cobj.volume, cobj.block_name);
         goto out;
         }
       } else {
-        MSG(stderr, "%s\n", "'ring-buffer' option is incorrect, hint: should be uint type");
-        MSG(stderr, "%s\n", GB_CREATE_HELP_STR);
+        MSG(stderr, "'ring-buffer' option is incorrect, hint: should be uint type");
+        MSG(stderr, GB_CREATE_HELP_STR);
         LOG("cli", GB_LOG_ERROR, "failed while parsing ring-buffer for block <%s/%s>",
             cobj.volume, cobj.block_name);
         goto out;
@@ -659,7 +659,7 @@ glusterBlockCreate(int argcount, char **options, int json)
 
   if (TAKE_SIZE) {
     if (argcount - optind != 2) {
-      MSG(stderr, "Inadequate arguments for create:\n%s\n", GB_CREATE_HELP_STR);
+      MSG(stderr, "Inadequate arguments for create:\n%s", GB_CREATE_HELP_STR);
       LOG("cli", GB_LOG_ERROR,
           "failed with Inadequate args for create block %s on volume %s with hosts %s",
           cobj.block_name, cobj.volume, cobj.block_hosts);
@@ -667,8 +667,8 @@ glusterBlockCreate(int argcount, char **options, int json)
     }
   } else {
     if (PREALLOC_OPT) {
-      MSG(stderr, "Inadequate arguments for create:\n%s\n", GB_CREATE_HELP_STR);
-      MSG(stderr, "%s\n", "Hint: do not use [prealloc <full|no>] in combination with [storage <filename>] option");
+      MSG(stderr, "Inadequate arguments for create:\n%s", GB_CREATE_HELP_STR);
+      MSG(stderr, "Hint: do not use [prealloc <full|no>] in combination with [storage <filename>] option");
       LOG("cli", GB_LOG_ERROR,
           "failed with Inadequate args for create block %s on volume %s with hosts %s",
           cobj.block_name, cobj.volume, cobj.block_hosts);
@@ -676,8 +676,8 @@ glusterBlockCreate(int argcount, char **options, int json)
     }
 
     if (argcount - optind != 1) {
-      MSG(stderr, "Inadequate arguments for create:\n%s\n", GB_CREATE_HELP_STR);
-      MSG(stderr, "%s\n", "Hint: do not use [size] in combination with [storage <filename>] option");
+      MSG(stderr, "Inadequate arguments for create:\n%s", GB_CREATE_HELP_STR);
+      MSG(stderr, "Hint: do not use [size] in combination with [storage <filename>] option");
       LOG("cli", GB_LOG_ERROR,
           "failed with Inadequate args for create block %s on volume %s with hosts %s",
           cobj.block_name, cobj.volume, cobj.block_hosts);
@@ -694,8 +694,8 @@ glusterBlockCreate(int argcount, char **options, int json)
   if (TAKE_SIZE) {
     sparse_ret = glusterBlockParseSize("cli", options[optind]);
     if (sparse_ret < 0) {
-      MSG(stderr, "%s\n", "'[size]' is incorrect");
-      MSG(stderr, "%s\n", GB_CREATE_HELP_STR);
+      MSG(stderr, "'[size]' is incorrect");
+      MSG(stderr, GB_CREATE_HELP_STR);
       LOG("cli", GB_LOG_ERROR, "failed while parsing size for block <%s/%s>",
           cobj.volume, cobj.block_name);
       goto out;
@@ -750,7 +750,7 @@ glusterBlockDelete(int argcount, char **options, int json)
 
 
   if (argcount < 2 || argcount > 5) {
-    MSG(stderr, "Inadequate arguments for delete:\n%s\n", GB_DELETE_HELP_STR);
+    MSG(stderr, "Inadequate arguments for delete:\n%s", GB_DELETE_HELP_STR);
     return -1;
   }
 
@@ -772,8 +772,8 @@ glusterBlockDelete(int argcount, char **options, int json)
     if(ret >= 0) {
       dobj.unlink = ret;
     } else {
-      MSG(stderr, "%s\n", "'unlink-storage' option is incorrect");
-      MSG(stderr, "%s\n", GB_DELETE_HELP_STR);
+      MSG(stderr, "'unlink-storage' option is incorrect");
+      MSG(stderr, GB_DELETE_HELP_STR);
       LOG("cli", GB_LOG_ERROR, "Delete failed while parsing argument "
                                "to unlink-storage  for <%s/%s>",
                                dobj.volume, dobj.block_name);
@@ -787,7 +787,7 @@ glusterBlockDelete(int argcount, char **options, int json)
   }
 
   if (argcount - optind) {
-    MSG(stderr, "Unknown option: '%s'\n%s\n", options[optind], GB_DELETE_HELP_STR);
+    MSG(stderr, "Unknown option: '%s'\n%s", options[optind], GB_DELETE_HELP_STR);
     LOG("cli", GB_LOG_ERROR, "Delete failed parsing argument unknow option '%s'"
         " for <%s/%s>", options[optind], dobj.volume, dobj.block_name);
     goto out;
@@ -846,7 +846,7 @@ glusterBlockReplace(int argcount, char **options, int json)
 
 
   if (argcount < 4 || argcount > 5) {
-    MSG(stderr, "Inadequate arguments for replace:\n%s\n", GB_REPLACE_HELP_STR);
+    MSG(stderr, "Inadequate arguments for replace:\n%s", GB_REPLACE_HELP_STR);
     return -1;
   }
 
@@ -857,21 +857,21 @@ glusterBlockReplace(int argcount, char **options, int json)
   }
 
   if (!glusterBlockIsAddrAcceptable(options[optind])) {
-    MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
+    MSG(stderr, "host addr (%s) should be a valid ip address\n%s",
         options[optind], GB_REPLACE_HELP_STR);
     goto out;
   }
   GB_STRCPYSTATIC(robj.old_node, options[optind++]);
 
   if (!glusterBlockIsAddrAcceptable(options[optind])) {
-    MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
+    MSG(stderr, "host addr (%s) should be a valid ip address\n%s",
         options[optind], GB_REPLACE_HELP_STR);
     goto out;
   }
   GB_STRCPYSTATIC(robj.new_node, options[optind++]);
 
   if (!strcmp(robj.old_node, robj.new_node)) {
-    MSG(stderr, "<old-node> (%s) and <new-node> (%s) cannot be same\n%s\n",
+    MSG(stderr, "<old-node> (%s) and <new-node> (%s) cannot be same\n%s",
         robj.old_node, robj.new_node, GB_REPLACE_HELP_STR);
     goto out;
   }
@@ -880,7 +880,7 @@ glusterBlockReplace(int argcount, char **options, int json)
 
   if (argcount == 5) {
     if (strcmp(options[optind], "force")) {
-      MSG(stderr, "unknown option '%s' for replace:\n%s\n", options[optind], GB_REPLACE_HELP_STR);
+      MSG(stderr, "unknown option '%s' for replace:\n%s", options[optind], GB_REPLACE_HELP_STR);
       return -1;
     } else {
       robj.force = true;
@@ -912,7 +912,7 @@ glusterBlockGenConfig(int argcount, char **options, int json)
   GB_ARGCHECK_OR_RETURN(argcount, 4, "genconfig", GB_GENCONF_HELP_STR);
 
   if (!glusterBlockIsVolListAcceptable(options[optind])) {
-    MSG(stderr, "volume list(%s) should be delimited by '%c' character only\n%s\n",
+    MSG(stderr, "volume list(%s) should be delimited by '%c' character only\n%s",
         options[optind], GB_VOLS_DELIMITER, GB_GENCONF_HELP_STR);
     goto out;
   }
@@ -921,13 +921,13 @@ glusterBlockGenConfig(int argcount, char **options, int json)
 
   if (!strcmp(options[optind++], "enable-tpg")) {
     if (!glusterBlockIsAddrAcceptable(options[optind])) {
-      MSG(stderr, "host addr (%s) should be a valid ip address\n%s\n",
+      MSG(stderr, "host addr (%s) should be a valid ip address\n%s",
           options[optind -1], GB_REPLACE_HELP_STR);
       goto out;
     }
     GB_STRCPYSTATIC(robj.addr, options[optind]);
   } else {
-      MSG(stderr, "unknown option '%s' for genconfig:\n%s\n", options[optind -1], GB_GENCONF_HELP_STR);
+      MSG(stderr, "unknown option '%s' for genconfig:\n%s", options[optind -1], GB_GENCONF_HELP_STR);
       return -1;
   }
   robj.json_resp = json;
@@ -954,49 +954,49 @@ glusterBlockParseArgs(int count, char **options, size_t opt, int json)
     case GB_CLI_CREATE:
       ret = glusterBlockCreate(count, options, json);
       if (ret && ret != EEXIST) {
-        LOG("cli", GB_LOG_ERROR, "%s", FAILED_CREATE);
+        LOG("cli", GB_LOG_ERROR, FAILED_CREATE);
       }
       goto out;
 
     case GB_CLI_LIST:
       ret = glusterBlockList(count, options, json);
       if (ret) {
-        LOG("cli", GB_LOG_ERROR, "%s", FAILED_LIST);
+        LOG("cli", GB_LOG_ERROR, FAILED_LIST);
       }
       goto out;
 
     case GB_CLI_INFO:
       ret = glusterBlockInfo(count, options, json);
       if (ret) {
-        LOG("cli", GB_LOG_ERROR, "%s", FAILED_INFO);
+        LOG("cli", GB_LOG_ERROR, FAILED_INFO);
       }
       goto out;
 
     case GB_CLI_MODIFY:
       ret = glusterBlockModify(count, options, json);
       if (ret) {
-        LOG("cli", GB_LOG_ERROR, "%s", FAILED_MODIFY);
+        LOG("cli", GB_LOG_ERROR, FAILED_MODIFY);
       }
       goto out;
 
     case GB_CLI_REPLACE:
       ret = glusterBlockReplace(count, options, json);
       if (ret) {
-        LOG("cli", GB_LOG_ERROR, "%s", FAILED_REPLACE);
+        LOG("cli", GB_LOG_ERROR, FAILED_REPLACE);
       }
       goto out;
 
     case GB_CLI_GENCONFIG:
       ret = glusterBlockGenConfig(count, options, json);
       if (ret) {
-        LOG("cli", GB_LOG_ERROR, "%s", FAILED_GENCONFIG);
+        LOG("cli", GB_LOG_ERROR, FAILED_GENCONFIG);
       }
       goto out;
 
     case GB_CLI_DELETE:
       ret = glusterBlockDelete(count, options, json);
       if (ret) {
-        LOG("cli", GB_LOG_ERROR, "%s", FAILED_DELETE);
+        LOG("cli", GB_LOG_ERROR, FAILED_DELETE);
       }
       goto out;
 
@@ -1009,7 +1009,7 @@ glusterBlockParseArgs(int count, char **options, size_t opt, int json)
 
     case GB_CLI_VERSION:
     case GB_CLI_HYPHEN_VERSION:
-      MSG(stdout, "%s\n", argp_program_version);
+      MSG(stdout, "%s", argp_program_version);
       goto out;
 
     default:
@@ -1044,7 +1044,7 @@ main(int argc, char *argv[])
   while (1) {
     opt = glusterBlockCLIOptEnumParse(argv[count]);
     if (opt < 1 || opt >= GB_CLI_OPT_MAX) {
-      MSG(stderr, "Unknown option: %s\n", argv[count]);
+      MSG(stderr, "Unknown option: %s", argv[count]);
       goto fail;
     }
     if (opt == GB_CLI_TIMEOUT) {
@@ -1056,8 +1056,8 @@ main(int argc, char *argv[])
       if (isNumber(argv[2])) {
         sscanf(argv[2], "%ld", &cliOptTimeout);
       } else {
-        MSG(stderr, "%s\n", "'timeout' option is incorrect, check usage.");
-        MSG(stderr, "%s\n", "hint: timeout argument accept only time in seconds.");
+        MSG(stderr, "'timeout' option is incorrect, check usage.");
+        MSG(stderr, "hint: timeout argument accept only time in seconds.");
         goto fail;
       }
       args = args - 2;
@@ -1067,7 +1067,7 @@ main(int argc, char *argv[])
 
     json = jsonResponseFormatParse(argv[argc-1]);
     if (json == GB_JSON_MAX) {
-      MSG(stderr, "expecting '--json*', got '%s'\n",
+      MSG(stderr, "expecting '--json*', got '%s'",
           argv[argc-1]);
       return -1;
     } else if (json != GB_JSON_NONE) {

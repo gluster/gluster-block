@@ -103,7 +103,7 @@ onSigCliHandler(int signum)
 static void
 glusterBlockDHelp(void)
 {
-  MSG(stdout, "%s",
+  MSG(stdout,
       "gluster-blockd ("PACKAGE_VERSION")\n"
       "usage:\n"
       "  gluster-blockd [--glfs-lru-count <COUNT>]\n"
@@ -123,7 +123,6 @@ glusterBlockDHelp(void)
       "        Show this message and exit.\n"
       "  --version\n"
       "        Show version info and exit.\n"
-      "\n"
      );
 }
 
@@ -265,7 +264,7 @@ glusterBlockServerProcess(void)
 
   if (errMsg[0]) {
     LOG ("mgmt", GB_LOG_ERROR, "%s", errMsg);
-    MSG(stderr, "%s\n", errMsg);
+    MSG(stderr, "%s", errMsg);
     exit(EXIT_FAILURE);
   }
 
@@ -286,7 +285,7 @@ glusterBlockDParseArgs(int count, char **options)
   while (optind < count) {
     opt = glusterBlockDaemonOptEnumParse(options[optind++]);
     if (!opt || opt >= GB_DAEMON_OPT_MAX) {
-      MSG(stderr, "unknown option: %s\n", options[optind-1]);
+      MSG(stderr, "unknown option: %s", options[optind-1]);
       return -1;
     }
 
@@ -294,7 +293,7 @@ glusterBlockDParseArgs(int count, char **options)
     case GB_DAEMON_HELP:
     case GB_DAEMON_USAGE:
       if (count != 2) {
-        MSG(stderr, "undesired options for: '%s'\n", options[optind-1]);
+        MSG(stderr, "undesired options for: '%s'", options[optind-1]);
         ret = -1;
       }
       glusterBlockDHelp();
@@ -302,19 +301,19 @@ glusterBlockDParseArgs(int count, char **options)
 
     case GB_DAEMON_VERSION:
       if (count != 2) {
-        MSG(stderr, "undesired options for: '%s'\n", options[optind-1]);
+        MSG(stderr, "undesired options for: '%s'", options[optind-1]);
         ret = -1;
       }
-      MSG(stdout, "%s\n", argp_program_version);
+      MSG(stdout, "%s", argp_program_version);
       exit(ret);
 
     case GB_DAEMON_GLFS_LRU_COUNT:
       if (count - optind  < 1) {
-        MSG(stderr, "option '%s' needs argument <COUNT>\n", options[optind-1]);
+        MSG(stderr, "option '%s' needs argument <COUNT>", options[optind-1]);
         return -1;
       }
       if (sscanf(options[optind], "%zu", &lruCount) != 1) {
-        MSG(stderr, "option '%s' expect argument type integer <COUNT>\n",
+        MSG(stderr, "option '%s' expect argument type integer <COUNT>",
             options[optind-1]);
         return -1;
       }
@@ -326,7 +325,7 @@ glusterBlockDParseArgs(int count, char **options)
 
     case GB_DAEMON_LOG_LEVEL:
       if (count - optind  < 1) {
-        MSG(stderr, "option '%s' needs argument <LOG-LEVEL>\n", options[optind-1]);
+        MSG(stderr, "option '%s' needs argument <LOG-LEVEL>", options[optind-1]);
         return -1;
       }
       logLevel = blockLogLevelEnumParse(options[optind]);
@@ -515,8 +514,7 @@ gbDependenciesVersionCheck(void)
 
  out:
   GB_FREE(out);
-  LOG("mgmt", GB_LOG_ERROR, "%s",
-      "Please install the recommended dependency version and try again.");
+  LOG("mgmt", GB_LOG_ERROR, "Please install the recommended dependency version and try again.");
   exit(EXIT_FAILURE);
 }
 
@@ -531,18 +529,18 @@ blockNodeSanityCheck(void)
   /* Check if tcmu-runner is running */
   ret = gbRunner("ps aux ww | grep -w '[t]cmu-runner' > /dev/null");
   if (ret) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "tcmu-runner not running");
+    LOG("mgmt", GB_LOG_ERROR, "tcmu-runner not running");
     return ESRCH;
   }
 
   /* Check targetcli has user:glfs handler listed */
   ret = gbRunner("targetcli /backstores/user:glfs ls > /dev/null");
   if (ret == EKEYEXPIRED) {
-    LOG("mgmt", GB_LOG_ERROR, "%s",
+    LOG("mgmt", GB_LOG_ERROR,
         "targetcli not found, please install targetcli and try again.");
     return EKEYEXPIRED;
   } else if (ret) {
-    LOG("mgmt", GB_LOG_ERROR, "%s",
+    LOG("mgmt", GB_LOG_ERROR,
         "tcmu-runner running, but targetcli doesn't list user:glfs handler");
     return  ENODEV;
   }
@@ -560,7 +558,7 @@ blockNodeSanityCheck(void)
   ret = gbRunner(global_opts);
   GB_FREE(global_opts);
   if (ret) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "targetcli set global attr failed");
+    LOG("mgmt", GB_LOG_ERROR, "targetcli set global attr failed");
     return  -1;
   }
 
@@ -574,7 +572,7 @@ initDaemonCapabilities(void)
 
   gbSetCapabilties();
   if (!globalCapabilities) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "capabilities fetching failed");
+    LOG("mgmt", GB_LOG_ERROR, "capabilities fetching failed");
     return -1;
   }
 
@@ -601,12 +599,12 @@ main (int argc, char **argv)
 
   gbCfg = glusterBlockSetupConfig(NULL);
   if (!gbCfg) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockSetupConfig() failed");
+    LOG("mgmt", GB_LOG_ERROR, "glusterBlockSetupConfig() failed");
     exit(EXIT_FAILURE);
   }
 
   if (glusterBlockDParseArgs(argc, argv)) {
-    LOG("mgmt", GB_LOG_ERROR, "%s", "glusterBlockDParseArgs() failed");
+    LOG("mgmt", GB_LOG_ERROR, "glusterBlockDParseArgs() failed");
     goto out;
   }
 
@@ -620,8 +618,7 @@ main (int argc, char **argv)
 
   lock.l_type = F_WRLCK;
   if (fcntl(ctx.pfd, F_SETLK, &lock) == -1) {
-    LOG("mgmt", GB_LOG_ERROR, "%s",
-        "gluster-blockd is already running...");
+    LOG("mgmt", GB_LOG_ERROR, "gluster-blockd is already running...");
     goto out;
   }
 
@@ -633,9 +630,9 @@ main (int argc, char **argv)
     if (initDaemonCapabilities()) {
       goto out;
     }
-    LOG("mgmt", GB_LOG_INFO, "%s", "capabilities fetched successfully");
+    LOG("mgmt", GB_LOG_INFO, "capabilities fetched successfully");
   } else {
-    LOG("mgmt", GB_LOG_DEBUG, "%s", "gluster-blockd running in noRemoteRpc mode");
+    LOG("mgmt", GB_LOG_DEBUG, "gluster-blockd running in noRemoteRpc mode");
   }
 
   initCache();
@@ -681,7 +678,7 @@ main (int argc, char **argv)
       LOG("mgmt", GB_LOG_DEBUG,
           "exit status of server process was (%d)", WEXITSTATUS(wstatus));
 
-      LOG("mgmt", GB_LOG_CRIT, "%s", "Exiting ...");
+      LOG("mgmt", GB_LOG_CRIT, "Exiting ...");
 
       if (WEXITSTATUS(wstatus) == EXIT_SUCCESS) {
         exit(EXIT_SUCCESS);
