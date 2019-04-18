@@ -9,6 +9,8 @@
 */
 
 
+# define   _GNU_SOURCE         /* See feature_test_macros(7) */
+# include  <stdio.h>
 # include  <dirent.h>
 # include  <sys/stat.h>
 
