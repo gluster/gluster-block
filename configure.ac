@@ -43,8 +43,8 @@ AC_ARG_WITH(sysconfigdir,
             [sysconfigdir='/etc/sysconfig'])
 AC_SUBST(sysconfigdir)
 
-AC_ARG_ENABLE([libtirpc],
-              AC_HELP_STRING([--enable-libtirpc],
+AC_ARG_ENABLE([tirpc],
+              AC_HELP_STRING([--enable-tirpc],
                              [enable use of tirpc [default: yes]]))
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign nostdinc])
