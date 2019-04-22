@@ -4515,7 +4515,7 @@ block_create_v2_1_svc_st(blockCreate2 *blk, struct svc_req *rqstp)
 
 
   if (blk->rb_size) {
-    GB_ASPRINTF(&rbsize, ",%s=%d", GB_RING_BUFFER_STR, blk->rb_size);
+    GB_ASPRINTF(&rbsize, " control='%s=%d'", GB_RING_BUFFER_STR, blk->rb_size);
   }
 
   convertTypeCreate2ToCreate(blk, &blk_v1);
