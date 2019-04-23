@@ -101,11 +101,11 @@ rm -rf ${RPM_BUILD_ROOT}
 * Mon Apr 22 2019 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - update targetcli and tcmu-runner dependency version
 
-* Fri Aug 10 2018 Niels de Vos <ndevos@redhat.com>
+* Mon Apr 15 2019 Niels de Vos <ndevos@redhat.com>
 - use the modern libtirpc package, will be removed from glibc
 - new Fedora releases require rpcgen (unbundled from glibc)
 
-* Sun Apr 3 2019 Xiubo Li <xiubli@redhat.com>
+* Wed Apr 03 2019 Xiubo Li <xiubli@redhat.com>
 - Add logrotate support
 
 * Sun Oct 14 2018 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
