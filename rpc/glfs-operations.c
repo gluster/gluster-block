@@ -14,6 +14,7 @@
 # include "config.h"
 
 # define  GB_LB_ATTR_PREFIX  "user.block"
+# define  GB_ZEROS_BUF_SIZE  4194304  /* 4MiB */
 
 
 struct glfs *
@@ -116,6 +117,70 @@ glusterBlockCheckAvailableSpace(struct glfs *glfs,
   errno = errSave;
 
   return -1;
+}
+
+
+int
+glusterBlockZeroFill(struct glfs_fd *tgfd, off_t offset, size_t size)
+{
+  struct iovec iov[4];
+  char *zerodata = NULL;
+  size_t len;
+  size_t rest;
+  int ret = -1;
+  int i;
+
+
+  LOG("gfapi", GB_LOG_INFO,
+      "zerofill is not supported for this volume type, slow zeroing will be used");
+
+  if (GB_ALLOC_N(zerodata, GB_ZEROS_BUF_SIZE) < 0) {
+    LOG("gfapi", GB_LOG_ERROR, "Alloc failed");
+    goto out;
+  }
+
+  for(i = 0; i < 4; ++i) {
+    iov[i].iov_base = zerodata;
+    iov[i].iov_len = GB_ZEROS_BUF_SIZE;
+  }
+
+  if (glfs_lseek(tgfd, offset, SEEK_SET) < 0) {
+    LOG("gfapi", GB_LOG_ERROR,
+        "glfs_lseek() failed: %s", strerror(errno));
+    goto out;
+  }
+
+  while (size >= GB_ZEROS_BUF_SIZE * 4) {
+    len = glfs_writev(tgfd, iov, 4, 0);
+    if (len < 0) {
+      LOG("gfapi", GB_LOG_ERROR,
+          "glfs_writev() failed to write zeros: %s", strerror(errno));
+      goto out;
+    }
+    size -= len;
+  }
+
+  if (size == 0) {
+    ret = 0;
+    goto out;
+  }
+
+  /* Calculate the rest */
+  len = size / GB_ZEROS_BUF_SIZE;
+  rest = size % GB_ZEROS_BUF_SIZE;
+  iov[len].iov_len = rest;
+
+  if (glfs_writev(tgfd, iov, rest ? len + 1 : len, 0) < 0) {
+    LOG("gfapi", GB_LOG_ERROR,
+        "glfs_writev() failed to write zeros: %s", strerror(errno));
+    goto out;
+  }
+
+  ret = 0;
+
+ out:
+  GB_FREE(zerodata);
+  return ret;
 }
 
 
@@ -227,14 +292,26 @@ glusterBlockCreateEntry(struct glfs *glfs, blockCreateCli *blk, char *gbid,
       goto unlink;
     }
 
-    if (blk->prealloc && glfs_zerofill(tgfd, 0, blk->size)) {
-      *errCode = errno;
-      LOG("gfapi", GB_LOG_ERROR,
-          "glfs_zerofill(%s): on volume %s for block %s "
-          "of size %zu failed[%s]", gbid, blk->volume, blk->block_name,
-          blk->size, strerror(errno));
-      ret = -1;
-      goto unlink;
+    if (blk->prealloc) {
+      ret = glfs_zerofill(tgfd, 0, blk->size);
+      if (ret && errno == ENOTSUP) {
+        if (glusterBlockZeroFill(tgfd, 0, blk->size)) {
+          *errCode = errno;
+          LOG("gfapi", GB_LOG_ERROR, "glusterBlockZeroFill(%s) on "
+              "volume: %s block: %s of size %zu failed [%s]",
+              gbid, blk->volume, blk->block_name, blk->size, strerror(errno));
+          ret = -1;
+          goto unlink;
+        }
+        ret = 0;
+      } else if (ret) {
+        *errCode = errno;
+        LOG("gfapi", GB_LOG_ERROR, "glfs_zerofill(%s): on "
+            "volume %s for block %s of size %zu failed [%s]",
+            gbid, blk->volume, blk->block_name, blk->size, strerror(errno));
+        ret = -1;
+        goto unlink;
+      }
     }
   }
 
@@ -333,12 +410,22 @@ glusterBlockResizeEntry(struct glfs *glfs, blockModifySize *blk,
 
     /* dirty hack to check if the file is zerofilled ? */
     if ((blk->size > sb.st_size) && (sb.st_size <= 512 * sb.st_blocks)) {
-      if (glfs_zerofill(tgfd, sb.st_size, blk->size - sb.st_size)) {
+      ret = glfs_zerofill(tgfd, sb.st_size, blk->size - sb.st_size);
+      if (ret && errno == ENOTSUP) {
+        if (glusterBlockZeroFill(tgfd, sb.st_size, blk->size - sb.st_size)) {
+          *errCode = errno;
+          LOG("gfapi", GB_LOG_ERROR, "glusterBlockZeroFill(%s) on "
+              "volume %s for block %s of size %zu failed [%s]",
+              blk->gbid, blk->volume, blk->block_name, blk->size, strerror(errno));
+          ret = -1;
+          goto close;
+        }
+        ret = 0;
+      } else if (ret) {
         *errCode = errno;
-        LOG("gfapi", GB_LOG_ERROR,
-            "glfs_zerofill(%s): on volume %s for block %s "
-            "of size %zu failed[%s]", blk->gbid, blk->volume, blk->block_name,
-            blk->size, strerror(errno));
+        LOG("gfapi", GB_LOG_ERROR, "glfs_zerofill(%s): on "
+            "volume %s for block %s of size %zu failed [%s]",
+            blk->gbid, blk->volume, blk->block_name, blk->size, strerror(errno));
         ret = -1;
         goto close;
       }
