@@ -4,6 +4,8 @@ SUBDIRS = rpc utils cli daemon systemd docs extras tests
 
 DISTCLEANFILES = Makefile.in gluster-block.spec autom4te.cache
 
+noinst_HEADERS = version.h config.h
+
 CLEANFILES = *~ gluster-block.spec
 
 EXTRA_DIST = autogen.sh README.md COPYING-GPLV2 COPYING-LGPLV3 \
