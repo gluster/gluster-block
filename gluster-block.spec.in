@@ -8,6 +8,10 @@
 %global _with_initd true
 %endif
 
+%if ( 0%{?rhel} && 0%{?rhel} <= 7 ) || ( 0%{?centos_version} && 0%{?centos_version} <= 7 ) 
+%global _disable_tirpc --enable-tirpc=no
+%endif
+
 
 ##-----------------------------------------------------------------------------
 ## All package definitions should be placed here
@@ -22,9 +26,9 @@ Source0:          @PACKAGE_NAME@-@PACKAGE_VERSION@.tar.gz
 
 BuildRequires:    pkgconfig(glusterfs-api)
 BuildRequires:    pkgconfig(json-c)
-BuildRequires:    pkgconfig(libtirpc)
 BuildRequires:    help2man >= 1.36
-%if ( 0%{?fedora} && 0%{?fedora} >= 28 )
+%if ( 0%{?_disable_tirpc:0} ) 
+BuildRequires:    pkgconfig(libtirpc)
 BuildRequires:    rpcgen
 %endif
 %if ( 0%{?_with_systemd:1} )
@@ -45,7 +49,7 @@ storage creation and maintenance as simple as possible.
 %setup -q
 
 %build
-%configure
+%configure %{?_disable_tirpc}
 %make_build
 
 %install
