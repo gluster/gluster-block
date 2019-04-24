@@ -9,6 +9,7 @@ gluster-block - Gluster Block Storage Console Manager (command line utility)
 
 .SH SYNOPSIS
 .B gluster-block
+[\fBtimeout <seconds>\fR]
 <\fBcreate|list|info|delete|modify|replace|genconfig\fR>
 <\fBvolname\fR[\fB/blockname\fR]>
 [\fB<args>\fR]
@@ -102,19 +103,33 @@ show help message and exit.
 show version info and exit.
 .PP
 
-.SH SUPPORTED JSON-FORMATS
---json | --json-plain | --json-spaced | --json-pretty
+.SH COMMON CLI OPTIONS
+.SS
+[\fBtimeout <seconds>\fR]
+it is the time in seconds that cli can wait for daemon to respond (default: 300)
+.PP
+
+.SS
+[\fB--json*\fR]
+used to request the output result in json format (default: plain text) and supported JSON formats: --json|--json-plain|--json-spaced|--json-pretty
+.PP
 
 .SH EXAMPLES
 .nf
 To create a block device of size 1GiB
 .B # gluster-block create blockVol/sampleBlock ${HOST} 1GiB
 
+To create a block device of size 1GiB with timeout 300 seconds
+.B # gluster-block timeout 300 create blockVol/sampleBlock ${HOST} 1GiB
+
 To create a block device of size 1GiB with auth enable
 .B # gluster-block create blockVol/sampleBlock auth enable ${HOST} 1GiB
 
 To create a block device of size 1GiB, by preallocating storage with zero fill
 .B # gluster-block create blockVol/sampleBlock prealloc full ${HOST} 1GiB
+
+To create a thinly-provisioned block device of size 1GiB
+.B # gluster-block create blockVol/sampleBlock prealloc no ${HOST} 1GiB
 
 To create a block device with existing file in blockVol
 .B # gluster-block create blockVol/sampleBlock storage 3c242959-9238-4ce0-a1ed-19086aa23c7b ${HOST}
