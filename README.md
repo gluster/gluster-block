@@ -109,7 +109,7 @@ You can run gluster-blockd as systemd service, note '/etc/sysconfig/gluster-bloc
 # gluster-block --help
 gluster-block (0.3)
 usage:
-  gluster-block <command> <volname[/blockname]> [<args>] [--json*]
+  gluster-block [timeout <seconds>] <command> <volname[/blockname]> [<args>] [--json*]
 
 commands:
   create  <volname/blockname> [ha <count>]
@@ -119,7 +119,7 @@ commands:
                               [ring-buffer <size-in-MB-units>]
                               <host1[,host2,...]> [size]
         create block device [defaults: ha 1, auth disable, prealloc full, size in bytes,
-	                     ring-buffer default size dependends on kernel]
+                             ring-buffer default size dependends on kernel]
 
   list    <volname>
         list available block devices.
@@ -145,8 +145,13 @@ commands:
   version
         show version info and exit.
 
-supported JSON formats:
-  --json|--json-plain|--json-spaced|--json-pretty
+common cli options: (fixed formats)
+  timeout <seconds>
+        it is the time in seconds that cli can wait for daemon to respond.
+        [default: timeout 300]
+  --json*
+        used to request the output result in json format [default: plain text]
+        supported JSON formats: --json|--json-plain|--json-spaced|--json-pretty
 ```
 
 #### Example:

@@ -5,13 +5,13 @@ Installation Instructions:
 Install from Source:
 -------------------
 
-1. gluster-block uses targetcli (>= 2.1.fb43-2) and tcmu-runner. So, make sure you have them installed.
+1. gluster-block uses targetcli (>= 2.1.fb49) and tcmu-runner. So, make sure you have them installed.
 
 2. $ git clone https://github.com/gluster/gluster-block.git
 
 3. Run ./autogen.sh.
 
-4. Run ./configure.
+4. Run ./configure [--enable-tirpc=yes/no] [--disable-silent-rules] ....
 
  $ ./configure
  [...]
@@ -20,6 +20,7 @@ Install from Source:
    Prefix.........: /usr/local
    C Compiler.....: gcc -g -O2
    Linker.........: /usr/bin/ld -m elf_x86_64
+   Using Tirpc....: yes
  ---------------------------------------------
 
  In case if you notice failures, install the dependencies suggested by configure.
@@ -32,11 +33,8 @@ Install from Source:
 Installation completed :-)
 
 Check,
- $ gluster-block version (or)
- $ gluster-block --version
-
- $ gluster-block help (or)
- $ gluster-block --help
+ $ gluster-block version
+ $ gluster-block help
 
 Make sure your version is the latest from the release, and the one you just installed.
 
@@ -58,11 +56,8 @@ https://copr.fedorainfracloud.org/coprs/pkalever/gluster-block/repo/fedora-25/pk
 Installation completed :-)
 
 Check,
- $ gluster-block version (or)
- $ gluster-block --version
-
- $ gluster-block help (or)
- $ gluster-block --help
+ $ gluster-block version
+ $ gluster-block help
 
 As of now gluster-block is supported on fedora >= 25.
 
