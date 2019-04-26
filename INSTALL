@@ -5,38 +5,30 @@ Installation Instructions:
 Install from Source:
 -------------------
 
-1. gluster-block uses targetcli (>= 2.1.fb49) and tcmu-runner. So, make sure you have them installed.
+# git clone https://github.com/gluster/gluster-block.git
+# cd gluster-block/
+# dnf install gcc autoconf automake make file libtool libuuid-devel \
+              json-c-devel glusterfs-api-devel targetcli tcmu-runner
 
-2. $ git clone https://github.com/gluster/gluster-block.git
+On Fedora27 and Centos7 [Which use legacy glibc RPC], pass '--enable-tirpc=no'
+# ./autogen.sh && ./configure --enable-tirpc=no && make -j install
 
-3. Run ./autogen.sh.
+On Fedora28 and higher [Which use TIRPC], in addition to above, we should also install
+# dnf install rpcgen libtirpc-devel
 
-4. Run ./configure [--enable-tirpc=yes/no] [--disable-silent-rules] ....
-
- $ ./configure
- [...]
- ------------------ Summary ------------------
-  gluster-block version 0.3
-   Prefix.........: /usr/local
-   C Compiler.....: gcc -g -O2
-   Linker.........: /usr/bin/ld -m elf_x86_64
-   Using Tirpc....: yes
- ---------------------------------------------
-
- In case if you notice failures, install the dependencies suggested by configure.
-
-5. Now just run 'make' and later run 'make install' to install the package.
-
- $ make
- $ make install
+And pass '--enable-tirpc=yes'(default) flag or nothing at configure time
+# ./autogen.sh && ./configure && make -j install
 
 Installation completed :-)
 
 Check,
- $ gluster-block version
- $ gluster-block help
+# gluster-block version
+# gluster-block help
 
 Make sure your version is the latest from the release, and the one you just installed.
+
+Note: targetcli (>= 2.1.fb49) and tcmu-runner are runtime dependencies for gluster-block.
+So, make sure you have them installed before starting gluster-blockd.
 
 
 Download from repo:
