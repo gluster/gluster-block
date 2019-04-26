@@ -77,7 +77,7 @@ void
 onSigServerHandler(int signum)
 {
   LOG("mgmt", GB_LOG_DEBUG,
-      "server process with (pid: %lu) received (signal: %s)",
+      "server process with (pid: %u) received (signal: %s)",
       getpid(), strsignal(signum));
 
   svc_exit();
@@ -90,7 +90,7 @@ void
 onSigCliHandler(int signum)
 {
   LOG("mgmt", GB_LOG_DEBUG,
-      "cli process with (pid: %lu) received (signal: %s)",
+      "cli process with (pid: %u) received (signal: %s)",
       getpid(), strsignal(signum));
 
   kill(ctx.chpid, signum);  /* Pass the signal to server process */
@@ -352,9 +352,9 @@ glusterBlockDParseArgs(int count, char **options)
 static void
 gbMinKernelVersionCheck(void)
 {
-  struct utsname verStr = {'\0', };
+  struct utsname verStr = {{0},};
   char *distro = NULL;
-  size_t vNum[VERNUM_BUFLEN] = {0, };
+  size_t vNum[VERNUM_BUFLEN] = {0,};
   int i = 0;
   char *tptr;
 
@@ -647,7 +647,7 @@ main (int argc, char **argv)
     LOG("mgmt", GB_LOG_ERROR, "failed forking: (%s)", strerror(errno));
     goto out;
   } else if (ctx.chpid == 0) {
-    LOG("mgmt", GB_LOG_INFO, "server process pid: (%lu)", getpid());
+    LOG("mgmt", GB_LOG_INFO, "server process pid: (%u)", getpid());
 
     /* Handle signals */
     signal(SIGINT,  onSigServerHandler);
@@ -657,7 +657,7 @@ main (int argc, char **argv)
 
     exit (EXIT_FAILURE); /* server process svc_run exits */
   } else {
-    LOG("mgmt", GB_LOG_INFO, "cli process pid: (%lu)", getpid());
+    LOG("mgmt", GB_LOG_INFO, "cli process pid: (%u)", getpid());
 
     /* Handle signals */
     signal(SIGINT,  onSigCliHandler);
