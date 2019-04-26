@@ -215,7 +215,7 @@ mapJsonFlagToJsonCstring(int jsonflag)
 
 void
 blockFormatErrorResponse(operations op, int json_resp, int errCode,
-                         char *errMsg, struct blockResponse *reply)
+                         char *errMsg, blockResponse *reply)
 {
   json_object *json_obj = NULL;
 
@@ -516,8 +516,8 @@ glusterBlockCallRPC_1(char *host, void *cobj,
   blockResponse reply = {0,};
   struct addrinfo *res = NULL;
   gbCapResp *obj = NULL;
-  struct blockCreate cblk_v1 = {0,};
-  struct blockCreate2 *cblk_v2 = NULL;
+  blockCreate cblk_v1 = {{0},};
+  blockCreate2 *cblk_v2 = NULL;
 
 
   *rpc_sent = FALSE;
@@ -894,7 +894,7 @@ static int
 glusterBlockCapabilityRemoteAsync(blockServerDef *servers, bool *minCaps,
                                   bool *resultCaps, char **errMsg)
 {
-  static blockRemoteObj *args = NULL;
+  blockRemoteObj *args = NULL;
   pthread_t  *tid = NULL;
   int ret = -1;
   size_t i;
@@ -1004,7 +1004,7 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
                             blockRemoteCreateResp **savereply)
 {
   pthread_t  *tid = NULL;
-  static blockRemoteObj *args = NULL;
+  blockRemoteObj *args = NULL;
   int ret = -1;
   size_t i;
 
@@ -2197,7 +2197,7 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
 void
 blockReplaceNodeCliFormatResponse(blockReplaceCli *blk, int errCode, char *errMsg,
                                   blockRemoteReplaceResp *savereply,
-                                  struct blockResponse *reply)
+                                  blockResponse *reply)
 {
   json_object *json_obj = NULL;
   char *tmp = NULL;
@@ -2530,7 +2530,7 @@ block_replace_cli_1_svc_st(blockReplaceCli *blk, struct svc_req *rqstp)
  out:
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
   blockReplaceNodeCliFormatResponse(blk, errCode, errMsg, savereply, reply);
-  LOG("cmdlog", errCode?GB_LOG_ERROR:GB_LOG_INFO, "%s", reply->out);
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s", reply->out);
   blockServerDefFree(list);
   blockRemoteReplaceRespFree(savereply);
   blockFreeMetaInfo(info);
@@ -2944,7 +2944,7 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
                     bool deleteall, bool forcedel, bool unlink, blockRemoteDeleteResp *drobj)
 {
   int ret = -1;
-  static blockDelete dobj;
+  blockDelete dobj;
   size_t count = 0;
   MetaInfo *info = NULL;
   int asyncret = 0;
@@ -3116,10 +3116,10 @@ glusterBlockAuditRequest(struct glfs *glfs,
 
 
 static void
-blockModifyCliFormatResponse (blockModifyCli *blk, struct blockModify *mobj,
+blockModifyCliFormatResponse (blockModifyCli *blk, blockModify *mobj,
                               int errCode, char *errMsg,
                               blockRemoteModifyResp *savereply,
-                              MetaInfo *info, struct blockResponse *reply,
+                              MetaInfo *info, blockResponse *reply,
                               bool rollback)
 {
   json_object *json_obj = NULL;
@@ -3234,9 +3234,9 @@ blockResponse *
 block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
 {
   int ret = -1;
-  static blockModify mobj = {0};
-  static blockRemoteModifyResp *savereply = NULL;
-  static blockResponse *reply = NULL;
+  blockModify mobj = {{0}};
+  blockRemoteModifyResp *savereply = NULL;
+  blockResponse *reply = NULL;
   struct glfs *glfs;
   struct glfs_fd *lkfd = NULL;
   MetaInfo *info = NULL;
@@ -3410,7 +3410,7 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
  initfail:
   blockModifyCliFormatResponse (blk, &mobj, asyncret?asyncret:errCode,
                                 errMsg, savereply, info, reply, rollback);
-  LOG("cmdlog", errCode?GB_LOG_ERROR:GB_LOG_INFO, "%s", reply->out);
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s", reply->out);
   blockFreeMetaInfo(info);
 
   if (savereply) {
@@ -3427,10 +3427,10 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
 
 
 static void
-blockModifySizeCliFormatResponse(blockModifySizeCli *blk, struct blockModifySize *mobj,
+blockModifySizeCliFormatResponse(blockModifySizeCli *blk, blockModifySize *mobj,
                                  int errCode, char *errMsg,
                                  blockRemoteResp *savereply,
-                                 MetaInfo *info, struct blockResponse *reply)
+                                 MetaInfo *info, blockResponse *reply)
 {
   json_object *json_obj = NULL;
   char        *tmp = NULL;
@@ -3536,9 +3536,9 @@ blockResponse *
 block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
 {
   int ret = -1;
-  static blockModifySize mobj = {0};
-  static blockRemoteResp *savereply = NULL;
-  static blockResponse *reply = NULL;
+  blockModifySize mobj = {{0},};
+  blockRemoteResp *savereply = NULL;
+  blockResponse *reply = NULL;
   struct glfs *glfs;
   struct glfs_fd *lkfd = NULL;
   MetaInfo *info = NULL;
@@ -3683,7 +3683,7 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
  initfail:
   blockModifySizeCliFormatResponse(blk, &mobj, asyncret?asyncret:errCode,
                                    errMsg, savereply, info, reply);
-  LOG("cmdlog", errCode?GB_LOG_ERROR:GB_LOG_INFO, "%s", reply->out);
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s", reply->out);
   blockFreeMetaInfo(info);
 
   blockRemoteRespFree(savereply);
@@ -3695,9 +3695,9 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
 
 void
 blockCreateCliFormatResponse(struct glfs *glfs, blockCreateCli *blk,
-                             struct blockCreate2 *cobj, int errCode,
+                             blockCreate2 *cobj, int errCode,
                              char *errMsg, blockRemoteCreateResp *savereply,
-                             struct blockResponse *reply)
+                             blockResponse *reply)
 {
   MetaInfo *info = NULL;
   json_object *json_obj = NULL;
@@ -3860,12 +3860,12 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   blockRemoteCreateResp *savereply = NULL;
   char gbid[UUID_BUF_SIZE];
   char passwd[UUID_BUF_SIZE];
-  struct blockResponse *reply;
+  blockResponse *reply;
   struct glfs *glfs = NULL;
   struct glfs_fd *lkfd = NULL;
   blockServerDefPtr list = NULL;
   char *errMsg = NULL;
-  struct blockCreate2  cobj = {0, };
+  blockCreate2 cobj = {{0},};
   bool *resultCaps = NULL;
 
 
@@ -4027,7 +4027,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
 
  optfail:
   blockCreateCliFormatResponse(glfs, blk, &cobj, errCode, errMsg, savereply, reply);
-  LOG("cmdlog", errCode?GB_LOG_ERROR:GB_LOG_INFO, "%s", reply->out);
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s", reply->out);
   GB_FREE(errMsg);
   blockServerDefFree(list);
   blockCreateParsedRespFree(savereply);
@@ -4509,7 +4509,7 @@ blockResponse *
 block_create_v2_1_svc_st(blockCreate2 *blk, struct svc_req *rqstp)
 {
   char *rbsize= NULL;
-  blockCreate blk_v1 = {0, };
+  blockCreate blk_v1 = {{0},};
   char *volServer = NULL;
   size_t len = blk->xdata.xdata_len;
 
@@ -4537,7 +4537,7 @@ err:
 void
 blockDeleteCliFormatResponse(blockDeleteCli *blk, int errCode, char *errMsg,
                              blockRemoteDeleteResp *savereply,
-                             struct blockResponse *reply)
+                             blockResponse *reply)
 {
   json_object *json_obj = NULL;
   char *tmp = NULL;
@@ -4601,7 +4601,7 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
 {
   blockRemoteDeleteResp *savereply = NULL;
   MetaInfo *info = NULL;
-  static blockResponse *reply = NULL;
+  blockResponse *reply = NULL;
   struct glfs *glfs;
   struct glfs_fd *lkfd = NULL;
   char *errMsg = NULL;
@@ -4704,7 +4704,7 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
 
 
   blockDeleteCliFormatResponse(blk, errCode, errMsg, savereply, reply);
-  LOG("cmdlog", errCode?GB_LOG_ERROR:GB_LOG_INFO, "%s", reply->out);
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s", reply->out);
 
   if (savereply) {
     GB_FREE(savereply->d_attempt);
@@ -5116,7 +5116,7 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
 void
 blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
                            char *errMsg, MetaInfo *info,
-                           struct blockResponse *reply)
+                           blockResponse *reply)
 {
   json_object  *json_obj    = NULL;
   json_object  *json_array1 = NULL;

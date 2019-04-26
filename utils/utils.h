@@ -162,15 +162,18 @@ extern struct gbConf gbConf;
           do {                                                         \
             FILE *fd;                                                  \
             char timestamp[GB_TIME_STRING_BUFLEN] = {0};               \
+            char *tmp;                                                 \
+            if (GB_STRDUP(tmp, str) < 0)                               \
+              fprintf(stderr, "No memory: %s\n", strerror(errno));     \
             LOCK(gbConf.lock);                                         \
             if (level <= gbConf.logLevel) {                            \
-              if ((str) == "mgmt")                                     \
+              if (!strcmp(tmp, "mgmt"))                                \
                 fd = fopen (gbConf.daemonLogFile, "a");                \
-              else if ((str) == "cli")                                 \
+              else if (!strcmp(tmp, "cli"))                            \
                 fd = fopen (gbConf.cliLogFile, "a");                   \
-              else if ((str) == "gfapi")                               \
+              else if (!strcmp(tmp, "gfapi"))                          \
                 fd = fopen (gbConf.gfapiLogFile, "a");                 \
-              else if ((str) == "cmdlog")                              \
+              else if (!strcmp(tmp, "cmdlog"))                         \
                 fd = fopen (gbConf.cmdhistoryLogFile, "a");            \
               else                                                     \
                 fd = stderr;                                           \
@@ -187,7 +190,8 @@ extern struct gbConf gbConf;
               if (fd != stderr)                                        \
                 fclose(fd);                                            \
             }                                                          \
-	    UNLOCK(gbConf.lock);                                     \
+            UNLOCK(gbConf.lock);                                       \
+            GB_FREE(tmp);                                              \
           } while (0)
 
 # define  GB_METALOCK_OR_GOTO(lkfd, volume, errCode, errMsg, label)  \

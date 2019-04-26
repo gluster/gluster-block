@@ -63,7 +63,6 @@ gbConfig *
 glusterBlockCLILoadConfig(void)
 {
   gbConfig *cfg = NULL;
-  int ret;
 
   if (GB_ALLOC(cfg) < 0) {
     LOG("cli", GB_LOG_ERROR,
@@ -460,8 +459,8 @@ static int
 glusterBlockModify(int argcount, char **options, int json)
 {
   size_t optind = 1;
-  blockModifyCli mobj = {0, };
-  blockModifySizeCli msobj = {0, };
+  blockModifyCli mobj = {{0}, };
+  blockModifySizeCli msobj = {{0}, };
   char volume[255] = {0};
   char block[255] = {0};
   ssize_t sparse_ret;
@@ -564,7 +563,7 @@ glusterBlockCreate(int argcount, char **options, int json)
   size_t optind = 1;
   int ret = -1;
   ssize_t sparse_ret;
-  blockCreateCli cobj = {0, };
+  blockCreateCli cobj = {{0}, };
   bool TAKE_SIZE=true;
   bool PREALLOC_OPT=false;
 
@@ -722,7 +721,7 @@ glusterBlockCreate(int argcount, char **options, int json)
 static int
 glusterBlockList(int argcount, char **options, int json)
 {
-  blockListCli cobj = {0};
+  blockListCli cobj = {{0},};
   int ret = -1;
 
 
@@ -744,7 +743,7 @@ glusterBlockList(int argcount, char **options, int json)
 static int
 glusterBlockDelete(int argcount, char **options, int json)
 {
-  blockDeleteCli dobj = {0};
+  blockDeleteCli dobj = {{0},};
   size_t optind = 1;
   int ret = -1;
 
@@ -811,7 +810,7 @@ glusterBlockDelete(int argcount, char **options, int json)
 static int
 glusterBlockInfo(int argcount, char **options, int json)
 {
-  blockInfoCli cobj = {0};
+  blockInfoCli cobj = {{0},};
   int ret = -1;
 
 
@@ -840,7 +839,7 @@ glusterBlockInfo(int argcount, char **options, int json)
 static int
 glusterBlockReplace(int argcount, char **options, int json)
 {
-  blockReplaceCli robj = {0};
+  blockReplaceCli robj = {{0},};
   int ret = -1;
   int optind = 1;
 
@@ -904,7 +903,7 @@ glusterBlockReplace(int argcount, char **options, int json)
 static int
 glusterBlockGenConfig(int argcount, char **options, int json)
 {
-  blockGenConfigCli robj = {0};
+  blockGenConfigCli robj = {{0},};
   int ret = -1;
   int optind = 1;
 
