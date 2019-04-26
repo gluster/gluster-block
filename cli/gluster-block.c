@@ -1029,10 +1029,15 @@ main(int argc, char *argv[])
   int count = 1;
   int args = argc;
   int json = GB_JSON_NONE;
+  int ret;
 
 
   if (argc <= 1) {
     glusterBlockHelp();
+    goto fail;
+  }
+
+  if (initGbConfig()) {
     goto fail;
   }
 
@@ -1075,8 +1080,13 @@ main(int argc, char *argv[])
     break;
   }
 
-  return glusterBlockParseArgs(args - 1, &argv[count], opt, json);
+  ret = glusterBlockParseArgs(args - 1, &argv[count], opt, json);
+
+  finiGbConfig();
+
+  return ret;
 
  fail:
+  finiGbConfig();
   exit(EXIT_FAILURE);
 }

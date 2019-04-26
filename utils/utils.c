@@ -14,18 +14,11 @@
 # include  <dirent.h>
 # include  <sys/stat.h>
 # include  <pthread.h>
+# include  <sys/mman.h>
 
 # include "utils.h"
 # include "lru.h"
 # include "config.h"
-
-struct gbConf gbConf = {
-  .lock = PTHREAD_MUTEX_INITIALIZER,
-  .glfsLruCount = LRU_COUNT_DEF,
-  .logLevel = GB_LOG_INFO,
-  .logDir = GB_LOGDIR_DEF,
-  .cliTimeout = CLI_TIMEOUT_DEF
-};
 
 const char *argp_program_version = ""                                 \
   PACKAGE_NAME" ("PACKAGE_VERSION")"                                  \
@@ -37,6 +30,64 @@ const char *argp_program_version = ""                                 \
   "or later), or the GNU General Public License, version 2 (GPLv2),\n"\
   "in all cases as published by the Free Software Foundation.";
 
+struct gbConf *gbConf = NULL;
+
+int
+initGbConfig(void)
+{
+  pthread_mutexattr_t attr;
+  int ret;
+
+
+  if (gbConf)
+    return 0;
+
+  if (gbCtx == GB_CLI_MODE) {
+    if (GB_ALLOC_N(gbConf, sizeof(gbConf)) < 0) {
+      ret = errno;
+      MSG(stderr, "Failed to allocate memory for gbConf %s", strerror (errno));
+      return ret;
+    }
+
+    pthread_mutex_init(&gbConf->lock, NULL);
+  } else {
+    gbConf = mmap(NULL, sizeof(*gbConf), PROT_READ|PROT_WRITE,
+                  MAP_SHARED|MAP_ANON, -1, 0);
+    if (gbConf == MAP_FAILED) {
+      ret = errno;
+      MSG(stderr, "mmap the gbConf failed %s", strerror (errno));
+      return ret;
+    }
+
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+    pthread_mutex_init(&gbConf->lock, &attr);
+  }
+
+  gbConf->glfsLruCount = LRU_COUNT_DEF;
+  gbConf->logLevel = GB_LOG_INFO;
+  snprintf(gbConf->logDir, PATH_MAX, "%s", GB_LOGDIR_DEF);
+  gbConf->cliTimeout = CLI_TIMEOUT_DEF;
+
+  return 0;
+}
+
+
+void
+finiGbConfig(void)
+{
+  if (!gbConf)
+      return;
+
+  pthread_mutex_destroy(&gbConf->lock);
+
+  if (gbCtx == GB_CLI_MODE) {
+    GB_FREE(gbConf);
+  } else {
+    munmap(gbConf, sizeof(*gbConf));
+  }
+}
+
 
 int
 glusterBlockSetLogLevel(unsigned int logLevel)
@@ -45,9 +96,9 @@ glusterBlockSetLogLevel(unsigned int logLevel)
     MSG(stderr, "unknown LOG-LEVEL: '%d'", logLevel);
     return -1;
   }
-  LOCK(gbConf.lock);
-  gbConf.logLevel = logLevel;
-  UNLOCK(gbConf.lock);
+  LOCK(gbConf->lock);
+  gbConf->logLevel = logLevel;
+  UNLOCK(gbConf->lock);
 
   if (gbCtx == GB_CLI_MODE) {
     LOG("cli", GB_LOG_DEBUG,
@@ -69,9 +120,9 @@ glusterBlockSetCliTimeout(size_t timeout)
     MSG(stderr, "unknown GB_CLI_TIMEOUT: '%zu'", timeout);
     return -1;
   }
-  LOCK(gbConf.lock);
-  gbConf.cliTimeout = timeout;
-  UNLOCK(gbConf.lock);
+  LOCK(gbConf->lock);
+  gbConf->cliTimeout = timeout;
+  UNLOCK(gbConf->lock);
 
   return 0;
 }
@@ -247,20 +298,20 @@ out:
 static bool
 glusterBlockLogdirCreate(void)
 {
-  DIR* dir = opendir(gbConf.logDir);
+  DIR* dir = opendir(gbConf->logDir);
   char *buf = NULL;
 
 
   if (dir) {
     closedir(dir);
   } else if (errno == ENOENT) {
-    GB_ASPRINTF(&buf, "mkdir -p %s -m 0755 > /dev/null", gbConf.logDir);
+    GB_ASPRINTF(&buf, "mkdir -p %s -m 0755 > /dev/null", gbConf->logDir);
     if (gbRunner(buf) == -1) {
-      MSG(stderr, "mkdir(%s) failed (%s)", gbConf.logDir, strerror (errno));
+      MSG(stderr, "mkdir(%s) failed (%s)", gbConf->logDir, strerror (errno));
       return 0;  /* False */
     }
   } else {
-    MSG(stderr, "opendir(%s) failed (%s)", gbConf.logDir, strerror (errno));
+    MSG(stderr, "opendir(%s) failed (%s)", gbConf->logDir, strerror (errno));
     return 0;  /* False */
   }
 
@@ -279,9 +330,9 @@ fetchGlfsVolServerFromEnv()
   if (!volServer) {
     volServer = "localhost";
   }
-  snprintf(gbConf.volServer, HOST_NAME_MAX, "%s", volServer);
+  snprintf(gbConf->volServer, HOST_NAME_MAX, "%s", volServer);
 
-  LOG("mgmt", GB_LOG_INFO, "Block Hosting Volfile Server Set to: %s", gbConf.volServer);
+  LOG("mgmt", GB_LOG_INFO, "Block Hosting Volfile Server Set to: %s", gbConf->volServer);
 }
 
 
@@ -423,7 +474,7 @@ initLogDirAndFiles(char *newLogDir)
   }
 
   LOG(dom, logLevel,
-      "trying to change logDir from %s to %s", gbConf.logDir, logDir);
+      "trying to change logDir from %s to %s", gbConf->logDir, logDir);
 
   if (strlen(logDir) > PATH_MAX - GB_MAX_LOGFILENAME) {
     LOG(dom, GB_LOG_ERROR, "strlen of logDir Path > PATH_MAX: %s", logDir);
@@ -432,35 +483,35 @@ initLogDirAndFiles(char *newLogDir)
   }
 
   /* set logfile paths */
-  LOCK(gbConf.lock);
-  snprintf(gbConf.logDir, PATH_MAX,
+  LOCK(gbConf->lock);
+  snprintf(gbConf->logDir, PATH_MAX,
            "%s", logDir);
-  snprintf(gbConf.daemonLogFile, PATH_MAX,
+  snprintf(gbConf->daemonLogFile, PATH_MAX,
            "%s/gluster-blockd.log", logDir);
-  snprintf(gbConf.cliLogFile, PATH_MAX,
+  snprintf(gbConf->cliLogFile, PATH_MAX,
            "%s/gluster-block-cli.log", logDir);
-  snprintf(gbConf.gfapiLogFile, PATH_MAX,
+  snprintf(gbConf->gfapiLogFile, PATH_MAX,
            "%s/gluster-block-gfapi.log", logDir);
-  snprintf(gbConf.configShellLogFile, PATH_MAX,
+  snprintf(gbConf->configShellLogFile, PATH_MAX,
            "%s/gluster-block-configshell.log", logDir);
-  snprintf(gbConf.cmdhistoryLogFile, PATH_MAX,
+  snprintf(gbConf->cmdhistoryLogFile, PATH_MAX,
            "%s/cmd_history.log", logDir);
 
   if(!glusterBlockLogdirCreate()) {
     ret = -1;
   }
-  UNLOCK(gbConf.lock);
+  UNLOCK(gbConf->lock);
 
   if (ret == -1) {
     goto out;
   }
 
-  LOG(dom, logLevel, "logDir now is %s", gbConf.logDir);
+  LOG(dom, logLevel, "logDir now is %s", gbConf->logDir);
 
-  glusterBlockUpdateLruLogdir(gbConf.gfapiLogFile);
+  glusterBlockUpdateLruLogdir(gbConf->gfapiLogFile);
 
   if (!def) {
-    glusterLogrotateConfigSet(gbConf.logDir);
+    glusterLogrotateConfigSet(gbConf->logDir);
   }
 
 out:

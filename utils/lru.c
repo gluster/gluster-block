@@ -64,9 +64,9 @@ glusterBlockSetLruCount(const size_t lruCount)
     return -1;
   }
 
-  LOCK(gbConf.lock);
-  gbConf.glfsLruCount = lruCount;
-  UNLOCK(gbConf.lock);
+  LOCK(gbConf->lock);
+  gbConf->glfsLruCount = lruCount;
+  UNLOCK(gbConf->lock);
 
   LOG("mgmt", GB_LOG_CRIT,
       "glfsLruCount now is %lu", lruCount);
@@ -103,13 +103,13 @@ appendNewEntry(const char *volname, glfs_t *fs)
   Entry *tmp;
 
 
-  LOCK(gbConf.lock);
-  if (lruCount == gbConf.glfsLruCount) {
+  LOCK(gbConf->lock);
+  if (lruCount == gbConf->glfsLruCount) {
     releaseColdEntry();
   }
 
   if (GB_ALLOC(tmp) < 0) {
-    UNLOCK(gbConf.lock);
+    UNLOCK(gbConf->lock);
     return -1;
   }
   GB_STRCPYSTATIC(tmp->volume, volname);
@@ -120,7 +120,7 @@ appendNewEntry(const char *volname, glfs_t *fs)
   UNLOCK(lru_lock);
 
   lruCount++;
-  UNLOCK(gbConf.lock);
+  UNLOCK(gbConf->lock);
 
   return 0;
 }
