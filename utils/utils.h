@@ -156,7 +156,7 @@ struct gbConf {
   char volServer[HOST_NAME_MAX];
 };
 
-extern struct gbConf gbConf;
+extern struct gbConf *gbConf;
 
 # define  LOG(str, level, fmt, ...)                                    \
           do {                                                         \
@@ -165,16 +165,16 @@ extern struct gbConf gbConf;
             char *tmp;                                                 \
             if (GB_STRDUP(tmp, str) < 0)                               \
               fprintf(stderr, "No memory: %s\n", strerror(errno));     \
-            LOCK(gbConf.lock);                                         \
-            if (level <= gbConf.logLevel) {                            \
+            LOCK(gbConf->lock);                                        \
+            if (level <= gbConf->logLevel) {                           \
               if (!strcmp(tmp, "mgmt"))                                \
-                fd = fopen (gbConf.daemonLogFile, "a");                \
+                fd = fopen (gbConf->daemonLogFile, "a");               \
               else if (!strcmp(tmp, "cli"))                            \
-                fd = fopen (gbConf.cliLogFile, "a");                   \
+                fd = fopen (gbConf->cliLogFile, "a");                  \
               else if (!strcmp(tmp, "gfapi"))                          \
-                fd = fopen (gbConf.gfapiLogFile, "a");                 \
+                fd = fopen (gbConf->gfapiLogFile, "a");                \
               else if (!strcmp(tmp, "cmdlog"))                         \
-                fd = fopen (gbConf.cmdhistoryLogFile, "a");            \
+                fd = fopen (gbConf->cmdhistoryLogFile, "a");           \
               else                                                     \
                 fd = stderr;                                           \
               if (fd == NULL) {                                        \
@@ -190,7 +190,7 @@ extern struct gbConf gbConf;
               if (fd != stderr)                                        \
                 fclose(fd);                                            \
             }                                                          \
-            UNLOCK(gbConf.lock);                                       \
+            UNLOCK(gbConf->lock);                                      \
             GB_FREE(tmp);                                              \
           } while (0)
 
@@ -617,6 +617,9 @@ typedef enum gbDependencies {
   TCMURUNNER       = 1,
   TARGETCLI        = 2,
 } gbDependencies;
+
+int initGbConfig(void);
+void finiGbConfig(void);
 
 int glusterBlockSetLogLevel(unsigned int logLevel);
 

@@ -337,7 +337,7 @@ glusterBlockDParseArgs(int count, char **options)
       break;
 
     case GB_DAEMON_NO_REMOTE_RPC:
-      gbConf.noRemoteRpc = true;
+      gbConf->noRemoteRpc = true;
       break;
 
     }
@@ -552,7 +552,7 @@ blockNodeSanityCheck(void)
   /* Check if dependencies meet minimum recommended versions */
   gbDependenciesVersionCheck();
 
-  if (GB_ASPRINTF(&global_opts, GB_TGCLI_GLOBALS, gbConf.configShellLogFile) == -1) {
+  if (GB_ASPRINTF(&global_opts, GB_TGCLI_GLOBALS, gbConf->configShellLogFile) == -1) {
     return ENOMEM;
   }
   /* Set targetcli globals */
@@ -588,8 +588,12 @@ main (int argc, char **argv)
   int wstatus;
 
 
-  if(initLogging()) {
+  if (initGbConfig()) {
     exit(EXIT_FAILURE);
+  }
+
+  if(initLogging()) {
+    goto out;
   }
 
   fetchGlfsVolServerFromEnv();
@@ -597,7 +601,7 @@ main (int argc, char **argv)
   gbCfg = glusterBlockSetupConfig();
   if (!gbCfg) {
     LOG("mgmt", GB_LOG_ERROR, "glusterBlockSetupConfig() failed");
-    exit(EXIT_FAILURE);
+    goto out;
   }
 
   if (glusterBlockDParseArgs(argc, argv)) {
@@ -619,7 +623,7 @@ main (int argc, char **argv)
     goto out;
   }
 
-  if (!gbConf.noRemoteRpc) {
+  if (!gbConf->noRemoteRpc) {
     if (blockNodeSanityCheck()) {
       goto out;
     }
@@ -638,7 +642,7 @@ main (int argc, char **argv)
   signal(SIGPIPE, SIG_IGN);
 
   pmap_unset(GLUSTER_BLOCK_CLI, GLUSTER_BLOCK_CLI_VERS);
-  if (!gbConf.noRemoteRpc) {
+  if (!gbConf->noRemoteRpc) {
     pmap_unset(GLUSTER_BLOCK, GLUSTER_BLOCK_VERS);
   }
 
@@ -686,6 +690,8 @@ main (int argc, char **argv)
   }
 
  out:
+  finiGbConfig();
+
   glusterBlockCleanGlobals();
   exit (EXIT_FAILURE);
   /* NOTREACHED */

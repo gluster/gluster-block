@@ -34,27 +34,27 @@ glusterBlockVolumeInit(char *volume, int *errCode, char **errMsg)
     GB_ASPRINTF (errMsg, "Not able to Initialize volume %s [%s]", volume,
                  strerror(*errCode));
     LOG("gfapi", GB_LOG_ERROR, "glfs_new(%s) from %s failed[%s]", volume,
-        gbConf.volServer, strerror(*errCode));
+        gbConf->volServer, strerror(*errCode));
     return NULL;
   }
 
-  ret = glfs_set_volfile_server(glfs, "tcp", gbConf.volServer, 24007);
+  ret = glfs_set_volfile_server(glfs, "tcp", gbConf->volServer, 24007);
   if (ret) {
     *errCode = errno;
     GB_ASPRINTF (errMsg, "Not able to add Volfile server for volume %s[%s]",
                  volume, strerror(*errCode));
     LOG("gfapi", GB_LOG_ERROR, "glfs_set_volfile_server(%s) of %s "
-        "failed[%s]", gbConf.volServer, volume, strerror(*errCode));
+        "failed[%s]", gbConf->volServer, volume, strerror(*errCode));
     goto out;
   }
 
-  ret = glfs_set_logging(glfs, gbConf.gfapiLogFile, GFAPI_LOG_LEVEL);
+  ret = glfs_set_logging(glfs, gbConf->gfapiLogFile, GFAPI_LOG_LEVEL);
   if (ret) {
     *errCode = errno;
     GB_ASPRINTF (errMsg, "Not able to add logging for volume %s[%s]", volume,
                  strerror(*errCode));
     LOG("gfapi", GB_LOG_ERROR, "glfs_set_logging(%s, %d) on %s failed[%s]",
-        gbConf.gfapiLogFile, GFAPI_LOG_LEVEL, volume, strerror(*errCode));
+        gbConf->gfapiLogFile, GFAPI_LOG_LEVEL, volume, strerror(*errCode));
     goto out;
   }
 

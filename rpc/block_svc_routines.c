@@ -1937,8 +1937,8 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
     goto out;
   }
 
-  cobj->xdata.xdata_len = strlen(gbConf.volServer);
-  cobj->xdata.xdata_val = (char *) gbConf.volServer;
+  cobj->xdata.xdata_len = strlen(gbConf->volServer);
+  cobj->xdata.xdata_val = (char *) gbConf->volServer;
   GB_STRCPYSTATIC(cobj->ipaddr, blk->new_node);
   GB_STRCPYSTATIC(cobj->volume, info->volume);
   GB_STRCPYSTATIC(cobj->gbid, info->gbid);
@@ -2709,10 +2709,10 @@ getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
   json_object_object_add(so_obj, "attributes", so_obj_attr);
   // }
 
-  if (!strcmp(gbConf.volServer, "localhost")) {
+  if (!strcmp(gbConf->volServer, "localhost")) {
     snprintf(cfgstr, 1024, "glfs/%s@%s/block-store/%s", info->volume, blk->addr, info->gbid);
   } else {
-    snprintf(cfgstr, 1024, "glfs/%s@%s/block-store/%s", info->volume, gbConf.volServer, info->gbid);
+    snprintf(cfgstr, 1024, "glfs/%s@%s/block-store/%s", info->volume, gbConf->volServer, info->gbid);
   }
   json_object_object_add(so_obj, "config", GB_JSON_OBJ_TO_STR(cfgstr[0]?cfgstr:NULL));
   if (info->rb_size) {
@@ -3981,8 +3981,8 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   cobj.rb_size = blk->rb_size;
   GB_STRCPYSTATIC(cobj.gbid, gbid);
   GB_STRDUP(cobj.block_hosts,  blk->block_hosts);
-  cobj.xdata.xdata_len = strlen(gbConf.volServer);
-  cobj.xdata.xdata_val = (char *) gbConf.volServer;
+  cobj.xdata.xdata_len = strlen(gbConf->volServer);
+  cobj.xdata.xdata_val = (char *) gbConf->volServer;
 
   if (blk->auth_mode) {
     uuid_generate(uuid);
