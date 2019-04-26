@@ -2,52 +2,9 @@
 gluster-block is a CLI utility, which aims at making Gluster backed block
 storage creation and maintenance as simple as possible.
 
-## License
-gluster-block is licensed to you under your choice of the GNU Lesser General Public License, version 3 or any later version ([LGPLv3](https://opensource.org/licenses/lgpl-3.0.html) or later), or the GNU General Public License, version 2 ([GPLv2](https://opensource.org/licenses/GPL-2.0)), in all cases as published by the Free Software Foundation.
-
-## Gluster
-[Gluster](http://gluster.readthedocs.io/en/latest/) is a well known scale-out distributed storage system, flexible in its design and easy to use. One of its key goals is to provide high availability of data. Gluster is very easy to setup and use. Addition and removal of storage servers from a Gluster cluster is intuitive. These capabilities along with other data services that Gluster provides makes it a reliable software defined storage platform.
-
-We can access glusterfs via [FUSE](https://en.wikipedia.org/wiki/Filesystem_in_Userspace) module. However to perform a single filesystem operation various context switches are required which can often exhibit performance issues. [Libgfapi](http://blog.gluster.org/2014/04/play-with-libgfapi-and-its-python-bindings/) is a userspace library for accessing data in Glusterfs. It can perform I/O on gluster volumes without the FUSE module, kernel VFS layer and hence requires no context switches. It exposes a filesystem like API for accessing gluster volumes. Samba, NFS-Ganesha, QEMU and now the tcmu-runner all use libgfapi to integrate with Gluster.
-
-> A unique distributed storage solution build on traditional filesystems
-
-### How we provide block storage in gluster ?
-
-![untitled diagram](https://cloud.githubusercontent.com/assets/12432241/21478518/235e533c-cb72-11e6-9c5a-e351513a34b7.png)
-
-1. Create a file in the gluster volume
-2. We expose the file in the gluster volume as tcmu backstore using tcmu-runner, exporting the target file as iSCSI LUN and
-3. From the initiator we login to the exported LUN and play with the block device
-
-#### Background
-The [SCSI](http://searchstorage.techtarget.com/definition/SCSI) subsystem uses a form of client-server model.  The Client/Initiator request I/O happen through target which is a storage device. The SCSI target subsystem enables a computer node to behave as a SCSI storage device, responding to storage requests by other SCSI initiator nodes.
-
-In simple terms SCSI is a set of standards for physically connecting and transferring data between computers and peripheral devices.
-
-The most common implementation of the SCSI target subsystem is an iSCSIserver, [iSCSI](http://searchstorage.techtarget.com/definition/iSCSI) transports block level data between the iSCSI initiator and the target which resides on the actual storage device. iSCSi protocol wraps up the SCSI commands and sends it over TCP/IP layer. Up on receiving the packets at the other end it disassembles them to form the same SCSI commands, hence on the OS’es it seen as local SCSI device.
-
-> In other words iSCSI is SCSI over TCP/IP.
-
-The [LIO](http://linux-iscsi.org/wiki/LIO) project began with the iSCSI design as its core objective, and created a generic SCSI target subsystem to support iSCSI. LIO is the SCSI target in the Linux kernel. It is entirely kernel code, and allows exported SCSI logical units (LUNs) to be backed by regular files or block devices.
-
-> LIO is Linux IO target, is an implementation of iSCSI target.
-
-[TCM](https://www.kernel.org/doc/Documentation/target/tcmu-design.txt) is another name for LIO, an in-kernel iSCSI target (server). As we know existing TCM targets run in the kernel. TCMU (TCM in Userspace) allows userspace programs to be written which act as iSCSI targets. These enables wider variety of backstores without kernel code. Hence the TCMU userspace-passthrough backstore allows a userspace process to handle requests to a LUN. TCMU utilizes the traditional UIO subsystem, which is designed to allow device driver development in userspace.
-
-> One such backstore with best clustered network storage capabilities is GlusterFS
-
-Any TCMU userspace-passthrough can utilize the TCMU framework handling the messy details of the TCMU interface.
-One such passthrough is [Tcmu-runner](https://github.com/open-iscsi/tcmu-runner) (Thanks to Andy Grover). Tcmu-runner has a glusterfs handler that can interact with the backed file in gluster volume over gluster libgfapi interface and can show it as a target (over network).
-
-Some responsibilities of userspace-passthrough include,
-
-Discovering and configuring TCMU UIO devices
-waiting for the events on the device and
-managing the command ring buffers
-
-[TargetCli](https://github.com/Datera/targetcli) is the general management platform for the LIO/TCM/TCMU. TargetCli with its shell interface is used to configure LIO.
-> Think it like a shell which makes life easy in configuring LIO core
+### Demo
+------
+[![asciicast](https://asciinema.org/a/237565.svg)](https://asciinema.org/a/237565)
 
 ### Install
 ------
@@ -70,10 +27,10 @@ And pass '--enable-tirpc=yes'(default) flag or nothing at configure time
 ### Usage
 ------
 **Prerequisites:** *this guide assumes that the following are already present*
-- [x] *A gluster volume with name 'block-test'*
+- [x] *A block hosting gluster volume with name 'hosting-volume'*
 - [x] *Open 24007(for glusterd) 24010(gluster-blockd) 3260(iscsi targets) 111(rpcbind) ports and glusterfs service in your firewall*
 
-<b>Daemon</b>: run gluster-blockd on all the nodes
+<b>Daemon</b>: gluster-blockd runs on all the nodes
 ```script
 # gluster-blockd --help
 gluster-blockd (0.3)
@@ -166,33 +123,36 @@ Preparation:
 * Create a gluster trusted storage pool of the 3 nodes
   192.168.1.11, 192.168.1.12, and 192.168.1.13.
     * Read more about [trusted storage pools](https://gluster.readthedocs.io/en/latest/Administrator%20Guide/Storage%20Pools/).
-* Create a gluster volume called `block-test` on the gluster cluster.
+* Create a block hosting gluster volume called `hosting-volume` on the gluster cluster.
     * Read More on how to [create a gluster volume](https://gluster.readthedocs.io/en/latest/Administrator%20Guide/Setting%20Up%20Volumes/#creating-replicated-volumes).
+    * We recommend replica 3 volume with group profile applied on it.
+      * Helpful command: `# gluster vol set <block-hosting-volume> group gluster-block`
 
-In the following, you can execute gluster-block CLI from any of the 3
-nodes where glusterd and gluster-blockd are running.
+You can execute gluster-block CLI from any of the 3 nodes where glusterd and gluster-blockd are running.
 
+
+##### On the Server/Target node[s]
 <pre>
-Create 1G gluster block storage with name 'sample-block'
-<b># gluster-block create block-test/sample-block ha 3 192.168.1.11,192.168.1.12,192.168.1.13 1GiB</b>
+Create 1G gluster block storage with name 'block-volume'
+<b># gluster-block create hosting-volume/block-volume ha 3 192.168.1.11,192.168.1.12,192.168.1.13 1GiB</b>
 IQN: iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea
 PORTAL(S): 192.168.1.11:3260 192.168.1.12:3260 192.168.1.13:3260
 RESULT: SUCCESS
 
 Enable Authentication (this can be part of create as well)
-<b># gluster-block modify block-test/sample-block auth enable</b>
+<b># gluster-block modify hosting-volume/block-volume auth enable</b>
 IQN: iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea
 USERNAME: aafea465-9167-4880-b37c-2c36db8562ea
 PASSWORD: 4a5c9b84-3a6d-44b4-9668-c9a6d699a5e9
 SUCCESSFUL ON:  192.168.1.11 192.168.1.12 192.168.1.13
 RESULT: SUCCESS
 
-<b># gluster-block list block-test</b>
-sample-block
+<b># gluster-block list hosting-volume</b>
+block-volume
 
-<b># gluster-block info block-test/sample-block</b>
-NAME: sample-block
-VOLUME: block-test
+<b># gluster-block info hosting-volume/block-volume</b>
+NAME: block-volume
+VOLUME: hosting-volume
 GBID: 6b60c53c-8ce0-4d8d-a42c-5b546bca3d09
 SIZE: 1.0 GiB
 HA: 3
@@ -200,7 +160,7 @@ EXPORTED NODE(S): 192.168.1.11 192.168.1.12 192.168.1.13
 </pre>
 <b>NOTE:</b> Block targets created using gluster-block utility will use TPG: 1 and LUN: 0.
 
-##### On the Initiator machine
+##### On the Client/Initiator node
 <pre>
 # dnf install iscsi-initiator-utils device-mapper-multipath
 # systemctl start iscsid.service
@@ -213,9 +173,9 @@ Below we set mapth in Active/Passive mode; Note currently Active/Active is not s
 # mpathconf --enable
 
 Please add the below configuration at the end of /etc/multipath.conf file.
-# LIO iSCSI
 
 For both the versions with and without load-balance support:
+# LIO iSCSI
 devices {
         device {
                 vendor "LIO-ORG"
@@ -231,6 +191,7 @@ devices {
 }
 
 For versions with load-balance support:
+# LIO iSCSI
 devices {
         device {
                 vendor "LIO-ORG"
@@ -242,6 +203,7 @@ devices {
                 path_checker "tur"
                 prio "alua"
                 no_path_retry 120
+                rr_weight "uniform"
         }
 }
 
@@ -264,19 +226,67 @@ Login ...
 # mount /dev/mapper/mpatha /mnt
 </pre>
 
-##### Delete the targets
+##### Deleting the block volume
 <pre>
-On initiator node
+On client node
 # umount /mnt
 # iscsiadm -m node -u
 
-On the gluster-block node
-<b># gluster-block delete block-test/sample-block</b>
+On the server node
+<b># gluster-block delete hosting-volume/block-volume</b>
 SUCCESSFUL ON: 192.168.1.11 192.168.1.12 192.168.1.13
 RESULT: SUCCESS
 </pre>
 
 <b>NOTE:</b> gluster-block cannot track iSCSI targets created manually using targetcli.
 
-## Demo about "how to gluster-block ?":
-[![asciicast](https://asciinema.org/a/237565.svg)](https://asciinema.org/a/237565)
+------
+
+## About Gluster
+[Gluster](http://gluster.readthedocs.io/en/latest/) is a well known scale-out distributed storage system, flexible in its design and easy to use. One of its key goals is to provide high availability of data. Gluster is very easy to setup and use. Addition and removal of storage servers from a Gluster cluster is intuitive. These capabilities along with other data services that Gluster provides makes it a reliable software defined storage platform.
+
+We can access glusterfs via [FUSE](https://en.wikipedia.org/wiki/Filesystem_in_Userspace) module. However to perform a single filesystem operation various context switches are required which can often exhibit performance issues. [Libgfapi](http://blog.gluster.org/2014/04/play-with-libgfapi-and-its-python-bindings/) is a userspace library for accessing data in Glusterfs. It can perform I/O on gluster volumes without the FUSE module, kernel VFS layer and hence requires no context switches. It exposes a filesystem like API for accessing gluster volumes. Samba, NFS-Ganesha, QEMU and now the tcmu-runner all use libgfapi to integrate with Gluster.
+
+> A unique distributed storage solution build on traditional filesystems
+
+### How we provide block storage in gluster ?
+
+![untitled diagram](https://cloud.githubusercontent.com/assets/12432241/21478518/235e533c-cb72-11e6-9c5a-e351513a34b7.png)
+
+1. Create a file in the gluster volume (Block Hosting Volume)
+2. We expose the file in the gluster volume as tcmu backstore using tcmu-runner, exporting the target file as iSCSI LUN and
+3. From the initiator we login to the exported LUN and play with the block device
+
+#### Background
+The [SCSI](http://searchstorage.techtarget.com/definition/SCSI) subsystem uses a form of client-server model.  The Client/Initiator request I/O happen through target which is a storage device. The SCSI target subsystem enables a computer node to behave as a SCSI storage device, responding to storage requests by other SCSI initiator nodes.
+
+In simple terms SCSI is a set of standards for physically connecting and transferring data between computers and peripheral devices.
+
+The most common implementation of the SCSI target subsystem is an iSCSIserver, [iSCSI](http://searchstorage.techtarget.com/definition/iSCSI) transports block level data between the iSCSI initiator and the target which resides on the actual storage device. iSCSi protocol wraps up the SCSI commands and sends it over TCP/IP layer. Up on receiving the packets at the other end it disassembles them to form the same SCSI commands, hence on the OS’es it seen as local SCSI device.
+
+> In other words iSCSI is SCSI over TCP/IP.
+
+The [LIO](http://linux-iscsi.org/wiki/LIO) project began with the iSCSI design as its core objective, and created a generic SCSI target subsystem to support iSCSI. LIO is the SCSI target in the Linux kernel. It is entirely kernel code, and allows exported SCSI logical units (LUNs) to be backed by regular files or block devices.
+
+> LIO is Linux IO target, is an implementation of iSCSI target.
+
+[TCM](https://www.kernel.org/doc/Documentation/target/tcmu-design.txt) is another name for LIO, an in-kernel iSCSI target (server). As we know existing TCM targets run in the kernel. TCMU (TCM in Userspace) allows userspace programs to be written which act as iSCSI targets. These enables wider variety of backstores without kernel code. Hence the TCMU userspace-passthrough backstore allows a userspace process to handle requests to a LUN. TCMU utilizes the traditional UIO subsystem, which is designed to allow device driver development in userspace.
+
+> One such backstore with best clustered network storage capabilities is GlusterFS
+
+Any TCMU userspace-passthrough can utilize the TCMU framework handling the messy details of the TCMU interface.
+One such passthrough is [Tcmu-runner](https://github.com/open-iscsi/tcmu-runner) (Thanks to Andy Grover). Tcmu-runner has a glusterfs handler that can interact with the backed file in gluster volume over gluster libgfapi interface and can show it as a target (over network).
+
+Some responsibilities of userspace-passthrough include,
+
+Discovering and configuring TCMU UIO devices
+waiting for the events on the device and
+managing the command ring buffers
+
+[TargetCli](https://github.com/Datera/targetcli) is the general management platform for the LIO/TCM/TCMU. TargetCli with its shell interface is used to configure LIO.
+> Think it like a shell which makes life easy in configuring LIO core
+
+------
+
+## License
+gluster-block is licensed to you under your choice of the GNU Lesser General Public License, version 3 or any later version ([LGPLv3](https://opensource.org/licenses/lgpl-3.0.html) or later), or the GNU General Public License, version 2 ([GPLv2](https://opensource.org/licenses/GPL-2.0)), in all cases as published by the Free Software Foundation.

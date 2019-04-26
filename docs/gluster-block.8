@@ -36,7 +36,7 @@ multipath requirement for high availability (default: 1)
 authentication setting (default: disable)
 .TP
 [prealloc <full|no>]
-"full" mode preallocates space by writing zeros to storage (default: no)
+"full" mode preallocates space by writing zeros to storage (default: full)
 .TP
 [storage <filename>]
 existing file(only name) in the gluster volume, that needs to be linked while creating block (default: creates a new file)
@@ -188,7 +188,9 @@ To generate the block volumes target configuration and load it
 .br
 /var/run/gluster-block.lock
 .br
-/etc/sysconfig/gluster-blockd-config
+/etc/sysconfig/gluster-blockd
+.br
+/etc/logrotate.d/gluster-blockd
 .PP
 
 
