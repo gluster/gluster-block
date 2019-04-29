@@ -92,21 +92,38 @@ finiGbConfig(void)
 int
 glusterBlockSetLogLevel(unsigned int logLevel)
 {
-  if (logLevel >= GB_LOG_MAX) {
-    MSG(stderr, "unknown LOG-LEVEL: '%d'", logLevel);
-    return -1;
+  char *dom;
+  int level;
+
+  if (gbCtx == GB_CLI_MODE) {
+    dom = "cli";
+    level = GB_LOG_DEBUG;
+  } else if (gbCtx == GB_DAEMON_MODE) {
+    dom = "mgmt";
+    level = GB_LOG_CRIT;
   }
+
+  if (!dom) {
+    return -EINVAL;
+  }
+
+  if (logLevel >= GB_LOG_MAX) {
+    LOG(dom, GB_LOG_ERROR, "unknown LOG-LEVEL: '%d'", logLevel);
+    return -EINVAL;
+  }
+
   LOCK(gbConf->lock);
+  if (gbConf->logLevel == logLevel) {
+    UNLOCK(gbConf->lock);
+    LOG(dom, GB_LOG_DEBUG,
+        "No changes to current logLevel: %s, skipping it.",
+        LogLevelLookup[logLevel]);
+    return 0;
+  }
   gbConf->logLevel = logLevel;
   UNLOCK(gbConf->lock);
 
-  if (gbCtx == GB_CLI_MODE) {
-    LOG("cli", GB_LOG_DEBUG,
-        "logLevel now is %s", LogLevelLookup[logLevel]);
-  } else {
-    LOG("mgmt", GB_LOG_CRIT,
-        "logLevel now is %s", LogLevelLookup[logLevel]);
-  }
+  LOG(dom, level, "logLevel now is %s", LogLevelLookup[logLevel]);
 
   return 0;
 }
@@ -459,6 +476,15 @@ initLogDirAndFiles(char *newLogDir)
    */
   if (newLogDir) {
     logDir = newLogDir;
+    LOCK(gbConf->lock);
+    if (!strcmp(logDir, gbConf->logDir)) {
+      UNLOCK(gbConf->lock);
+      LOG(dom, GB_LOG_DEBUG,
+          "No changes to current logDir: %s, skipping it.",
+          gbConf->logDir);
+      goto out;
+    }
+    UNLOCK(gbConf->lock);
   } else {
     logDir = getenv("GB_LOGDIR");
 
