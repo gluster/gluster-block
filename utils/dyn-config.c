@@ -246,15 +246,18 @@ glusterBlockReadConfig(gbConfig *cfg, ssize_t *len)
   int save = errno;
   char *p, *buf, *line = NULL;
   ssize_t m, buf_len = GB_BUF_LEN;
+  int i, count = 0;
   size_t n;
   FILE *fp;
-  int i;
+  bool empty = true;
 
 
   if (GB_ALLOC_N(buf, buf_len) < 0) {
     return NULL;
   }
 
+retry:
+  count++;
   for (i = 0; i < 5; i++) {
     if ((fp = fopen(cfg->configPath, "r")) == NULL) {
       /* give a moment for editor to restore
@@ -274,6 +277,7 @@ glusterBlockReadConfig(gbConfig *cfg, ssize_t *len)
   *len = 0;
   p = buf;
   while ((m = getline(&line, &n, fp)) != -1) {
+    empty = false;
     if (gluserBlockIsBlankOrCommentLine(line, m)) {
       continue;
     }
@@ -293,11 +297,33 @@ glusterBlockReadConfig(gbConfig *cfg, ssize_t *len)
     *len += m;
   }
 
-  *len += 1;
-  buf[*len] = '\0';
-
-  fclose(fp);
   GB_FREE(line);
+  fclose(fp);
+
+  /*
+   * In-case if the editor (vim) follows write to a new file (.swp, .tmp ..)
+   * and move it to actual file name later. There is a window, where we will
+   * encounter one case that the file data is not flushed to the disk, so in
+   * another process(here) when reading it will be empty.
+   *
+   * Let just wait and try again.
+   */
+  if (empty == true ) {
+    if (count <= 5) {
+      LOG("mgmt", GB_LOG_DEBUG,
+          "failed to read the config from file, probably your editors savefile"
+          " transaction is conflicting, retrying (%d/5) time(s)", count);
+      sleep(1);
+      goto retry;
+    }
+
+    GB_FREE(buf);
+    goto out;
+  }
+
+  buf[++(*len)] = '\0';
+
+out:
   errno = save;
   return buf;
 }
