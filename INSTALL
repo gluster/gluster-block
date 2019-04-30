@@ -7,8 +7,8 @@ Install from Source:
 
 # git clone https://github.com/gluster/gluster-block.git
 # cd gluster-block/
-# dnf install gcc autoconf automake make file libtool libuuid-devel \
-              json-c-devel glusterfs-api-devel targetcli tcmu-runner
+# dnf install gcc autoconf automake make file libtool libuuid-devel json-c-devel \
+              glusterfs-api-devel glusterfs-server targetcli tcmu-runner
 
 On Fedora27 and Centos7 [Which use legacy glibc RPC], pass '--enable-tirpc=no'
 # ./autogen.sh && ./configure --enable-tirpc=no && make -j install
