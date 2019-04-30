@@ -12,7 +12,7 @@ storage creation and maintenance as simple as possible.
 # git clone https://github.com/gluster/gluster-block.git
 # cd gluster-block/
 
-# dnf install gcc autoconf automake make file libtool libuuid-devel json-c-devel glusterfs-api-devel tcmu-runner targetcli
+# dnf install gcc autoconf automake make file libtool libuuid-devel json-c-devel glusterfs-api-devel glusterfs-server tcmu-runner targetcli
 
 On Fedora27 and Centos7 [Which use legacy glibc RPC], pass '--enable-tirpc=no' flag at configure time
 # ./autogen.sh && ./configure --enable-tirpc=no && make -j install
@@ -54,11 +54,11 @@ commands:
         Show version info and exit.
 ```
 
-You can run gluster-blockd as systemd service, note '/etc/sysconfig/gluster-blockd' is the configuration file where you can choose to edit various options, while systemd will take care of parsing them all and supply to daemon.
+You can run gluster-blockd as systemd service, note '/etc/sysconfig/gluster-blockd' is the configuration file which gets dynamicaly reloaded on changing any options.
 <pre>
 # cat /etc/sysconfig/gluster-blockd
 # systemctl daemon-reload
-# systemctl restart gluster-blockd
+# systemctl start gluster-blockd
 </pre>
 
 <b>CLI</b>: you can choose to run gluster-block(cli) from any node which has gluster-blockd running
@@ -174,7 +174,7 @@ Below we set mapth in Active/Passive mode; Note currently Active/Active is not s
 
 Please add the below configuration at the end of /etc/multipath.conf file.
 
-For both the versions with and without load-balance support:
+For tcmu-runner version < 1.4.0, use:
 # LIO iSCSI
 devices {
         device {
@@ -190,7 +190,7 @@ devices {
         }
 }
 
-For versions with load-balance support:
+For tcmu-runner version >= 1.4.0, use:
 # LIO iSCSI
 devices {
         device {
@@ -224,6 +224,28 @@ Login ...
 # lsblk (note the new devices, let's say sdb, sdc and sdd multipath to mpatha)
 # mkfs.xfs /dev/mapper/mpatha
 # mount /dev/mapper/mpatha /mnt
+</pre>
+
+##### On the Server/Target node[s] to resize the block volume
+<pre>
+Resizing 1G gluster block volume 'block-volume' to 2G
+<b># gluster-block modify hosting-volume/block-volume size 2GiB</b>
+IQN: iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea
+SIZE: 2.0 GiB
+SUCCESSFUL ON: 192.168.1.11 192.168.1.12 192.168.1.13
+RESULT: SUCCESS
+</pre>
+
+##### On Initiator side, commands to refresh the device after block volume resizing
+<pre>
+Rescan the devices
+# iscsiadm -m node -R
+
+Rescan the multipath
+# multipathd -k'resize map mpatha'
+
+Grow the filesystem
+# xfs_growfs  /mnt
 </pre>
 
 ##### Deleting the block volume
@@ -290,3 +312,11 @@ managing the command ring buffers
 
 ## License
 gluster-block is licensed to you under your choice of the GNU Lesser General Public License, version 3 or any later version ([LGPLv3](https://opensource.org/licenses/lgpl-3.0.html) or later), or the GNU General Public License, version 2 ([GPLv2](https://opensource.org/licenses/GPL-2.0)), in all cases as published by the Free Software Foundation.
+
+## Maintainers
+See [MAINTAINERS](https://github.com/gluster/gluster-block/blob/master/MAINTAINERS.md) file
+
+## Community
+* Please join our [mailing list](https://lists.gluster.org/mailman/listinfo/gluster-devel)
+* To ask a question or start a discussion, you can also raise an [issue](https://github.com/gluster/gluster-block/issues)
+* IRC: #gluster-devel on Freenode
