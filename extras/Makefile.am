@@ -1,5 +1,5 @@
 EXTRA_DIST = replace-node.sh wait-for-bricks.sh upgrade_activities.sh            \
-			 gluster-blockd.logrotate
+			 gluster-block.logrotate
 
 DISTCLEANFILES = Makefile.in
 
@@ -12,11 +12,11 @@ install-data-local:
 	$(INSTALL_DATA) -m 755 $(top_srcdir)/extras/upgrade_activities.sh            \
 		$(DESTDIR)$(GLUSTER_BLOCKD_LIBEXECDIR)/upgrade_activities.sh;            \
 	$(MKDIR_P) $(DESTDIR)$(GLUSTER_BLOCKD_LOGROTATEDIR);                         \
-	$(INSTALL_DATA) gluster-blockd.logrotate                               \
-		$(DESTDIR)$(GLUSTER_BLOCKD_LOGROTATEDIR)/gluster-blockd;
+	$(INSTALL_DATA) gluster-block.logrotate                               \
+		$(DESTDIR)$(GLUSTER_BLOCKD_LOGROTATEDIR)/gluster-block;
 
 uninstall-local:
 	rm -f $(DESTDIR)$(GLUSTER_BLOCKD_LIBEXECDIR)/wait-for-bricks.sh              \
 		$(DESTDIR)$(GLUSTER_BLOCKD_LIBEXECDIR)/upgrade_activities.sh             \
 		$(DESTDIR)$(GLUSTER_BLOCKD_WORKDIR)/gb_upgrade.status                    \
-		$(DESTDIR)$(GLUSTER_BLOCKD_LOGROTATEDIR)/gluster-blockd;
+		$(DESTDIR)$(GLUSTER_BLOCKD_LOGROTATEDIR)/gluster-block;
