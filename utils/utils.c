@@ -98,13 +98,9 @@ glusterBlockSetLogLevel(unsigned int logLevel)
   if (gbCtx == GB_CLI_MODE) {
     dom = "cli";
     level = GB_LOG_DEBUG;
-  } else if (gbCtx == GB_DAEMON_MODE) {
+  } else {
     dom = "mgmt";
     level = GB_LOG_CRIT;
-  }
-
-  if (!dom) {
-    return -EINVAL;
   }
 
   if (logLevel >= GB_LOG_MAX) {
@@ -450,7 +446,7 @@ initLogDirAndFiles(char *newLogDir)
 {
   char *logDir = NULL;
   char *tmpLogDir = NULL;
-  char *dom = NULL;
+  char *dom;
   int ret = 0;
   bool def = false;
   int logLevel;
@@ -459,13 +455,9 @@ initLogDirAndFiles(char *newLogDir)
   if (gbCtx == GB_CLI_MODE) {
     dom = "cli";
     logLevel = GB_LOG_DEBUG;
-  } else if (gbCtx == GB_DAEMON_MODE) {
+  } else {
     dom = "mgmt";
     logLevel = GB_LOG_CRIT;
-  }
-
-  if (!dom) {
-    return -EINVAL;
   }
 
   /*
