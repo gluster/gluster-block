@@ -68,7 +68,7 @@ glusterBlockSetLruCount(const size_t lruCount)
   if (gbConf->glfsLruCount == lruCount) {
     UNLOCK(gbConf->lock);
     LOG("mgmt", GB_LOG_DEBUG,
-        "No changes to current glfsLruCount: %d, skipping it.",
+        "No changes to current glfsLruCount: %lu, skipping it.",
         gbConf->glfsLruCount);
     return 0;
   }
