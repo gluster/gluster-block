@@ -1,23 +1,68 @@
-gluster-block release 0.3 is tagged.
+gluster-block release 0.4 is tagged.
+
+This is the new stable version of gluster-block
 
 Highlights:
 ----------
-* Improvements to cli response time
-* Support preallocated block device creation
-* Switch to MT-safe rpc routines
-* Switch to port 24010 for management connections
-* Do not allow delete if all the nodes are not up
-* Init scripts added
+* add replacing block volume support (540e816)
+* add block volume resizing support (cfa7677)
+* add configuration generation support (4a0ac49)
+* add load-balancing support across available target nodes (f6bb475)
+* add logrotate support (73dd5ba)
+* add libtirpc support (3ac1399)
+* add auditlog support (8416247)
+* add dynamic reloading of config (/etc/sysconfig/gluster-blockd) support (4d56cd0)
+* add cli rpc timeout option support (2629966)
+* add ability to create block volume with configurable ring-buffer size (34c4a6d)
+* add capabilities(versioning) support to work with heterogeneous cluster (46f460f)
+* add ablility to create block volume with existing backend file (450f7e8)
+* add option for leaving the backend file without unlinking while deleting the block (7008073)
+* save-config only alter given block configuration (17832a4)
+* automatically align the target device size to sector size (e971593)
+* fix various cli operations exitcode (dc0c037)
+* reserve 10M space for meta-data store, this avoids op failures when block hosting volume is 100% full (812ca9a)
+* add the gfapi version check, and use the api based on available version (dbb0b26)
+* use slow zeroing if glfs_zerofill is not supported (7b11fb1)
+* defend on minimum recommended kernel version (c521390)
+* defend on dependencies version at runtime (8599bd6)
+* on stop service, clear the target config only when tcmu-runner is running (6bc89f4)
+* add travis-integration for build verification using docker (bb046e5)
+* support volfile server (discovery service) setting through Env (471401c)
+* create block volume with 'prealloc full' by default (e9faa8e)
+* convert cli and remote threads to individual processes to fix contention in tirpc (f70857a)
+* increase max backup files (/etc/target/backup/) count (ae79a80)
+* fix high severity issues from coverity (d913aa7)
+* fix leaks reported by asan (c3307ff)
+* add a simple demo to README doc (08be8c9)
+* add more test cases (b2cac85)
 
 Other Notable Fixes:
 -------------------
-* Fix configshell file loglevel to INFO
-* Fix systemd dependency list
-* Support logdir choosing via Environment variable
-* Fix LOG segfault if log dir does not exist - fall back to stderr.
-* Fix (null) prints in log-file while trying to log volname
-* Block info shows size in human readable format
-* And many more ...
+* add a script for upgrade time activities (f6b40cc)
+* script to wait for bricks to come online (2d89eaf)
+* inotify watch the directory not just file (ac702ac)
+* correct some rpc socket setup bits (b246756)
+* fix create failure with ring-buffer option (b512de2)
+* fix block delete failure (a4de1ee)
+* fix heap-buffer-overflow reported by asan (872016e)
+* fix dereference of undefined pointer value (6f04510)
+* add CRIT loglevel in logger (149255f)
+* add simple gfapi access test (8d34b29)
+* silent building as default with automake (07dd59a)
+* read configfile line-by-line instead of allocating a fixed 32K buffer (a661484)
+* fix memleak for GB_LOG_LEVEL (4a47361)
+* dump all failure msgs to stderr (fd62ac4)
+* fix memleak for errMsg (9f705e7)
+* avoid socket double free (766f97e)
+* introduce remote exit value GB_BLOCK_NOT_FOUND (0a65c01)
+* defend on block not loaded and CLEANUPFAIL status with delete (43d0a74)
+* report block is not loaded status with modify (0b0b7db)
+* fix auth command args parsing with modify (5a180e9)
+* cleanup json object releasing (38cac9a)
+* replace strcat and strcpy with their secure versions (d7ebb69)
+* make create size unit prefixes case insensitive (f03d641)
+* update docs to the latest (1eb1507)
+* and many more ...
 
 Read more at [1] and [2]
 
