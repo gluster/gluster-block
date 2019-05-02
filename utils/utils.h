@@ -29,7 +29,7 @@
 
 # include  "list.h"
 
-# define  GB_LOGROTATE_PATH      "/etc/logrotate.d/gluster-blockd"
+# define  GB_LOGROTATE_PATH      "/etc/logrotate.d/gluster-block"
 # define  GB_LOGDIR_DEF          DATADIR "/log/gluster-block"
 # define  GB_INFODIR             DATADIR "/run"
 
