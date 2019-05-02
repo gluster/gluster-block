@@ -132,8 +132,9 @@
             len = GB_ASPRINTF(&buf, fmt, ##__VA_ARGS__);             \
             if (len != -1) {                                         \
               if (buf[len - 1] != '\n')                              \
-                buf[len - 1] = '\n';                                 \
-              fprintf(fd, "%s", buf);                                \
+                fprintf(fd, "%s\n", buf);                            \
+              else                                                   \
+                fprintf(fd, "%s", buf);                              \
               free(buf);                                             \
             } else {                                                 \
               fprintf(fd, fmt "\n", ##__VA_ARGS__);                  \
