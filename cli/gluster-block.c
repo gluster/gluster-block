@@ -391,6 +391,22 @@ glusterBlockIsAddrAcceptable(char *addr)
   return TRUE;
 }
 
+static bool
+glusterBlockIsAddrListAcceptable(char *addr_list)
+{
+  int i = 0;
+
+
+  if (!addr_list || strlen(addr_list) == 0) {
+    return FALSE;
+  }
+  for (i = 0; i < strlen(addr_list); i++) {
+    if (!isdigit(addr_list[i]) && (addr_list[i] != '.') && (addr_list[i] != ','))
+      return FALSE;
+  }
+  return TRUE;
+}
+
 static int
 glusterBlockParseVolumeBlock(char *volumeblock, char *volume, char *block,
                              size_t vol_len, size_t block_len,
@@ -687,6 +703,16 @@ glusterBlockCreate(int argcount, char **options, int json)
   if (GB_STRDUP(cobj.block_hosts, options[optind++]) < 0) {
     LOG("cli", GB_LOG_ERROR, "failed while parsing servers for block <%s/%s>",
         cobj.volume, cobj.block_name);
+    goto out;
+  }
+
+  /* defend on the use of hostnames */
+  if (!glusterBlockIsAddrListAcceptable(cobj.block_hosts)) {
+    MSG(stderr, "hostnames are not supported with gluster-block");
+    MSG(stderr, "Hint: please use ip addresses only");
+    LOG("cli", GB_LOG_ERROR,
+        "failed while parsing the host-list for create block %s on volume %s with hosts %s",
+        cobj.block_name, cobj.volume, cobj.block_hosts);
     goto out;
   }
 
