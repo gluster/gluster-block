@@ -27,7 +27,7 @@ for debugging.
 
 ### Logs and Information about the environment:
 
-- gluster-block version used (e.g. v0.3 or master):
+- gluster-block version used (e.g. v0.4 or master):
 - other dependencies version
   - glusterfs
   - tcmu-runner

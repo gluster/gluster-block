@@ -18,7 +18,7 @@
 # define  DEPENDENCY_VERSION   KERNEL_VERSION
 
 
-# define  GLUSTER_BLOCK_VERSION                "0.3"
+# define  GLUSTER_BLOCK_VERSION                "0.4"
 
 
 /* Other dependencies versions */

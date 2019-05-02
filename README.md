@@ -33,7 +33,7 @@ And pass '--enable-tirpc=yes'(default) flag or nothing at configure time
 <b>Daemon</b>: gluster-blockd runs on all the nodes
 ```script
 # gluster-blockd --help
-gluster-blockd (0.3)
+gluster-blockd (0.4)
 usage:
   gluster-blockd [--glfs-lru-count <COUNT>]
                  [--log-level <LOGLEVEL>]
@@ -64,7 +64,7 @@ You can run gluster-blockd as systemd service, note '/etc/sysconfig/gluster-bloc
 <b>CLI</b>: you can choose to run gluster-block(cli) from any node which has gluster-blockd running
 ```script
 # gluster-block --help
-gluster-block (0.3)
+gluster-block (0.4)
 usage:
   gluster-block [timeout <seconds>] <command> <volname[/blockname]> [<args>] [--json*]
 
