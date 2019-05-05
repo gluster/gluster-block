@@ -12,7 +12,4 @@
   compress
   delaycompress
   notifempty
-  postrotate
-  killall -q -s 1 gluster-blockd > /dev/null 2>&1 || true
-  endscript
 }
