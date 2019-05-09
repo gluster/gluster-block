@@ -527,12 +527,18 @@ blockNodeSanityCheck(void)
   char *global_opts;
 
 
+  /*
+   * Systemd service will help to guarantee that the tcmu-runner
+   * is already up when reaching here
+   */
+#ifndef USE_SYSTEMD
   /* Check if tcmu-runner is running */
   ret = gbRunner("ps aux ww | grep -w '[t]cmu-runner' > /dev/null");
   if (ret) {
     LOG("mgmt", GB_LOG_ERROR, "tcmu-runner not running");
     return ESRCH;
   }
+#endif
 
   /* Check targetcli has user:glfs handler listed */
   ret = gbRunner("targetcli /backstores/user:glfs ls > /dev/null");

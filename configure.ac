@@ -28,6 +28,9 @@ AC_ARG_WITH(systemddir,
             [systemddir='${prefix}/lib/systemd/system'])
 AC_SUBST(systemddir)
 AM_CONDITIONAL([USE_SYSTEMD], test [ -d '/usr/lib/systemd/system' ])
+if test -d '/usr/lib/systemd/system'; then
+    AC_DEFINE([USE_SYSTEMD], [1], [use systemd])
+fi
 
 AC_ARG_WITH(initddir,
             AC_HELP_STRING([--with-initddir=DIR],
