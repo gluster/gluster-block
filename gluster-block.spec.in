@@ -60,13 +60,16 @@ mv %{buildroot}/%{_initddir}/gluster-blockd.initd %{buildroot}/%{_initddir}/glus
 
 %if ( 0%{?_with_systemd:1} )
 %post
+%systemd_post gluster-block-target.service
 %systemd_post gluster-blockd.service
 
 %preun
+%systemd_preun gluster-block-target.service
 %systemd_preun gluster-blockd.service
-rm -rf %{_sharedstatedir}/gluster-block/gb_upgrade.status
+find %{_sharedstatedir}/gluster-block/ -name 'gb_upgrade.status' -delete
 
 %postun
+%systemd_postun_with_restart gluster-block-target.service
 %systemd_postun_with_restart gluster-blockd.service
 %endif
 
@@ -99,6 +102,9 @@ rm -rf ${RPM_BUILD_ROOT}
      %attr(0644,-,-) %{_sharedstatedir}/gluster-block/gluster-block-caps.info
 
 %changelog
+* Tue May 14 2019 Xiubo Li <xiubli@redhat.com>
+- Fix rpmlint dangerous-command-in-preun rm warning
+
 * Thu May 02 2019 Prasanna Kumar Kalever <prasanna.kalever@redhat.com>
 - Renaming logrotate configure file back to project name
 
