@@ -161,27 +161,42 @@ extern struct gbConf *gbConf;
 
 # define  LOG(str, level, fmt, ...)                                    \
           do {                                                         \
-            FILE *fd;                                                  \
+            FILE *fd = NULL;                                           \
             char timestamp[GB_TIME_STRING_BUFLEN] = {0};               \
             char *tmp;                                                 \
+            bool logFileExist = false;                                 \
             if (GB_STRDUP(tmp, str) < 0)                               \
               fprintf(stderr, "No memory: %s\n", strerror(errno));     \
             LOCK(gbConf->lock);                                        \
             if (level <= gbConf->logLevel) {                           \
-              if (!strcmp(tmp, "mgmt"))                                \
-                fd = fopen (gbConf->daemonLogFile, "a");               \
-              else if (!strcmp(tmp, "cli"))                            \
-                fd = fopen (gbConf->cliLogFile, "a");                  \
-              else if (!strcmp(tmp, "gfapi"))                          \
-                fd = fopen (gbConf->gfapiLogFile, "a");                \
-              else if (!strcmp(tmp, "cmdlog"))                         \
-                fd = fopen (gbConf->cmdhistoryLogFile, "a");           \
-              else                                                     \
+              if (!strcmp(tmp, "mgmt")) {                              \
+                if (gbConf->daemonLogFile[0]) {                        \
+                    fd = fopen (gbConf->daemonLogFile, "a");           \
+                    logFileExist = true;                               \
+                }                                                      \
+              } else if (!strcmp(tmp, "cli")) {                        \
+                if (gbConf->cliLogFile[0]) {                           \
+                    fd = fopen (gbConf->cliLogFile, "a");              \
+                    logFileExist = true;                               \
+                }                                                      \
+              } else if (!strcmp(tmp, "gfapi")) {                      \
+                if (gbConf->gfapiLogFile[0]) {                         \
+                    fd = fopen (gbConf->gfapiLogFile, "a");            \
+                    logFileExist = true;                               \
+                }                                                      \
+              } else if (!strcmp(tmp, "cmdlog")) {                     \
+                if (gbConf->cmdhistoryLogFile[0]) {                    \
+                    fd = fopen (gbConf->cmdhistoryLogFile, "a");       \
+                    logFileExist = true;                               \
+                }                                                      \
+              } else {                                                 \
                 fd = stderr;                                           \
+              }                                                        \
               if (fd == NULL) {                                        \
-                fprintf(stderr, "Error opening log file: %s\n"         \
-                        "Logging to stderr.\n",                        \
-                        strerror(errno));                              \
+                if (logFileExist)                                      \
+                    fprintf(stderr, "Error opening log file: %s\n"     \
+                            "Logging to stderr.\n",                    \
+                            strerror(errno));                          \
                 fd = stderr;                                           \
               }                                                        \
               logTimeNow(timestamp, GB_TIME_STRING_BUFLEN);            \
