@@ -66,7 +66,6 @@ initGbConfig(void)
 
   gbConf->glfsLruCount = LRU_COUNT_DEF;
   gbConf->logLevel = GB_LOG_INFO;
-  snprintf(gbConf->logDir, PATH_MAX, "%s", GB_LOGDIR_DEF);
   gbConf->cliTimeout = CLI_TIMEOUT_DEF;
 
   return 0;
@@ -441,6 +440,24 @@ glusterLogrotateConfigSet(char *logDir)
 }
 
 
+static bool
+isSamePath(const char *path1, const char *path2)
+{
+    struct stat st1 = {0,};
+    struct stat st2 = {0,};
+
+    if (!path1 || !path2) {
+        return false;
+    }
+
+    if (stat(path1, &st1) == -1 || stat(path2, &st2) == -1) {
+        return false;
+    }
+
+    return st1.st_dev == st2.st_dev && st1.st_ino == st2.st_ino;
+}
+
+
 static int
 initLogDirAndFiles(char *newLogDir)
 {
@@ -469,7 +486,7 @@ initLogDirAndFiles(char *newLogDir)
   if (newLogDir) {
     logDir = newLogDir;
     LOCK(gbConf->lock);
-    if (!strcmp(logDir, gbConf->logDir)) {
+    if (isSamePath(logDir, gbConf->logDir)) {
       UNLOCK(gbConf->lock);
       LOG(dom, GB_LOG_DEBUG,
           "No changes to current logDir: %s, skipping it.",
@@ -477,6 +494,8 @@ initLogDirAndFiles(char *newLogDir)
       goto out;
     }
     UNLOCK(gbConf->lock);
+    LOG(dom, logLevel,
+        "trying to change logDir from %s to %s", gbConf->logDir, logDir);
   } else {
     logDir = getenv("GB_LOGDIR");
 
@@ -490,9 +509,6 @@ initLogDirAndFiles(char *newLogDir)
       logDir = GB_LOGDIR_DEF;
     }
   }
-
-  LOG(dom, logLevel,
-      "trying to change logDir from %s to %s", gbConf->logDir, logDir);
 
   if (strlen(logDir) > PATH_MAX - GB_MAX_LOGFILENAME) {
     LOG(dom, GB_LOG_ERROR, "strlen of logDir Path > PATH_MAX: %s", logDir);
