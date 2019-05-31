@@ -45,7 +45,7 @@ jsonResponseFormatParse(const char *opt)
         (_a - (_a % _b)); })
 
 ssize_t
-glusterBlockParseSize(const char *dom, char *value)
+glusterBlockParseSize(const char *dom, char *value, int blksize)
 {
   char *postfix;
   char *tmp;
@@ -64,6 +64,10 @@ glusterBlockParseSize(const char *dom, char *value)
   tmp = postfix;
   if (*postfix == ' ') {
     tmp = tmp + 1;
+  }
+
+  if (!blksize) {
+    blksize = GB_DEFAULT_SECTOR_SIZE;
   }
 
   switch (tolower(*tmp)) {
@@ -93,20 +97,20 @@ glusterBlockParseSize(const char *dom, char *value)
     /* fall through */
   case 'b':
   case '\0':
-    if (sizef < GB_DEFAULT_SECTOR_SIZE) {
-        MSG(stderr, "minimum acceptable block size is %d bytes", GB_DEFAULT_SECTOR_SIZE);
+    if (sizef < blksize) {
+        MSG(stderr, "minimum acceptable block size is %d bytes", blksize);
         LOG(dom, GB_LOG_ERROR, "minimum acceptable block size is %d bytes",
-            GB_DEFAULT_SECTOR_SIZE);
+            blksize);
         return -1;
     }
 
-    if (sizef % GB_DEFAULT_SECTOR_SIZE) {
+    if (sizef % blksize) {
       MSG(stdout, "The size %ld will align to sector size %d bytes",
-          sizef, GB_DEFAULT_SECTOR_SIZE);
+          sizef, blksize);
       LOG(dom, GB_LOG_ERROR,
           "The target device size %ld will align to the sector size %d",
-          sizef, GB_DEFAULT_SECTOR_SIZE);
-      sizef = round_down(sizef, GB_DEFAULT_SECTOR_SIZE);
+          sizef, blksize);
+      sizef = round_down(sizef, blksize);
     }
     break;
   default:

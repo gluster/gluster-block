@@ -26,7 +26,7 @@ Note that the gluster-blockd daemon is responsible for block management, hence t
 
 .SH COMMANDS
 .SS
-\fBcreate\fR <VOLNAME/NEW-BLOCKNAME> [ha <COUNT>] [auth <enable|disable>] [prealloc <full|no>] [storage <filename>] [ring-buffer <size-in-MB-units>] <HOST1[,HOST2,..]> [BYTES]
+\fBcreate\fR <VOLNAME/NEW-BLOCKNAME> [ha <COUNT>] [auth <enable|disable>] [prealloc <full|no>] [storage <filename>] [ring-buffer <size-in-MB-units>] [block-size <size-in-Byte-units>] <HOST1[,HOST2,..]> [BYTES]
 create block device.
 .TP
 [ha <COUNT>]
@@ -43,6 +43,9 @@ existing file(only name) in the gluster volume, that needs to be linked while cr
 .TP
 [ring-buffer <size-in-MB-units>]
 kernel ring buffer size for exchanging iSCSI commands, range [1MB - 64MB] (default: as per kernel)
+.TP
+[block-size <size-in-Byte-units>]
+kernel hw block size, aligns to 512 (default: as per kernel)
 .TP
 <HOST1,[HOST2....]>
 servers in the pool where targets will be exported
@@ -134,8 +137,11 @@ To create a thinly-provisioned block device of size 1GiB
 To create a block device with existing file in blockVol
 .B # gluster-block create blockVol/sampleBlock storage 3c242959-9238-4ce0-a1ed-19086aa23c7b ${HOST}
 
-To create a block device with ring buffer size 16MB
+To create a block device with ring buffer size 16MiB
 .B # gluster-block create blockVol/sampleBlock ring-buffer 16 ${HOST} 1GiB
+
+To create a block device with block size 1024
+.B # gluster-block create blockVol/sampleBlock block-size 1024 ${HOST} 1GiB
 
 To create a block device of size 1GiB with multi-path(replica) 3
 .B # gluster-block create blockVol/sampleBlock ha 3 ${HOST1},${HOST2},${HOST3} 1GiB

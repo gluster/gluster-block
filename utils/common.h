@@ -97,7 +97,7 @@ void strToCharArrayDefFree(strToCharArrayDefPtr arr);
 
 enum JsonResponseFormat jsonResponseFormatParse(const char *opt);
 
-ssize_t glusterBlockParseSize(const char *dom, char *value);
+ssize_t glusterBlockParseSize(const char *dom, char *value, int blksize);
 
 char* glusterBlockFormatSize(const char *dom, size_t bytes);
 

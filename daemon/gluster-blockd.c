@@ -34,8 +34,6 @@
                                 "logfile=%s auto_save_on_exit=false "          \
                                 "max_backup_files=100"
 
-# define   VERNUM_BUFLEN        8
-
 # define   GB_DISTRO_CHECK      "grep -P '(^ID=)' /etc/os-release"
 
 
@@ -426,65 +424,6 @@ gbMinKernelVersionCheck(void)
 }
 
 
-static bool
-gbDependencyVersionCompare(int dependencyName, char *version)
-{
-  size_t vNum[VERNUM_BUFLEN] = {0, };
-  char *verStr;
-  int i = 0, j;
-  char *token, *tmp;
-  bool done = false;
-  bool ret = false;
-
-
-  if (GB_STRDUP(verStr, version) < 0) {
-    LOG("mgmt", GB_LOG_ERROR,
-        "gbDependencyVersionCompare: failed to strdup (%s)", strerror(errno));
-    return ret;
-  }
-
-  token = strtok(verStr, ".-");
-  while( token != NULL ) {
-    done = false;
-    for (j = 0; j < strlen(token); j++) { /* say if version is 2.1.fb49, parse fb49 */
-      if (isdigit(token[j])) {
-        vNum[i] = atoi(token);
-      } else {
-        tmp = token;
-        for(; *tmp; ++tmp) {
-          if (isdigit(*tmp)) {
-            vNum[i] = atoi(tmp);  /* feed 49 from fb49, so done = true */
-            done = true;
-            break;
-          }
-        }
-      }
-      if (done) {
-        break;
-      }
-    }
-    token = strtok(NULL, ".-");
-    i++;
-  }
-
-  switch (dependencyName) {
-  case TCMURUNNER:
-    if (DEPENDENCY_VERSION(vNum[0], vNum[1], vNum[2]) >= GB_MIN_TCMURUNNER_VERSION_CODE) {
-        ret = true;
-    }
-    break;
-  case TARGETCLI:
-    if (DEPENDENCY_VERSION(vNum[0], vNum[1], vNum[2]) >= GB_MIN_TARGETCLI_VERSION_CODE) {
-        ret = true;
-    }
-    break;
-  }
-
-  GB_FREE(verStr);
-  return ret;
-}
-
-
 static void
 gbDependenciesVersionCheck(void)
 {
@@ -509,6 +448,14 @@ gbDependenciesVersionCheck(void)
     goto out;
   }
   LOG("mgmt", GB_LOG_INFO, "starting with targetcli version - %s", out);
+  GB_FREE(out);
+
+  out = gbRunnerGetOutput("python -c 'from rtslib_fb import __version__; print(__version__)'");
+  if (!strcmp(out, "GIT_VERSION")) {
+    LOG("mgmt", GB_LOG_INFO, "starting with rtslib version <= 2.1.69");
+  } else {
+    LOG("mgmt", GB_LOG_INFO, "starting with rtslib version - %s", out);
+  }
   GB_FREE(out);
 
   return;

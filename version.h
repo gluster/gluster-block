@@ -20,13 +20,15 @@
 
 # define  GLUSTER_BLOCK_VERSION                "0.4"
 
+# define  VERNUM_BUFLEN                        8
 
 /* Other dependencies versions */
 # define  GB_MIN_TCMURUNNER_VERSION            "1.1.3"
 # define  GB_MIN_TARGETCLI_VERSION             "2.1.fb49"
+# define  GB_MIN_RTSLIB_BLKSIZE_VERSION        "2.1.69"
 
-# define  GB_MIN_TCMURUNNER_VERSION_CODE       65795
-# define  GB_MIN_TARGETCLI_VERSION_CODE        131377
-
+# define  GB_MIN_TCMURUNNER_VERSION_CODE       DEPENDENCY_VERSION(1, 1, 3)
+# define  GB_MIN_TARGETCLI_VERSION_CODE        DEPENDENCY_VERSION(2, 1, 49)
+# define  GB_MIN_RTSLIB_BLKSIZE_VERSION_CODE   DEPENDENCY_VERSION(2, 1, 69)
 
 # endif /* _VERSION_H */

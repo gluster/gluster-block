@@ -138,3 +138,14 @@ create_ring_buffer: true
 # Since: 0.4
 ##
 create_load_balance: true
+
+##
+# Nature: cli sub-command
+#
+# Label: 'block-size'
+#
+# Description: capability to create block with given block size
+#
+# Since: 0.5
+##
+create_block_size: true
