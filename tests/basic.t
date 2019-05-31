@@ -125,6 +125,10 @@ TEST gluster-block delete ${VOLNAME}/${BLKNAME}
 TEST gluster-block create ${VOLNAME}/${BLKNAME} ring-buffer 32 ${HOST} 1MiB
 TEST gluster-block delete ${VOLNAME}/${BLKNAME}
 
+# Block create with 'block-size' set/delete
+TEST gluster-block create ${VOLNAME}/${BLKNAME} block-size 1024 ${HOST} 1MiB
+TEST gluster-block delete ${VOLNAME}/${BLKNAME}
+
 # Block create with 'storage' set and delete with 'unlink-storage no' set
 TEST gluster-block create ${VOLNAME}/${BLKNAME} ${HOST} 1MiB
 LINK=`eval gluster-block info ${VOLNAME}/${BLKNAME} | grep GBID | awk -F' ' '{print $2}'`

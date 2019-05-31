@@ -19,6 +19,7 @@
 # include "utils.h"
 # include "lru.h"
 # include "config.h"
+# include "version.h"
 
 const char *argp_program_version = ""                                 \
   PACKAGE_NAME" ("PACKAGE_VERSION")"                                  \
@@ -345,6 +346,70 @@ fetchGlfsVolServerFromEnv()
   snprintf(gbConf->volServer, HOST_NAME_MAX, "%s", volServer);
 
   LOG("mgmt", GB_LOG_INFO, "Block Hosting Volfile Server Set to: %s", gbConf->volServer);
+}
+
+
+bool
+gbDependencyVersionCompare(int dependencyName, char *version)
+{
+  size_t vNum[VERNUM_BUFLEN] = {0, };
+  char *verStr;
+  int i = 0, j;
+  char *token, *tmp;
+  bool done = false;
+  bool ret = false;
+
+
+  if (GB_STRDUP(verStr, version) < 0) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "gbDependencyVersionCompare: failed to strdup (%s)", strerror(errno));
+    return ret;
+  }
+
+  token = strtok(verStr, ".-");
+  while( token != NULL ) {
+    done = false;
+    for (j = 0; j < strlen(token); j++) { /* say if version is 2.1.fb49, parse fb49 */
+      if (isdigit(token[j])) {
+        vNum[i] = atoi(token);
+      } else {
+        tmp = token;
+        for(; *tmp; ++tmp) {
+          if (isdigit(*tmp)) {
+            vNum[i] = atoi(tmp);  /* feed 49 from fb49, so done = true */
+            done = true;
+            break;
+          }
+        }
+      }
+      if (done) {
+        break;
+      }
+    }
+    token = strtok(NULL, ".-");
+    i++;
+  }
+
+  switch (dependencyName) {
+  case TCMURUNNER:
+    if (DEPENDENCY_VERSION(vNum[0], vNum[1], vNum[2]) >= GB_MIN_TCMURUNNER_VERSION_CODE) {
+      ret = true;
+    }
+    break;
+  case TARGETCLI:
+    if (DEPENDENCY_VERSION(vNum[0], vNum[1], vNum[2]) >= GB_MIN_TARGETCLI_VERSION_CODE) {
+      ret = true;
+    }
+    break;
+  case RTSLIB_BLKSIZE:
+    if (DEPENDENCY_VERSION(vNum[0], vNum[1], vNum[2]) >= GB_MIN_RTSLIB_BLKSIZE_VERSION_CODE) {
+      ret = true;
+    }
+    break;
+  }
+
+  GB_FREE(verStr);
+  return ret;
 }
 
 

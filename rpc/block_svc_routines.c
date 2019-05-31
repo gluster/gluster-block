@@ -46,6 +46,7 @@
 # define   GB_ALUA_AO_TPG_NAME          "glfs_tg_pt_gp_ao"
 # define   GB_ALUA_ANO_TPG_NAME         "glfs_tg_pt_gp_ano"
 # define   GB_RING_BUFFER_STR           "max_data_area_mb"
+# define   GB_BLOCK_SIZE_STR            "hw_block_size"
 
 #define    GB_CMD_TIME_OUT      130
 
@@ -538,7 +539,8 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     cblk_v2 = (blockCreate2 *)cobj;
     GB_STRCPYSTATIC(cblk_v2->ipaddr, host);
 
-    if (cblk_v2->rb_size || cblk_v2->prio_path[0]) {
+    if (GB_XDATA_IS_MAGIC(((struct gbXdata*)cblk_v2->xdata.xdata_val)->magic) ||
+        cblk_v2->rb_size || cblk_v2->prio_path[0]) {
       *rpc_sent = TRUE;
       if (block_create_v2_1(cblk_v2, &reply, clnt) != RPC_SUCCESS) {
         LOG("mgmt", GB_LOG_ERROR, "%son host %s",
@@ -857,9 +859,11 @@ blockRemoteCapabilitiesRespParse(size_t count, blockRemoteObj *args,
             break;
         }
       }
+
       if (!CAP_MATCH) {
-        GB_ASPRINTF(errMsg, "capability '%s' doesn't exit on %s",
-                    gbCapabilitiesLookup[i], args[j].addr);
+        GB_ASPRINTF(errMsg, "the capability '%s' is not supported on host %s yet, %s.",
+                    gbCapabilitiesLookup[i], args[j].addr,
+                    i == GB_CREATE_BLOCK_SIZE_CAP ? "please upgrade rtslib >= 2.1.70" : "please upgrade");
         if (resultCaps) {
           resultCaps[i] = true;
           break;
@@ -899,11 +903,6 @@ glusterBlockCapabilityRemoteAsync(blockServerDef *servers, bool *minCaps,
   int ret = -1;
   size_t i;
 
-
-  /* skip if nhosts = 1 */
-  if (!servers || (servers->nhosts <= 1)) {
-    return 0;
-  }
 
   if (GB_ALLOC_N(tid, servers->nhosts) < 0) {
     goto out;
@@ -1668,6 +1667,9 @@ glusterBlockBuildMinCaps(void *data, operations opt)
     if (cblk->rb_size) {
       minCaps[GB_CREATE_RING_BUFFER_CAP] = true;
     }
+    if (cblk->blk_size) {
+      minCaps[GB_CREATE_BLOCK_SIZE_CAP] = true;
+    }
     minCaps[GB_CREATE_LOAD_BALANCE_CAP] = true;
     if (cblk->json_resp) {
       minCaps[GB_JSON_CAP] = true;
@@ -1732,8 +1734,7 @@ glusterBlockCheckCapabilities(void* blk, operations opt, blockServerDefPtr list,
   char *localErrMsg = NULL;
 
 
-  /* skip if nhosts = 1 */
-  if (!list || (list->nhosts <= 1)) {
+  if (!list) {
     return 0;
   }
 
@@ -1913,6 +1914,7 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
   blockCreate2 *cobj = NULL;
   blockDelete *dobj = NULL;
   blockReplace *robj = NULL;
+  struct gbXdata *xdata = NULL;
   bool Flag = false;
   bool cCheck = false;
   bool dCheck = false;
@@ -1937,8 +1939,27 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
     goto out;
   }
 
-  cobj->xdata.xdata_len = strlen(gbConf->volServer);
-  cobj->xdata.xdata_val = (char *) gbConf->volServer;
+  if (info->blk_size) { // Create V3
+    unsigned int len;
+    struct gbCreate3 *gbCreate3;
+
+    len = sizeof(struct gbXdata) + sizeof(struct gbCreate3);
+    if (GB_ALLOC_N(xdata, len) < 0) {
+	goto out;
+    }
+
+    xdata->magic = GB_XDATA_GEN_MAGIC(3);
+    gbCreate3 = (struct gbCreate3 *)(&xdata->data);
+    GB_STRCPY(gbCreate3->volServer, (char *)gbConf->volServer, sizeof(gbConf->volServer));
+    gbCreate3->blk_size = info->blk_size;
+
+    cobj->xdata.xdata_len = len;
+    cobj->xdata.xdata_val = (char *)xdata;
+  } else { // Create V2
+    cobj->xdata.xdata_len = strlen(gbConf->volServer);
+    cobj->xdata.xdata_val = (char *) gbConf->volServer;
+  }
+
   GB_STRCPYSTATIC(cobj->ipaddr, blk->new_node);
   GB_STRCPYSTATIC(cobj->volume, info->volume);
   GB_STRCPYSTATIC(cobj->gbid, info->gbid);
@@ -2184,6 +2205,7 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
     reply = NULL;
   }
   GB_FREE(tid);
+  GB_FREE(xdata);
   GB_FREE(cobj);
   GB_FREE(dobj);
   GB_FREE(robj);
@@ -2674,6 +2696,7 @@ getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
   struct json_object *so_obj_alua_ano_tpg;
   struct json_object *so_obj_alua_tpgs_arr;
   struct json_object *so_obj_attr = json_object_new_object();
+  int n = 0;
 
 
   // "alua_tpgs": [
@@ -2722,7 +2745,15 @@ getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
   }
   json_object_object_add(so_obj, "config", GB_JSON_OBJ_TO_STR(cfgstr[0]?cfgstr:NULL));
   if (info->rb_size) {
-    snprintf(control, 1024, "%s=%zu", GB_RING_BUFFER_STR, info->rb_size);
+    n = snprintf(control, 1024, "%s=%zu", GB_RING_BUFFER_STR, info->rb_size);
+  }
+  if (info->blk_size) {
+    if (n) {
+      control[n++] = ',';
+    }
+    snprintf(control + n, 1024 - n, "%s=%zu", GB_BLOCK_SIZE_STR, info->blk_size);
+  }
+  if (control[0]) {
     json_object_object_add(so_obj, "control", GB_JSON_OBJ_TO_STR(control[0]?control:NULL));
   }
   json_object_object_add(so_obj, "name", GB_JSON_OBJ_TO_STR(block));
@@ -3608,6 +3639,15 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
+  if (info->blk_size && (blk->size % info->blk_size)) {
+    GB_ASPRINTF(&errMsg, "size (%lu) is incorrect, it should be aligned to block size (%lu)",
+                blk->size, info->blk_size);
+    LOG("mgmt", GB_LOG_ERROR,
+        "size (%lu) is incorrect, it should be aligned to block size (%lu)",
+        blk->size, info->blk_size);
+    goto out;
+  }
+
   if ((info->size > blk->size && !blk->force) || info->size == blk->size) {
     cSize = glusterBlockFormatSize("mgmt", info->size);
     rSize = glusterBlockFormatSize("mgmt", blk->size);
@@ -3876,12 +3916,14 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   char *errMsg = NULL;
   blockCreate2 cobj = {{0},};
   bool *resultCaps = NULL;
+  struct gbXdata *xdata = NULL;
 
 
   LOG("mgmt", GB_LOG_INFO,
       "create cli request, volume=%s blockname=%s mpath=%d blockhosts=%s "
-      "authmode=%d size=%lu, rbsize=%d", blk->volume, blk->block_name, blk->mpath,
-      blk->block_hosts, blk->auth_mode, blk->size, blk->rb_size);
+      "authmode=%d size=%lu, rbsize=%d, blksize=%d", blk->volume,
+      blk->block_name, blk->mpath, blk->block_hosts, blk->auth_mode, blk->size,
+      blk->rb_size, blk->blk_size);
 
   if (GB_ALLOC(reply) < 0) {
     return NULL;
@@ -3981,8 +4023,8 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
 
   GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
                         errCode, errMsg, exist,
-                        "SIZE: %zu\nRINGBUFFER: %d\nENTRYCREATE: SUCCESS\n",
-                        blk->size, blk->rb_size);
+                        "SIZE: %zu\nRINGBUFFER: %u\nBLKSIZE: %u\nENTRYCREATE: SUCCESS\n",
+                        blk->size, blk->rb_size, blk->blk_size);
 
   GB_STRCPYSTATIC(cobj.volume, blk->volume);
   GB_STRCPYSTATIC(cobj.block_name, blk->block_name);
@@ -3990,8 +4032,27 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   cobj.rb_size = blk->rb_size;
   GB_STRCPYSTATIC(cobj.gbid, gbid);
   GB_STRDUP(cobj.block_hosts,  blk->block_hosts);
-  cobj.xdata.xdata_len = strlen(gbConf->volServer);
-  cobj.xdata.xdata_val = (char *) gbConf->volServer;
+
+  if (blk->blk_size) { // Create V3
+    unsigned int len;
+    struct gbCreate3 *gbCreate3;
+
+    len = sizeof(struct gbXdata) + sizeof(struct gbCreate3);
+    if (GB_ALLOC_N(xdata, len) < 0) {
+        goto exist;
+    }
+
+    xdata->magic = GB_XDATA_GEN_MAGIC(3);
+    gbCreate3 = (struct gbCreate3 *)(&xdata->data);
+    GB_STRCPY(gbCreate3->volServer, (char *)gbConf->volServer, sizeof(gbConf->volServer));
+    gbCreate3->blk_size = blk->blk_size;
+
+    cobj.xdata.xdata_len = len;
+    cobj.xdata.xdata_val = (char *)xdata;
+  } else { // Create V2
+    cobj.xdata.xdata_len = strlen(gbConf->volServer);
+    cobj.xdata.xdata_val = (char *)gbConf->volServer;
+  }
 
   if (blk->auth_mode) {
     uuid_generate(uuid);
@@ -4045,6 +4106,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   blockCreateParsedRespFree(savereply);
   GB_FREE (cobj.block_hosts);
   GB_FREE(resultCaps);
+  GB_FREE(xdata);
 
   return reply;
 }
@@ -4279,7 +4341,7 @@ out:
 
 
 blockResponse *
-block_create_common(blockCreate *blk, char *rbsize, char *volServer, char *prio_path)
+block_create_common(blockCreate *blk, char *control, char *volServer, char *prio_path)
 {
   char *tmp = NULL;
   char *backstore = NULL;
@@ -4320,7 +4382,7 @@ block_create_common(blockCreate *blk, char *rbsize, char *volServer, char *prio_
   if (GB_ASPRINTF(&backstore, "%s %s name=%s size=%zu cfgstring=%s@%s%s/%s%s wwn=%s",
                   GB_TGCLI_GLFS_PATH, GB_CREATE, blk->block_name, blk->size,
                   blk->volume, volServer?volServer:blk->ipaddr, GB_STOREDIR,
-                  blk->gbid, rbsize ? rbsize: "", blk->gbid) == -1) {
+                  blk->gbid, control ? control : "", blk->gbid) == -1) {
     goto out;
   }
 
@@ -4533,9 +4595,8 @@ block_create_common(blockCreate *blk, char *rbsize, char *volServer, char *prio_
   GB_FREE(backstore);
   GB_FREE(glfs_alua);
   GB_FREE(glfs_alua_type);
-  GB_FREE(rbsize);
+  GB_FREE(control);
   GB_FREE(backstore_attr);
-  GB_FREE(volServer);
   blockServerDefFree(list);
   GB_FREE(glfs_alua_sup);
 
@@ -4553,29 +4614,47 @@ block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
 blockResponse *
 block_create_v2_1_svc_st(blockCreate2 *blk, struct svc_req *rqstp)
 {
-  char *rbsize= NULL;
+  char buf[1024] = {0,};
+  char *control = NULL;
   blockCreate blk_v1 = {{0},};
   char *volServer = NULL;
   size_t len = blk->xdata.xdata_len;
+  size_t blk_size = 0;
+  struct gbXdata *xdata_val = (struct gbXdata*)blk->xdata.xdata_val;
+  struct gbCreate3 *gbCreate3 = (struct gbCreate3 *)xdata_val->data;
+  int n = 0;
 
+  if (len > 0 && xdata_val && GB_XDATA_IS_MAGIC(xdata_val->magic)) {
+    if (GB_XDATA_GET_MAGIC_VER(xdata_val->magic) == 3) {
+      blk_size = gbCreate3->blk_size;
+      volServer = gbCreate3->volServer;
+    }
+  } else if (len > 0 && len <= HOST_NAME_MAX) {
+    volServer = (char *)blk->xdata.xdata_val;
+    volServer[len] = '\0';
+  }
+
+  if (blk->rb_size || blk_size) {
+    n = snprintf(buf, 1024, " control=");
+  }
 
   if (blk->rb_size) {
-    GB_ASPRINTF(&rbsize, " control='%s=%d'", GB_RING_BUFFER_STR, blk->rb_size);
+    n += snprintf(buf + n, 1024 - n, "%s=%u,", GB_RING_BUFFER_STR, blk->rb_size);
+  }
+
+  if (blk_size) {
+    n += snprintf(buf + n, 1024 - n, "%s=%lu", GB_BLOCK_SIZE_STR, blk_size);
+  }
+
+  if (n) {
+    if (GB_STRDUP(control, buf) < 0) {
+        return NULL;
+    }
   }
 
   convertTypeCreate2ToCreate(blk, &blk_v1);
 
-  if (len > 0 && len <= HOST_NAME_MAX) {
-    if (strncmp(blk->xdata.xdata_val, "localhost", 9)) {
-      if (GB_ALLOC_N(volServer, len) < 0)
-        goto err;
-      strncpy(volServer, blk->xdata.xdata_val, len);
-    }
-  }
-  return block_create_common(&blk_v1, rbsize, volServer, blk->prio_path);
-
-err:
-  return NULL;
+  return block_create_common(&blk_v1, control, volServer, blk->prio_path);
 }
 
 

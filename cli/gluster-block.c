@@ -18,6 +18,7 @@
                                 "[ha <count>] [auth <enable|disable>] "        \
                                 "[prealloc <full|no>] [storage <filename>] "   \
                                 "[ring-buffer <size-in-MB-units>] "            \
+                                "[block-size <size-in-Byte-units>] "            \
                                 "<HOST1[,HOST2,...]> [size] [--json*]"
 # define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> "      \
                                 "[unlink-storage <yes|no>] [force] [--json*]"
@@ -296,9 +297,10 @@ glusterBlockHelp(void)
       "                              [prealloc <full|no>]\n"
       "                              [storage <filename>]\n"
       "                              [ring-buffer <size-in-MB-units>]\n"
+      "                              [block-size <size-in-Byte-units>]\n"
       "                              <host1[,host2,...]> [size]\n"
       "        create block device [defaults: ha 1, auth disable, prealloc full, size in bytes,\n"
-      "                             ring-buffer default size dependends on kernel]\n"
+      "                             ring-buffer and block-size default size dependends on kernel]\n"
       "\n"
       "  list    <volname>\n"
       "        list available block devices.\n"
@@ -527,7 +529,7 @@ glusterBlockModify(int argcount, char **options, int json)
     }
   } else if (!strcmp(options[optind], "size")) {
     optind++;
-    sparse_ret = glusterBlockParseSize("cli", options[optind++]);
+    sparse_ret = glusterBlockParseSize("cli", options[optind++], 0);
     if (sparse_ret < 0) {
       MSG(stderr, "'<size>' is incorrect");
       MSG(stderr, GB_MODIFY_HELP_STR);
@@ -669,6 +671,25 @@ glusterBlockCreate(int argcount, char **options, int json)
         goto out;
       }
       break;
+    case GB_CLI_CREATE_BLKSIZE:
+      if (isNumber(options[optind])) {
+        sscanf(options[optind++], "%u", &cobj.blk_size);
+        if (cobj.blk_size % 512) {
+          MSG(stderr, "'block-size' should be aligned to 512 bytes");
+          MSG(stderr, GB_CREATE_HELP_STR);
+          LOG("cli", GB_LOG_ERROR,
+              "failed while parsing block-size aligned to 512 bytes for block <%s/%s>",
+              cobj.volume, cobj.block_name);
+        goto out;
+        }
+      } else {
+        MSG(stderr, "'block-size' option is incorrect, hint: should be uint type");
+        MSG(stderr, GB_CREATE_HELP_STR);
+        LOG("cli", GB_LOG_ERROR, "failed while parsing block-size for block <%s/%s>",
+            cobj.volume, cobj.block_name);
+        goto out;
+      }
+      break;
     }
   }
 
@@ -717,7 +738,7 @@ glusterBlockCreate(int argcount, char **options, int json)
   }
 
   if (TAKE_SIZE) {
-    sparse_ret = glusterBlockParseSize("cli", options[optind]);
+    sparse_ret = glusterBlockParseSize("cli", options[optind], cobj.blk_size);
     if (sparse_ret < 0) {
       MSG(stderr, "'[size]' is incorrect");
       MSG(stderr, GB_CREATE_HELP_STR);

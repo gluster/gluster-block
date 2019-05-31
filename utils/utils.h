@@ -26,6 +26,7 @@
 # include  <sys/time.h>
 # include  <ctype.h>
 # include  <pthread.h>
+# include  <inttypes.h>
 
 # include  "list.h"
 
@@ -155,6 +156,22 @@ struct gbConf {
   char cmdhistoryLogFile[PATH_MAX];
   bool noRemoteRpc;
   char volServer[HOST_NAME_MAX];
+};
+
+# define GB_XDATA_MAGIC_NUM 0xABCD2019DCBA
+# define GB_XDATA_GET_MAGIC_NUM(magic) ((magic) >> 16)
+# define GB_XDATA_GET_MAGIC_VER(magic) ((magic) & 0xFFFF)
+# define GB_XDATA_GEN_MAGIC(ver) ((GB_XDATA_MAGIC_NUM << 16) | ((ver) & 0xFFFF))
+# define GB_XDATA_IS_MAGIC(magic) (GB_XDATA_GET_MAGIC_NUM(magic) == GB_XDATA_MAGIC_NUM)
+
+struct gbXdata {
+  uint64_t magic;
+  char data[];
+};
+
+struct gbCreate3 {
+  char volServer[HOST_NAME_MAX];
+  size_t blk_size;
 };
 
 extern struct gbConf *gbConf;
@@ -447,6 +464,7 @@ typedef enum gbCliCreateOptions {
   GB_CLI_CREATE_PREALLOC  = 3,
   GB_CLI_CREATE_STORAGE   = 4,
   GB_CLI_CREATE_RBSIZE    = 5,
+  GB_CLI_CREATE_BLKSIZE   = 6,
 
   GB_CLI_CREATE_OPT_MAX
 } gbCliCreateOptions;
@@ -458,6 +476,7 @@ static const char *const gbCliCreateOptLookup[] = {
   [GB_CLI_CREATE_PREALLOC] = "prealloc",
   [GB_CLI_CREATE_STORAGE]  = "storage",
   [GB_CLI_CREATE_RBSIZE]   = "ring-buffer",
+  [GB_CLI_CREATE_BLKSIZE]  = "block-size",
 
   [GB_CLI_CREATE_OPT_MAX]  = NULL,
 };
@@ -530,6 +549,7 @@ typedef enum Metakey {
   GB_META_PASSWD      = 6,
   GB_META_RINGBUFFER  = 7,
   GB_META_PRIOPATH    = 8,
+  GB_META_BLKSIZE     = 9,
 
   GB_METAKEY_MAX
 } Metakey;
@@ -544,6 +564,7 @@ static const char *const MetakeyLookup[] = {
   [GB_META_PASSWD]      = "PASSWORD",
   [GB_META_RINGBUFFER]  = "RINGBUFFER",
   [GB_META_PRIOPATH]    = "PRIOPATH",
+  [GB_META_BLKSIZE]     = "BLKSIZE",
 
   [GB_METAKEY_MAX]      = NULL
 };
@@ -632,6 +653,7 @@ typedef struct gbConfig {
 typedef enum gbDependencies {
   TCMURUNNER       = 1,
   TARGETCLI        = 2,
+  RTSLIB_BLKSIZE   = 3,
 } gbDependencies;
 
 int initGbConfig(void);
@@ -658,6 +680,8 @@ int blockRemoteCreateRespEnumParse(const char *opt);
 void logTimeNow(char* buf, size_t bufSize);
 
 void fetchGlfsVolServerFromEnv(void);
+
+bool gbDependencyVersionCompare(int dependencyName, char *version);
 
 bool glusterBlockSetLogDir(char *logDir);
 

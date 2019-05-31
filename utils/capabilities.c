@@ -10,6 +10,7 @@
 
 
 # include "capabilities.h"
+# include "version.h"
 
 
 gbCapObj *globalCapabilities;
@@ -35,6 +36,23 @@ gbCapabilitiesEnumParse(const char *cap)
 }
 
 
+static bool
+gbBlockSizeDependenciesVersionCheck(void)
+{
+  char *out = NULL;
+  int ret = true;
+
+
+  out = gbRunnerGetOutput("python -c 'from rtslib_fb import __version__; print(__version__)'");
+  if (!gbDependencyVersionCompare(RTSLIB_BLKSIZE, out)) {
+    ret = false;
+  }
+
+  GB_FREE(out);
+  return ret;
+}
+
+
 void
 gbSetCapabilties(void)
 {
@@ -50,7 +68,8 @@ gbSetCapabilties(void)
   fp = fopen(GB_CAPS_FILE, "r");
   if (fp == NULL) {
     LOG("mgmt", GB_LOG_ERROR,
-        "gbSetCapabilties: fopen() failed (%s)", strerror(errno));
+        "gbSetCapabilties: fopen(\"%s\") failed (%s)", GB_CAPS_FILE,
+        strerror(errno));
     goto out;
   }
 
@@ -77,6 +96,22 @@ gbSetCapabilties(void)
     ret = gbCapabilitiesEnumParse(p);
     if (ret != GB_CAP_MAX) {
       GB_STRCPYSTATIC(caps[count].cap, gbCapabilitiesLookup[ret]);
+
+      /*
+       * If the rtslib version doesn't support hw_block_size option
+       * then disable the hw_block_size capability
+       */
+      if (ret == GB_CREATE_BLOCK_SIZE_CAP) {
+          if (!gbBlockSizeDependenciesVersionCheck()) {
+            LOG ("mgmt", GB_LOG_INFO,
+                 "the 'hw_block_size' needs atleast rtslib >= %s, so disable its capability",
+                 GB_MIN_RTSLIB_BLKSIZE_VERSION);
+            caps[count].status = 0;
+            count++;
+            GB_FREE(line);
+            continue;
+          }
+      }
 
       /* Part after ':' and before '\n' */
       p = sep + 1;

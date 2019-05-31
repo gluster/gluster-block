@@ -66,6 +66,7 @@ struct blockCreateCli {
   char      volume[255];
   u_quad_t  size;
   u_int     rb_size;              /* TCMU Ring Buffer size in kernel */
+  u_int     blk_size;             /* TCMU hw block size in kernel */
   u_int     mpath;                /* HA request count */
   bool      auth_mode;
   bool      prealloc;
