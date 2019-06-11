@@ -483,7 +483,7 @@ block_delete_1_svc_st(blockDelete *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", backstore, iqn) == -1) {
+  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nexit\nEOF", backstore, iqn) == -1) {
     goto out;
   }
 

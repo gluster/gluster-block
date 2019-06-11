@@ -426,6 +426,11 @@ gbDependencyVersionCompare(int dependencyName, char *version)
       ret = true;
     }
     break;
+  case TARGETCLI_DAEMON:
+    if (DEPENDENCY_VERSION(vNum[0], vNum[1], vNum[2]) >= GB_MIN_TARGETCLI_DAEMON_VERSION_CODE) {
+      ret = true;
+    }
+    break;
   }
 
   GB_FREE(verStr);

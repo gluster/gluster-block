@@ -1031,7 +1031,7 @@ block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, save) == -1) {
+  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nexit\nEOF", tmp, save) == -1) {
     goto out;
   }
 
@@ -1084,7 +1084,7 @@ block_modify_size_1_svc_st(blockModifySize *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, save) == -1) {
+  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nexit\nEOF", tmp, save) == -1) {
     goto out;
   }
 

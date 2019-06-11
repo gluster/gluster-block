@@ -683,7 +683,7 @@ block_create_common(blockCreate *blk, char *control, char *volServer,
     goto out;
   }
 
-  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nEOF", tmp, save) == -1) {
+  if (GB_ASPRINTF(&exec, "targetcli <<EOF\n%s\n%s\nexit\nEOF", tmp, save) == -1) {
     goto out;
   }
   GB_FREE(tmp);

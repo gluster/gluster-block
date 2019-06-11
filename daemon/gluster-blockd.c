@@ -479,7 +479,9 @@ static int
 blockNodeSanityCheck(void)
 {
   int ret;
+  bool use_targetclid = true;
   char *global_opts;
+  char *tmp;
 
 
   /*
@@ -516,6 +518,35 @@ blockNodeSanityCheck(void)
   if (GB_ASPRINTF(&global_opts, GB_TGCLI_GLOBALS, gbConf->configShellLogFile) == -1) {
     return ENOMEM;
   }
+
+  tmp = gbRunnerGetOutput(TARGETCLI_VERSION);
+  if (!gbDependencyVersionCompare(TARGETCLI_DAEMON, tmp)) {
+    use_targetclid = false;
+    LOG("mgmt", GB_LOG_WARNING,
+        "targetclid required: %s, current version: %s, using cli mode",
+        GB_MIN_TARGETCLI_DAEMON_VERSION, tmp);
+  }
+  GB_FREE(tmp);
+
+  if (use_targetclid) {
+    tmp = global_opts;
+    /* Check if targetclid is running */
+    ret = gbRunner("ps aux ww | grep -w '[t]argetclid' > /dev/null");
+    if (ret) {
+      LOG("mgmt", GB_LOG_WARNING, "targetclid not running, using targetcli");
+      if (GB_ASPRINTF(&global_opts, "targetcli --disable-daemon; %s", tmp) == -1) {
+        GB_FREE(tmp);
+        return ENOMEM;
+      }
+    } else {
+      if (GB_ASPRINTF(&global_opts, "%s auto_use_daemon=true", tmp) == -1) {
+        GB_FREE(tmp);
+        return ENOMEM;
+      }
+    }
+    GB_FREE(tmp);
+  }
+
   /* Set targetcli globals */
   ret = gbRunner(global_opts);
   GB_FREE(global_opts);

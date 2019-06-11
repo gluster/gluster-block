@@ -674,6 +674,7 @@ typedef enum gbDependencies {
   RTSLIB_RELOAD           = 5,
   CONFIGSHELL_SEMICOLON   = 6,
   TCMURUNNER_IO_TIMEOUT   = 7,
+  TARGETCLI_DAEMON        = 8,
 } gbDependencies;
 
 int initGbConfig(void);

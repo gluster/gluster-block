@@ -834,7 +834,7 @@ block_replace_1_svc_st(blockReplace *blk, struct svc_req *rqstp)
   }
 
   if (GB_ASPRINTF(&exec,
-                  "targetcli <<EOF\n%s delete %s ip_port=3260\n%s create %s\n%s\nEOF",
+                  "targetcli <<EOF\n%s delete %s ip_port=3260\n%s create %s\n%s\nexit\nEOF",
                   path, blk->ripaddr, path, blk->ipaddr, save) == -1) {
     goto out;
   }
