@@ -3,6 +3,7 @@ Description=Gluster block storage utility
 Requisite=glusterd.service
 Requires=rpcbind.service
 BindsTo=gluster-block-target.service
+Wants=targetclid.service
 After=gluster-block-target.service rpcbind.service
 
 [Service]

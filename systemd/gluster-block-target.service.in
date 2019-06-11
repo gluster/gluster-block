@@ -11,7 +11,7 @@
 Conflicts=target.service
 Requisite=glusterd.service
 BindsTo=tcmu-runner.service
-After=glusterd.service tcmu-runner.service
+After=glusterd.service tcmu-runner.service targetclid.service
 
 [Service]
 ExecStop=
