@@ -2685,11 +2685,17 @@ getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
 
     json_object_object_add(so_obj_alua_ao_tpg, "alua_access_type", json_object_new_int(1));
     json_object_object_add(so_obj_alua_ao_tpg, "alua_access_state", json_object_new_int(0));
+    json_object_object_add(so_obj_alua_ao_tpg, "alua_support_offline", json_object_new_int(0));
+    json_object_object_add(so_obj_alua_ao_tpg, "alua_support_standby", json_object_new_int(0));
+    json_object_object_add(so_obj_alua_ao_tpg, "alua_support_unavailable", json_object_new_int(0));
     json_object_object_add(so_obj_alua_ao_tpg, "name", GB_JSON_OBJ_TO_STR(GB_ALUA_AO_TPG_NAME));
     json_object_object_add(so_obj_alua_ao_tpg, "tg_pt_gp_id", json_object_new_int(1));
 
     json_object_object_add(so_obj_alua_ano_tpg, "alua_access_type", json_object_new_int(1));
     json_object_object_add(so_obj_alua_ano_tpg, "alua_access_state", json_object_new_int(1));
+    json_object_object_add(so_obj_alua_ano_tpg, "alua_support_offline", json_object_new_int(0));
+    json_object_object_add(so_obj_alua_ano_tpg, "alua_support_standby", json_object_new_int(0));
+    json_object_object_add(so_obj_alua_ano_tpg, "alua_support_unavailable", json_object_new_int(0));
     json_object_object_add(so_obj_alua_ano_tpg, "name", GB_JSON_OBJ_TO_STR(GB_ALUA_ANO_TPG_NAME));
     json_object_object_add(so_obj_alua_ano_tpg, "tg_pt_gp_id", json_object_new_int(2));
 
@@ -4282,6 +4288,7 @@ block_create_common(blockCreate *blk, char *rbsize, char *volServer, char *prio_
   char *tpg = NULL;
   char *glfs_alua = NULL;
   char *glfs_alua_type = NULL;
+  char *glfs_alua_sup = NULL;
   char *lun = NULL;
   char *lun0 = NULL;
   char *portal = NULL;
@@ -4332,11 +4339,42 @@ block_create_common(blockCreate *blk, char *rbsize, char *volServer, char *prio_
       goto out;
     }
 
+    /*
+     * Only the 1/"implicit" type is support. Set AO TPG's ALUA state
+     * to 0(Active/optimized state) and set the ANO TPG's ALUA state
+     * to 1(Active/non-optimized state).
+     */
     if (GB_ASPRINTF(&glfs_alua_type,
                     "%s/%s/alua/glfs_tg_pt_gp_ao set alua alua_access_type=1\n"
                     "%s/%s/alua/glfs_tg_pt_gp_ano set alua alua_access_type=1\n"
                     "%s/%s/alua/glfs_tg_pt_gp_ao set alua alua_access_state=0\n"
                     "%s/%s/alua/glfs_tg_pt_gp_ano set alua alua_access_state=1",
+                    GB_TGCLI_GLFS_PATH, blk->block_name,
+                    GB_TGCLI_GLFS_PATH, blk->block_name,
+                    GB_TGCLI_GLFS_PATH, blk->block_name,
+                    GB_TGCLI_GLFS_PATH, blk->block_name) == -1) {
+      goto out;
+    }
+
+    /*
+     * The ALUA states and transition:
+     *
+     * a) active/optimized: supported as default
+     * b) active/non-optimized: supported as default
+     * c) standby: non-supported
+     * d) unavailable: non-supported
+     * e) offline: non-supported
+     * f) transition: supported as default
+     */
+    if (GB_ASPRINTF(&glfs_alua_sup,
+                    "%s/%s/alua/glfs_tg_pt_gp_ao set alua alua_support_offline=0\n"
+                    "%s/%s/alua/glfs_tg_pt_gp_ao set alua alua_support_standby=0\n"
+                    "%s/%s/alua/glfs_tg_pt_gp_ao set alua alua_support_unavailable=0\n"
+                    "%s/%s/alua/glfs_tg_pt_gp_ano set alua alua_support_offline=0\n"
+                    "%s/%s/alua/glfs_tg_pt_gp_ano set alua alua_support_standby=0\n"
+                    "%s/%s/alua/glfs_tg_pt_gp_ano set alua alua_support_unavailable=0\n",
+                    GB_TGCLI_GLFS_PATH, blk->block_name,
+                    GB_TGCLI_GLFS_PATH, blk->block_name,
                     GB_TGCLI_GLFS_PATH, blk->block_name,
                     GB_TGCLI_GLFS_PATH, blk->block_name,
                     GB_TGCLI_GLFS_PATH, blk->block_name,
@@ -4434,8 +4472,8 @@ block_create_common(blockCreate *blk, char *rbsize, char *volServer, char *prio_
           goto out;
         }
       } else {
-        if (GB_ASPRINTF(&exec, "%s\n%s\n%s\n%s\n%s\n%s %s\n%s\n%s\n%s %s",
-            backstore, backstore_attr, glfs_alua, glfs_alua_type, iqn,
+        if (GB_ASPRINTF(&exec, "%s\n%s\n%s\n%s\n%s\n%s\n%s %s\n%s\n%s\n%s %s",
+            backstore, backstore_attr, glfs_alua, glfs_alua_type, glfs_alua_sup, iqn,
             tpg?tpg:"", lun, lun0, portal, attr, blk->auth_mode?authcred:"") == -1) {
           goto out;
         }
@@ -4499,6 +4537,7 @@ block_create_common(blockCreate *blk, char *rbsize, char *volServer, char *prio_
   GB_FREE(backstore_attr);
   GB_FREE(volServer);
   blockServerDefFree(list);
+  GB_FREE(glfs_alua_sup);
 
   return reply;
 }
