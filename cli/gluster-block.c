@@ -690,6 +690,13 @@ glusterBlockCreate(int argcount, char **options, int json)
         goto out;
       }
       break;
+    case GB_CLI_CREATE_OPT_MAX:
+    default:
+      MSG(stderr, "unknown option '%s'", options[optind - 1]);
+      MSG(stderr, GB_CREATE_HELP_STR);
+      LOG("cli", GB_LOG_ERROR, "received an unknown option '%s' for block <%s/%s>",
+          options[optind - 1], cobj.volume, cobj.block_name);
+      goto out;
     }
   }
 
