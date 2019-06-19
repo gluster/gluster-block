@@ -19,7 +19,7 @@ function printLog()
 {
     local msg=${1}
 
-    echo "[$(date -u +'%Y-%m-%d %I:%M:%S')] ${msg}" >> "${LOGDIR}/gluster-block-bricks-start.log"
+    echo "[$(date -u +'%Y-%m-%d %H:%M:%S')] ${msg}" >> "${LOGDIR}/gluster-block-bricks-start.log"
 }
 
 function volume_online_brick_count()

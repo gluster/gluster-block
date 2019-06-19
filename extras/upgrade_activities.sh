@@ -24,7 +24,7 @@ function printLog()
 {
   local msg=${1}
 
-  echo "[$(date -u +'%Y-%m-%d %I:%M:%S')] ${msg}" >> ${GB_LOGFILE}
+  echo "[$(date -u +'%Y-%m-%d %H:%M:%S')] ${msg}" >> ${GB_LOGFILE}
 }
 
 
@@ -131,11 +131,15 @@ then
 fi
 
 # generate the block volumes target configuration
-gluster-block genconfig ${started_bhvs_list} enable-tpg $(get_local_hostip) > ${GB_TMP_SAVEFILE}
+tpg=$(get_local_hostip)
+printLog "INFO: about to run '#gluster-block genconfig ${started_bhvs_list} enable-tpg ${tpg}'"
+gluster-block genconfig ${started_bhvs_list} enable-tpg ${tpg} > ${GB_TMP_SAVEFILE}
 genconfig_ret=${?}
 if [[ ${genconfig_ret} -ne 0 ]]
 then
   printLog "WARNING: genconfig returns \'${genconfig_ret}\'"
+else
+  printLog "INFO: gluster-block genconfig returned ${genconfig_ret}"
 fi
 
 # kill gluster-blockd
