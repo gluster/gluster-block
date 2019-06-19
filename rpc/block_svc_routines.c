@@ -2433,7 +2433,7 @@ block_replace_cli_1_svc_st(blockReplaceCli *blk, struct svc_req *rqstp)
 
 
   LOG("mgmt", GB_LOG_DEBUG,
-      "replace request, volume=%s, blockname=%s oldnode=%s newnode=%s force=%d",
+      "replace cli request, volume=%s, blockname=%s oldnode=%s newnode=%s force=%d",
       blk->volume, blk->block_name, blk->old_node, blk->new_node, blk->force);
 
   if (GB_ALLOC(reply) < 0) {
@@ -2525,7 +2525,7 @@ block_replace_cli_1_svc_st(blockReplaceCli *blk, struct svc_req *rqstp)
 
   errCode = 0;
 
-  LOG("mgmt", GB_LOG_DEBUG, "replace cli success, volume=%s", blk->volume);
+  LOG("mgmt", GB_LOG_INFO, "replace cli returns success, volume=%s", blk->volume);
 
  out:
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
@@ -2916,8 +2916,8 @@ block_gen_config_cli_1_svc_st(blockGenConfigCli *blk, struct svc_req *rqstp)
   char *errMsg = NULL;
 
 
-  LOG("mgmt", GB_LOG_DEBUG,
-      "genconfig request, volume[s]=%s addr=%s", blk->volume, blk->addr);
+  LOG("mgmt", GB_LOG_INFO,
+      "genconfig cli request, volume[s]=%s addr=%s", blk->volume, blk->addr);
 
   if (GB_ALLOC(reply) < 0) {
     return NULL;
@@ -2931,7 +2931,7 @@ block_gen_config_cli_1_svc_st(blockGenConfigCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  LOG("mgmt", GB_LOG_DEBUG, "genconfig cli success, volume[s]=%s", blk->volume);
+  LOG("mgmt", GB_LOG_INFO, "genconfig cli return success, volume[s]=%s", blk->volume);
 
  out:
   GB_FREE(errMsg);
@@ -3249,7 +3249,7 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
   blockServerDefPtr list = NULL;
 
 
-  LOG("mgmt", GB_LOG_DEBUG,
+  LOG("mgmt", GB_LOG_INFO,
       "modify cli request, volume=%s blockname=%s authmode=%d",
       blk->volume, blk->block_name, blk->auth_mode);
 
@@ -3392,9 +3392,9 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
 
   errCode = 0;
 
-  LOG("mgmt", GB_LOG_DEBUG,
-      "modify auth cli success, volume=%s blockname=%s auth=%d",
-      blk->volume, blk->block_name, blk->auth_mode);
+  LOG("mgmt", GB_LOG_INFO,
+      "modify auth cli return success, volume=%s blockname=%s",
+      blk->volume, blk->block_name);
 
  out:
   GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
@@ -3550,7 +3550,7 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
   blockServerDefPtr list = NULL;
 
 
-  LOG("mgmt", GB_LOG_DEBUG,
+  LOG("mgmt", GB_LOG_INFO,
       "modify size cli request, volume=%s blockname=%s size=%zu",
       blk->volume, blk->block_name, blk->size);
 
@@ -3668,6 +3668,9 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
   }
 
   errCode = 0;
+  LOG("mgmt", GB_LOG_INFO,
+      "modify size cli return success, volume=%s blockname=%s",
+      blk->volume, blk->block_name);
 
  out:
   GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
@@ -4013,6 +4016,9 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   } else if (!resultCaps[GB_CREATE_LOAD_BALANCE_CAP] && cobj.prio_path[0]) {
     blockIncPrioAttr(glfs, blk->volume, cobj.prio_path);
   }
+
+  LOG("mgmt", GB_LOG_INFO, "create cli returns success, block volume: %s/%s",
+      blk->volume, blk->block_name);
 
  exist:
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
@@ -4690,6 +4696,8 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
     blockDecPrioAttr(glfs, blk->volume, info->prio_path);
   }
 
+  LOG("mgmt", GB_LOG_INFO, "delete cli returns success, block volume: %s/%s",
+      blk->volume, blk->block_name);
  out:
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
   blockServerDefFree(list);
@@ -4999,7 +5007,7 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
   char *errMsg = NULL;
 
 
-  LOG("mgmt", GB_LOG_DEBUG, "list cli request, volume=%s", blk->volume);
+  LOG("mgmt", GB_LOG_INFO, "list cli request, volume=%s", blk->volume);
 
   if (GB_ALLOC(reply) < 0) {
     return NULL;
@@ -5057,7 +5065,7 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
 
   errCode = 0;
 
-  LOG("mgmt", GB_LOG_DEBUG, "list cli success, volume=%s", blk->volume);
+  LOG("mgmt", GB_LOG_INFO, "list cli returns success, volume=%s", blk->volume);
 
   if (blk->json_resp) {
     json_object_object_add(json_obj, "blocks", json_array);
@@ -5270,7 +5278,7 @@ block_info_cli_1_svc_st(blockInfoCli *blk, struct svc_req *rqstp)
   char *errMsg = NULL;
 
 
-  LOG("mgmt", GB_LOG_DEBUG,
+  LOG("mgmt", GB_LOG_INFO,
       "info cli request, volume=%s blockname=%s", blk->volume, blk->block_name);
 
   if ((GB_ALLOC(reply) < 0) || (GB_ALLOC(info) < 0)) {
@@ -5308,8 +5316,8 @@ block_info_cli_1_svc_st(blockInfoCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  LOG("mgmt", GB_LOG_DEBUG,
-      "info cli success, volume=%s blockname=%s", blk->volume, blk->block_name);
+  LOG("mgmt", GB_LOG_INFO,
+      "info cli returns success, volume=%s blockname=%s", blk->volume, blk->block_name);
 
  out:
   GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
