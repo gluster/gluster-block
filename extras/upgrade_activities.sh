@@ -18,7 +18,21 @@ GB_SAVEFILE="/etc/target/saveconfig.json"
 GB_TMP_SAVEFILE="/tmp/gb_saveconfig.json"
 USED_COMMANDS="ps sed grep awk head echo pkill gluster gluster-block gluster-blockd"  # append new use of commands here
 mkdir -p "${LOGDIR}"
+GBD_STARTED=0
 
+
+function my_exit()
+{
+  local ret=${1}
+
+  # kill gluster-blockd
+  if [[ ${GBD_STARTED} -ne 0 ]]
+  then
+    pkill -15 gluster-blockd
+  fi
+
+  exit ${ret}
+}
 
 function printLog()
 {
@@ -50,7 +64,7 @@ function get_local_hostip()
 
   while read -r ipaddr
   do
-    if [[ $(ip addr | grep -c ${ipaddr}) -eq 1 ]]
+    if [[ $(ip addr | grep -wc ${ipaddr}) -eq 1 ]]
     then
       echo ${ipaddr}
       break
@@ -64,13 +78,13 @@ function check_daemons_running()
   if ! ps cax | grep -wq '[g]lusterd'
   then
     printLog "ERROR: Glusterd is not running"
-    exit 1
+    my_exit 1
   fi
 
   if ! ps cax | grep -wq '[g]luster-blockd'
   then
     printLog "ERROR: Gluster-blockd is not running"
-    exit 1
+    my_exit 1
   fi
 }
 
@@ -82,7 +96,7 @@ function check_dependent_commands_exist()
     if ! command -v "${i}" > /dev/null 2>&1
     then
       printLog "ERROR: \'${i}\' command is not found"
-      exit 1
+      my_exit 1
     fi
   done
 }
@@ -100,7 +114,7 @@ fi
 if [[ -f ${GB_STATUSFILE} ]]
 then
   printLog "INFO: skipping upgrade activities"
-  exit 0
+  my_exit 0
 fi
 
 printLog "INFO: started upgrade activities"
@@ -108,6 +122,7 @@ printLog "INFO: started upgrade activities"
 check_dependent_commands_exist
 # start gluster-blockd
 gluster-blockd --no-remote-rpc & > /dev/null 2>&1
+GBD_STARTED=1
 check_daemons_running
 
 stopped_bhvs_list=$(get_bhv_list "Stopped")
@@ -126,7 +141,7 @@ then
   then
     touch ${GB_STATUSFILE}
     printLog "INFO: successfully completed the upgrade activities"
-    exit 0
+    my_exit 0
   fi
 fi
 
