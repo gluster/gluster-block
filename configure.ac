@@ -142,6 +142,8 @@ AC_SUBST(GLUSTER_BLOCKD_WORKDIR)
 if test "x$prefix" = xNONE; then
    test $libexecdir = '${prefix}/libexec' && localstatedir=$ac_default_prefix/libexec
    libexecdir=/usr/libexec
+else
+   libexecdir='${prefix}/libexec'
 fi
 
 GLUSTER_BLOCKD_LIBEXECDIR="$(eval echo ${libexecdir}/gluster-block)"
