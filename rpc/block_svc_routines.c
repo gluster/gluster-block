@@ -41,7 +41,7 @@
                                 "'%s' ls | grep -e tpg -e '%s' | grep -B1 '%s' | grep -o 'tpg\\w'"
 # define   GB_CHECK_PORTAL      "targetcli /iscsi/" GB_TGCLI_IQN_PREFIX \
                                 "'%s' ls | grep '%s' > " DEVNULLPATH
-# define   GB_SAVECONFIG_CHECK  "grep -m 1 '\"name\": \"%s\",' " GB_SAVECONFIG " > " DEVNULLPATH
+# define   GB_SAVECONFIG_SO_CHECK "grep -m 1 '\"config\":.*/block-store/%s\",' " GB_SAVECONFIG " > " DEVNULLPATH
 
 # define   GB_ALUA_AO_TPG_NAME          "glfs_tg_pt_gp_ao"
 # define   GB_ALUA_ANO_TPG_NAME         "glfs_tg_pt_gp_ano"
@@ -294,7 +294,7 @@ blockCheckBlockLoadedStatus(char *block_name, char *gbid, blockResponse *reply)
   }
   GB_FREE(exec);
 
-  if (GB_ASPRINTF(&exec, GB_SAVECONFIG_CHECK, block_name) == -1) {
+  if (GB_ASPRINTF(&exec, GB_SAVECONFIG_SO_CHECK, gbid) == -1) {
     ret = -1;
     goto out;
   }
