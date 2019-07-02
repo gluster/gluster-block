@@ -362,6 +362,8 @@ extern struct gbConf *gbConf;
            if (!strstr(out, tmp)) {                                    \
              GB_FREE(tmp);                                             \
              LOG("mgmt", GB_LOG_ERROR, errStr, vol_blk);               \
+             LOG("mgmt", GB_LOG_ERROR, "Error from targetcli:\n%s\n",  \
+                  out);                                                \
              goto label;                                               \
            }                                                           \
            GB_FREE(tmp);                                               \
