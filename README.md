@@ -88,7 +88,7 @@ commands:
   delete  <volname/blockname> [unlink-storage <yes|no>] [force]
         delete block device.
 
-  modify  <volname/blockname> [auth <enable|disable>] [size <size>] [force]
+  modify  <volname/blockname> [auth <enable|disable>] [size <size> [force]]
         modify block device.
 
   replace <volname/blockname> <old-node> <new-node> [force]
