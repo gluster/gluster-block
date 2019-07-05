@@ -23,8 +23,8 @@
 # define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> "      \
                                 "[unlink-storage <yes|no>] [force] [--json*]"
 # define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "      \
-                                "[auth <enable|disable>] [size <size>] "       \
-                                "[force] [--json*]"
+                                "[auth <enable|disable>] [size <size> "       \
+                                "[force]] [--json*]"
 # define  GB_REPLACE_HELP_STR "gluster-block replace <volname/blockname> "     \
                                 "<old-node> <new-node> [force] [--json*]"
 # define  GB_GENCONF_HELP_STR "gluster-block genconfig <volname[,volume2,volume3,...]> "\
@@ -311,7 +311,7 @@ glusterBlockHelp(void)
       "  delete  <volname/blockname> [unlink-storage <yes|no>] [force]\n"
       "        delete block device.\n"
       "\n"
-      "  modify  <volname/blockname> [auth <enable|disable>] [size <size>] [force]\n"
+      "  modify  <volname/blockname> [auth <enable|disable>] [size <size> [force]]\n"
       "        modify block device.\n"
       "\n"
       "  replace <volname/blockname> <old-node> <new-node> [force]\n"
