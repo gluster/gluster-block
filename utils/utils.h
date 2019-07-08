@@ -126,17 +126,17 @@
 
 # define  MSG(fd, fmt, ...)                                          \
           do {                                                       \
-            int len;                                                 \
-            char *buf;                                               \
+            int _len_;                                               \
+            char *_buf_;                                             \
             if (fd <= 0)       /* including STDIN_FILENO 0 */        \
               fd = stderr;                                           \
-            len = GB_ASPRINTF(&buf, fmt, ##__VA_ARGS__);             \
-            if (len != -1) {                                         \
-              if (buf[len - 1] != '\n')                              \
-                fprintf(fd, "%s\n", buf);                            \
+            _len_ = GB_ASPRINTF(&_buf_, fmt, ##__VA_ARGS__);         \
+            if (_len_ != -1) {                                       \
+              if (_buf_[_len_ - 1] != '\n')                          \
+                fprintf(fd, "%s\n", _buf_);                          \
               else                                                   \
-                fprintf(fd, "%s", buf);                              \
-              free(buf);                                             \
+                fprintf(fd, "%s", _buf_);                            \
+              free(_buf_);                                           \
             } else {                                                 \
               fprintf(fd, fmt "\n", ##__VA_ARGS__);                  \
             }                                                        \
@@ -178,60 +178,60 @@ extern struct gbConf *gbConf;
 
 # define  LOG(str, level, fmt, ...)                                    \
           do {                                                         \
-            FILE *fd = NULL;                                           \
-            char timestamp[GB_TIME_STRING_BUFLEN] = {0};               \
-            char *tmp;                                                 \
-            bool logFileExist = false;                                 \
-            if (GB_STRDUP(tmp, str) < 0)                               \
+            FILE *_fd_ = NULL;                                         \
+            char _timestamp_[GB_TIME_STRING_BUFLEN] = {0};             \
+            char *_tmp_;                                               \
+            bool _logFileExist_ = false;                               \
+            if (GB_STRDUP(_tmp_, str) < 0)                             \
               fprintf(stderr, "No memory: %s\n", strerror(errno));     \
             LOCK(gbConf->lock);                                        \
             if (level <= gbConf->logLevel) {                           \
-              if (!strcmp(tmp, "mgmt")) {                              \
+              if (!strcmp(_tmp_, "mgmt")) {                            \
                 if (gbConf->daemonLogFile[0]) {                        \
-                    fd = fopen (gbConf->daemonLogFile, "a");           \
-                    logFileExist = true;                               \
+                    _fd_ = fopen (gbConf->daemonLogFile, "a");         \
+                    _logFileExist_ = true;                             \
                 }                                                      \
-              } else if (!strcmp(tmp, "cli")) {                        \
+              } else if (!strcmp(_tmp_, "cli")) {                      \
                 if (gbConf->cliLogFile[0]) {                           \
-                    fd = fopen (gbConf->cliLogFile, "a");              \
-                    logFileExist = true;                               \
+                    _fd_ = fopen (gbConf->cliLogFile, "a");            \
+                    _logFileExist_ = true;                             \
                 }                                                      \
-              } else if (!strcmp(tmp, "gfapi")) {                      \
+              } else if (!strcmp(_tmp_, "gfapi")) {                    \
                 if (gbConf->gfapiLogFile[0]) {                         \
-                    fd = fopen (gbConf->gfapiLogFile, "a");            \
-                    logFileExist = true;                               \
+                    _fd_ = fopen (gbConf->gfapiLogFile, "a");          \
+                    _logFileExist_ = true;                             \
                 }                                                      \
-              } else if (!strcmp(tmp, "cmdlog")) {                     \
+              } else if (!strcmp(_tmp_, "cmdlog")) {                   \
                 if (gbConf->cmdhistoryLogFile[0]) {                    \
-                    fd = fopen (gbConf->cmdhistoryLogFile, "a");       \
-                    logFileExist = true;                               \
+                    _fd_ = fopen (gbConf->cmdhistoryLogFile, "a");     \
+                    _logFileExist_ = true;                             \
                 }                                                      \
               } else {                                                 \
-                fd = stderr;                                           \
+                _fd_ = stderr;                                         \
               }                                                        \
-              if (fd == NULL) {                                        \
-                if (logFileExist)                                      \
+              if (_fd_ == NULL) {                                      \
+                if (_logFileExist_)                                    \
                     fprintf(stderr, "Error opening log file: %s\n"     \
                             "Logging to stderr.\n",                    \
                             strerror(errno));                          \
-                fd = stderr;                                           \
+                _fd_ = stderr;                                         \
               }                                                        \
-              logTimeNow(timestamp, GB_TIME_STRING_BUFLEN);            \
-              fprintf(fd, "[%s] %s: " fmt " [at %s+%d :<%s>]\n",       \
-                      timestamp, LogLevelLookup[level],                \
+              logTimeNow(_timestamp_, GB_TIME_STRING_BUFLEN);          \
+              fprintf(_fd_, "[%s] %s: " fmt " [at %s+%d :<%s>]\n",     \
+                      _timestamp_, LogLevelLookup[level],              \
                       ##__VA_ARGS__, __FILE__, __LINE__, __FUNCTION__);\
-              if (fd != stderr)                                        \
-                fclose(fd);                                            \
+              if (_fd_ != stderr)                                      \
+                fclose(_fd_);                                          \
             }                                                          \
             UNLOCK(gbConf->lock);                                      \
-            GB_FREE(tmp);                                              \
+            GB_FREE(_tmp_);                                            \
           } while (0)
 
 # define  GB_METALOCK_OR_GOTO(lkfd, volume, errCode, errMsg, label)  \
           do {                                                       \
-            struct flock lock = {0, };                               \
-            lock.l_type = F_WRLCK;                                   \
-            if (glfs_posix_lock (lkfd, F_SETLKW, &lock)) {           \
+            struct flock _lock_ = {0, };                             \
+            _lock_.l_type = F_WRLCK;                                 \
+            if (glfs_posix_lock (lkfd, F_SETLKW, &_lock_)) {         \
               LOG("mgmt", GB_LOG_ERROR, "glfs_posix_lock() on "      \
                   "volume %s failed[%s]", volume, strerror(errno));  \
               errCode = errno;                                       \
@@ -246,8 +246,8 @@ extern struct gbConf *gbConf;
 # define  GB_METAUPDATE_OR_GOTO(lock, glfs, fname,                      \
                                 volume, ret, errMsg, label,...)         \
           do {                                                          \
-            char *write;                                                \
-            struct glfs_fd *tgmfd;                                      \
+            char *_write_;                                              \
+            struct glfs_fd *_tgmfd_;                                    \
             LOCK(lock);                                                 \
             ret = glfs_chdir (glfs, GB_METADIR);                        \
             if (ret) {                                                  \
@@ -260,10 +260,10 @@ extern struct gbConf *gbConf;
               ret = -1;                                                 \
               goto label;                                               \
             }                                                           \
-            tgmfd = glfs_creat(glfs, fname,                             \
+            _tgmfd_ = glfs_creat(glfs, fname,                           \
                                O_WRONLY | O_APPEND | O_SYNC,            \
                                S_IRUSR | S_IWUSR);                      \
-            if (!tgmfd) {                                               \
+            if (!_tgmfd_) {                                             \
               GB_ASPRINTF(&errMsg, "Failed to update transaction log "  \
                 "for %s/%s[%s]", volume, fname, strerror(errno));       \
               LOG("mgmt", GB_LOG_ERROR, "glfs_creat(%s): on "           \
@@ -273,11 +273,11 @@ extern struct gbConf *gbConf;
               ret = -1;                                                 \
               goto label;                                               \
             }                                                           \
-            if (GB_ASPRINTF(&write, ##__VA_ARGS__) < 0) {               \
+            if (GB_ASPRINTF(&_write_, ##__VA_ARGS__) < 0) {             \
               ret = -1;                                                 \
             }                                                           \
             if (!ret) {                                                 \
-              if(glfs_write (tgmfd, write, strlen(write), 0) < 0) {     \
+              if(glfs_write (_tgmfd_, _write_, strlen(_write_), 0) < 0){\
                 GB_ASPRINTF(&errMsg, "Failed to update transaction log "\
                   "for %s/%s[%s]", volume, fname, strerror(errno));     \
                 LOG("mgmt", GB_LOG_ERROR, "glfs_write(%s): on "         \
@@ -285,9 +285,9 @@ extern struct gbConf *gbConf;
                     strerror(errno));                                   \
                 ret = -1;                                               \
               }                                                         \
-              GB_FREE(write);                                           \
+              GB_FREE(_write_);                                         \
             }                                                           \
-            if (tgmfd && glfs_close(tgmfd) != 0) {                      \
+            if (_tgmfd_ && glfs_close(_tgmfd_) != 0) {                  \
               GB_ASPRINTF(&errMsg, "Failed to update transaction log "  \
                 "for %s/%s[%s]", volume, fname, strerror(errno));       \
               LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on "           \
@@ -305,9 +305,9 @@ extern struct gbConf *gbConf;
 
 # define  GB_METAUNLOCK(lkfd, volume, ret, errMsg)                   \
           do {                                                       \
-            struct flock lock = {0, };                               \
-            lock.l_type = F_UNLCK;                                   \
-            if (glfs_posix_lock(lkfd, F_SETLK, &lock)) {             \
+            struct flock _lock_ = {0, };                             \
+            _lock_.l_type = F_UNLCK;                                 \
+            if (glfs_posix_lock(lkfd, F_SETLK, &_lock_)) {           \
               if (!errMsg) {                                         \
                     GB_ASPRINTF (&errMsg, "Not able to acquire "     \
                         "lock on %s[%s]", volume, strerror(errno));  \
@@ -320,31 +320,31 @@ extern struct gbConf *gbConf;
 
 # define  GB_CMD_EXEC_AND_VALIDATE(cmd, sr, blk, vol, opt)             \
           do {                                                         \
-            FILE *fp;                                                  \
-            char tmp[1024];                                            \
+            FILE *_fp_;                                                  \
+            char _tmp_[1024];                                            \
             LOG("mgmt", GB_LOG_DEBUG, "command, %s", cmd);             \
-            fp = popen(cmd, "r");                                      \
-            snprintf(tmp, 1024, "%s/%s", vol?vol:"", blk->block_name); \
-            if (fp) {                                                  \
-              size_t newLen = fread(sr->out, sizeof(char), 8192, fp);  \
-              if (ferror( fp ) != 0) {                                 \
+            _fp_ = popen(cmd, "r");                                      \
+            snprintf(_tmp_, 1024, "%s/%s", vol?vol:"", blk->block_name); \
+            if (_fp_) {                                                  \
+              size_t newLen = fread(sr->out, sizeof(char), 8192, _fp_);  \
+              if (ferror( _fp_ ) != 0) {                                 \
                 LOG("mgmt", GB_LOG_ERROR,                              \
-                    "reading command %s output for %s failed(%s)", tmp,\
+                    "reading command %s output for %s failed(%s)", _tmp_,\
                     cmd, strerror(errno));                             \
                 sr->out[0] = '\0';                                     \
                 sr->exit = -1;                                         \
-                pclose(fp);                                            \
+                pclose(_fp_);                                            \
                 break;                                                 \
               } else {                                                 \
                 sr->out[newLen++] = '\0';                              \
               }                                                        \
               sr->exit = blockValidateCommandOutput(sr->out, opt,      \
                                                     (void*)blk);       \
-              pclose(fp);                                              \
+              pclose(_fp_);                                              \
             } else {                                                   \
               LOG("mgmt", GB_LOG_ERROR,                                \
                   "popen(): for %s executing command %s failed(%s)",   \
-                  tmp, cmd, strerror(errno));                          \
+                  _tmp_, cmd, strerror(errno));                          \
             }                                                          \
             LOG("mgmt", GB_LOG_DEBUG, "raw output, %s", sr->out);      \
             LOG("mgmt", GB_LOG_INFO, "command exit code, %d",          \
@@ -353,20 +353,20 @@ extern struct gbConf *gbConf;
 
 # define GB_OUT_VALIDATE_OR_GOTO(out, label, errStr, blk, vol, ...)    \
          do {                                                          \
-           char *tmp;                                                  \
-           char vol_blk[1024];                                         \
-           snprintf(vol_blk, 1024, "%s/%s", vol?vol:"",                \
+           char *_tmp_;                                                \
+           char _vol_blk_[1024];                                       \
+           snprintf(_vol_blk_, 1024, "%s/%s", vol?vol:"",              \
                     blk->block_name);                                  \
-           if (GB_ASPRINTF(&tmp, ##__VA_ARGS__) == -1)                 \
+           if (GB_ASPRINTF(&_tmp_, ##__VA_ARGS__) == -1)               \
              goto label;                                               \
-           if (!strstr(out, tmp)) {                                    \
-             GB_FREE(tmp);                                             \
-             LOG("mgmt", GB_LOG_ERROR, errStr, vol_blk);               \
+           if (!strstr(out, _tmp_)) {                                  \
+             GB_FREE(_tmp_);                                           \
+             LOG("mgmt", GB_LOG_ERROR, errStr, _vol_blk_);             \
              LOG("mgmt", GB_LOG_ERROR, "Error from targetcli:\n%s\n",  \
                   out);                                                \
              goto label;                                               \
            }                                                           \
-           GB_FREE(tmp);                                               \
+           GB_FREE(_tmp_);                                             \
          } while (0)
 
 # define GB_RPC_CALL(op, blk, reply, rqstp, ret)                    \
