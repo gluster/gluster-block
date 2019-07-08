@@ -46,6 +46,7 @@
 
 # define   DEVNULLPATH           "/dev/null"
 # define   GB_SAVECONFIG         "/etc/target/saveconfig.json"
+# define   GB_SAVECONFIG_TEMP    "/etc/target/saveconfig.json.temp"
 
 # define  GB_METADIR             "/block-meta"
 # define  GB_STOREDIR            "/block-store"
