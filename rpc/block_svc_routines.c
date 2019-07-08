@@ -41,7 +41,8 @@
                                 "'%s' ls | grep -e tpg -e '%s' | grep -B1 '%s' | grep -o 'tpg\\w'"
 # define   GB_CHECK_PORTAL      "targetcli /iscsi/" GB_TGCLI_IQN_PREFIX \
                                 "'%s' ls | grep '%s' > " DEVNULLPATH
-# define   GB_SAVECONFIG_SO_CHECK "grep -m 1 '\"config\":.*/block-store/%s\",' " GB_SAVECONFIG " > " DEVNULLPATH
+# define   GB_SAVECFG_GBID_CHECK "grep -m 1 '\"config\":.*/block-store/%s\",' " GB_SAVECONFIG " > " DEVNULLPATH
+# define   GB_SAVECFG_NAME_CHECK "grep -csh '\"name\": \"%s\",' " GB_SAVECONFIG " " GB_SAVECONFIG_TEMP
 
 # define   GB_ALUA_AO_TPG_NAME          "glfs_tg_pt_gp_ao"
 # define   GB_ALUA_ANO_TPG_NAME         "glfs_tg_pt_gp_ano"
@@ -294,7 +295,7 @@ blockCheckBlockLoadedStatus(char *block_name, char *gbid, blockResponse *reply)
   }
   GB_FREE(exec);
 
-  if (GB_ASPRINTF(&exec, GB_SAVECONFIG_SO_CHECK, gbid) == -1) {
+  if (GB_ASPRINTF(&exec, GB_SAVECFG_GBID_CHECK, gbid) == -1) {
     ret = -1;
     goto out;
   }
@@ -3138,7 +3139,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
   ret = glusterBlockAuditRequest(glfs, blk, cobj, list, reply);
   if (ret) {
     LOG("mgmt", GB_LOG_ERROR, "glusterBlockAuditRequest: return %d"
-        "volume: %s hosts: %s blockname %s", ret,
+        " volume: %s hosts: %s blockname %s", ret,
         blk->volume, blk->block_hosts, blk->block_name);
   }
 
@@ -4078,7 +4079,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   errCode = glusterBlockAuditRequest(glfs, blk, &cobj, list, &savereply);
   if (errCode) {
     LOG("mgmt", GB_LOG_ERROR, "glusterBlockAuditRequest: return %d"
-        "volume: %s hosts: %s blockname %s", errCode,
+        " volume: %s hosts: %s blockname %s", errCode,
         blk->volume, blk->block_hosts, blk->block_name);
   } else if (!resultCaps[GB_CREATE_LOAD_BALANCE_CAP] && cobj.prio_path[0]) {
     blockIncPrioAttr(glfs, blk->volume, cobj.prio_path);
@@ -4375,6 +4376,24 @@ block_create_common(blockCreate *blk, char *control, char *volServer, char *prio
   }
   reply->exit = -1;
 
+  if (GB_ALLOC_N(reply->out, 8192) < 0) {
+    goto out;
+  }
+
+  if (GB_ASPRINTF(&exec, GB_SAVECFG_NAME_CHECK, blk->block_name) == -1) {
+    goto out;
+  }
+
+  save = gbRunnerGetOutput(exec);
+  if (save && atol(save)) {
+    snprintf(reply->out, 8192,
+            "block with name '%s' already exist (Hint: may be hosted on a different block-hosting volume)",
+             blk->block_name);
+    goto out;
+  }
+  GB_FREE(exec);
+  GB_FREE(save);
+
   if (prio_path && prio_path[0]) {
     prioCap = true;
   }
@@ -4572,11 +4591,6 @@ block_create_common(blockCreate *blk, char *control, char *volServer, char *prio
     goto out;
   }
   GB_FREE(tmp);
-
-  if (GB_ALLOC_N(reply->out, 8192) < 0) {
-    GB_FREE(reply);
-    goto out;
-  }
 
   GB_CMD_EXEC_AND_VALIDATE(exec, reply, blk, blk->volume, CREATE_SRV);
   if (reply->exit) {
