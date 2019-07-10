@@ -19,17 +19,27 @@ GB_TMP_SAVEFILE="/tmp/gb_saveconfig.json"
 USED_COMMANDS="ps sed grep awk head echo pkill gluster gluster-block gluster-blockd"  # append new use of commands here
 mkdir -p "${LOGDIR}"
 GBD_STARTED=0
+GBD_PID=0
+
+
+function kill_gluster_blockd_wait()
+{
+  if [[ ${GBD_STARTED} -ne 0 && ${GBD_PID} -ne 0 ]]
+  then
+    # kill gluster-blockd
+    kill -15 ${GBD_PID} > /dev/null 2>&1
+
+    # let's wait until the child process is finished
+    wait ${GBD_PID}
+  fi
+}
 
 
 function my_exit()
 {
   local ret=${1}
 
-  # kill gluster-blockd
-  if [[ ${GBD_STARTED} -ne 0 ]]
-  then
-    pkill -15 gluster-blockd
-  fi
+  kill_gluster_blockd_wait
 
   exit ${ret}
 }
@@ -81,7 +91,19 @@ function check_daemons_running()
     my_exit 1
   fi
 
-  if ! ps cax | grep -wq '[g]luster-blockd'
+  # try 5 times to make sure the backgroud process is fired.
+  count=1
+  while [[ ${count} -le 5 ]]
+  do
+    if ps cax | grep -wq '[g]luster-blockd'
+    then
+      break
+    fi
+    sleep 1
+    let "count++"
+  done
+
+  if [[ ${count} -gt 5 ]]
   then
     printLog "ERROR: Gluster-blockd is not running"
     my_exit 1
@@ -122,6 +144,7 @@ printLog "INFO: started upgrade activities"
 check_dependent_commands_exist
 # start gluster-blockd
 gluster-blockd --no-remote-rpc & > /dev/null 2>&1
+GBD_PID=${!}
 GBD_STARTED=1
 check_daemons_running
 
@@ -143,6 +166,8 @@ then
     printLog "INFO: successfully completed the upgrade activities"
     my_exit 0
   fi
+  printLog "WARNING: not completely successful with upgrade activities, on next start of gluster-blockd service will try again!"
+  my_exit 1
 fi
 
 # generate the block volumes target configuration
@@ -157,8 +182,7 @@ else
   printLog "INFO: gluster-block genconfig returned ${genconfig_ret}"
 fi
 
-# kill gluster-blockd
-pkill -15 gluster-blockd
+kill_gluster_blockd_wait
 
 # copy the generated saveconfig file to right path
 if [[ -f ${GB_TMP_SAVEFILE} ]]
