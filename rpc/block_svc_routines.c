@@ -997,10 +997,8 @@ glusterBlockCreateRemote(void *data)
 
 
 static int
-glusterBlockCreateRemoteAsync(blockServerDefPtr list,
-                            size_t listindex, size_t mpath,
-                            struct glfs *glfs,
-                            blockCreate2 *cobj,
+glusterBlockCreateRemoteAsync(blockServerDefPtr list, size_t mpath,
+                            struct glfs *glfs, blockCreate2 *cobj,
                             blockRemoteCreateResp **savereply)
 {
   pthread_t  *tid = NULL;
@@ -1009,19 +1007,15 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list,
   size_t i;
 
 
-  if (GB_ALLOC_N(tid, mpath) < 0) {
+  if (GB_ALLOC_N(tid, mpath) < 0 || GB_ALLOC_N(args, mpath) < 0) {
     goto out;
   }
-
-  if (GB_ALLOC_N(args, mpath) < 0) {
-    goto out;
- }
 
   for (i = 0; i < mpath; i++) {
     args[i].glfs = glfs;
     args[i].obj = (void *)cobj;
     args[i].volume = cobj->volume;
-    args[i].addr = list->hosts[i + listindex];
+    args[i].addr = list->hosts[i];
   }
 
   for (i = 0; i < mpath; i++) {
@@ -1115,42 +1109,25 @@ glusterBlockDeleteRemote(void *data)
 
 
 static size_t
-glusterBlockDeleteFillArgs(MetaInfo *info, bool deleteall, blockRemoteObj *args,
+glusterBlockDeleteFillArgs(MetaInfo *info, blockRemoteObj *args,
                            struct glfs *glfs, blockDelete *dobj)
 {
   int i = 0;
   size_t count = 0;
+  unsigned int status;
 
   for (i = 0, count = 0; i < info->nhosts; i++) {
-    switch (blockMetaStatusEnumParse(info->list[i]->status)) {
-    case GB_CONFIG_SUCCESS:
-    case GB_AUTH_ENFORCEING:
-    case GB_AUTH_ENFORCED:
-    case GB_AUTH_ENFORCE_FAIL:
-    case GB_AUTH_CLEAR_ENFORCED:
-    case GB_AUTH_CLEAR_ENFORCEING:
-    case GB_AUTH_CLEAR_ENFORCE_FAIL:
-    case GB_RP_SUCCESS:
-    case GB_RP_FAIL:
-    case GB_RP_INPROGRESS:
-    case GB_RS_INPROGRESS:
-    case GB_RS_SUCCESS:
-    case GB_RS_FAIL:
-      if (!deleteall)
-        break;
- /* case GB_CONFIG_INPROGRESS: untouched may be due to connect failed */
-    case GB_CONFIG_FAIL:
-    case GB_CLEANUP_INPROGRESS:
-    case GB_CLEANUP_FAIL:
-      if (args) {
-        args[count].glfs = glfs;
-        args[count].obj = (void *)dobj;
-        args[count].volume = info->volume;
-        args[count].addr = info->list[i]->addr;
-      }
-      count++;
-      break;
+    status = blockMetaStatusEnumParse(info->list[i]->status);
+    if (status == GB_CONFIG_INPROGRESS || status == GB_CLEANUP_SUCCESS) {
+      continue;
     }
+    if (args) {
+      args[count].glfs = glfs;
+      args[count].obj = (void *)dobj;
+      args[count].volume = info->volume;
+      args[count].addr = info->list[i]->addr;
+    }
+    count++;
   }
   return count;
 }
@@ -1210,7 +1187,6 @@ glusterBlockDeleteRemoteAsync(char *blockname,
                               struct glfs *glfs,
                               blockDelete *dobj,
                               size_t count,
-                              bool deleteall,
                               blockRemoteDeleteResp **savereply)
 {
   pthread_t  *tid = NULL;
@@ -1226,15 +1202,11 @@ glusterBlockDeleteRemoteAsync(char *blockname,
   int cleanupsuccess = 0;
 
 
-  if (GB_ALLOC_N(tid, count) < 0) {
+  if (GB_ALLOC_N(tid, count) < 0  || GB_ALLOC_N(args, count) < 0) {
     goto out;
   }
 
-  if (GB_ALLOC_N(args, count) < 0) {
-    goto out;
-  }
-
-  count = glusterBlockDeleteFillArgs(info, deleteall, args, glfs, dobj);
+  count = glusterBlockDeleteFillArgs(info, args, glfs, dobj);
 
   for (i = 0; i < count; i++) {
     pthread_create(&tid[i], NULL, glusterBlockDeleteRemote, &args[i]);
@@ -1272,23 +1244,15 @@ glusterBlockDeleteRemoteAsync(char *blockname,
   }
 
   for (i = 0; i < count; i++) {
-    if (args[i].exit){
-      if (args[i].exit == GB_BLOCK_NOT_FOUND) {
-        cleanupsuccess++;
-      }
+    if (args[i].exit && args[i].exit == GB_BLOCK_NOT_FOUND) {
+      cleanupsuccess++;
     }
   }
 
   /* get new MetaInfo and compare */
-  if (GB_ALLOC(info_new) < 0) {
+  if (GB_ALLOC(info_new) < 0 || blockGetMetaInfo(glfs, blockname, info_new, NULL)) {
     goto out;
   }
-
-  ret = blockGetMetaInfo(glfs, blockname, info_new, NULL);
-  if (ret) {
-    goto out;
-  }
-  ret = -1;
 
   for (i = 0; i < info_new->nhosts; i++) {
     switch (blockMetaStatusEnumParse(info_new->list[i]->status)) {
@@ -2784,7 +2748,7 @@ getSoTgArraysForAllVolume(struct soTgObj *obj, blockGenConfigCli *blk,
   struct json_object *tg_obj = NULL;
 
 
-  vols = getCharArrayFromDelimitedStr(blk->volume, GB_VOLS_DELIMITER);
+  vols = getCharArrayFromDelimitedStr(blk->volume, GB_DELIMITER);
   if (!vols) {
     LOG("mgmt", GB_LOG_ERROR,
         "getCharArrayFromDelimitedStr(%s) failed", blk->volume);
@@ -2979,7 +2943,7 @@ block_gen_config_cli_1_svc_st(blockGenConfigCli *blk, struct svc_req *rqstp)
 
 static int
 glusterBlockCleanUp(struct glfs *glfs, char *blockname,
-                    bool deleteall, bool forcedel, bool unlink, blockRemoteDeleteResp *drobj)
+                    bool forcedel, bool unlink, blockRemoteDeleteResp *drobj)
 {
   int ret = -1;
   blockDelete dobj;
@@ -3001,9 +2965,9 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
   GB_STRCPYSTATIC(dobj.block_name, blockname);
   GB_STRCPYSTATIC(dobj.gbid, info->gbid);
 
-  count = glusterBlockDeleteFillArgs(info, deleteall, NULL, NULL, NULL);
+  count = glusterBlockDeleteFillArgs(info, NULL, NULL, NULL);
   asyncret = glusterBlockDeleteRemoteAsync(blockname, info, glfs, &dobj, count,
-                                           deleteall, &drobj);
+                                           &drobj);
   if (asyncret) {
     LOG("mgmt", GB_LOG_WARNING,
         "glusterBlockDeleteRemoteAsync: return %d %s for block %s on volume %s",
@@ -3011,26 +2975,24 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
   }
 
   /* delete metafile and block file */
-  if (deleteall) {
-    if (forcedel || !asyncret) {
+  if (forcedel || !asyncret) {
+    GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
+        ret, errMsg, out, "ENTRYDELETE: INPROGRESS\n");
+    if (unlink && glusterBlockDeleteEntry(glfs, info->volume, info->gbid)) {
       GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
-                            ret, errMsg, out, "ENTRYDELETE: INPROGRESS\n");
-      if (unlink && glusterBlockDeleteEntry(glfs, info->volume, info->gbid)) {
-        GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
-                              ret, errMsg, out, "ENTRYDELETE: FAIL\n");
-        LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s", FAILED_DELETING_FILE,
-            info->volume, blockname);
-        ret = -1;
-        goto out;
-      }
-      GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
-                            ret, errMsg, out, "ENTRYDELETE: SUCCESS\n");
-      ret = glusterBlockDeleteMetaFile(glfs, info->volume, blockname);
-      if (ret) {
-        LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s",
-            FAILED_DELETING_META, info->volume, blockname);
-        goto out;
-      }
+          ret, errMsg, out, "ENTRYDELETE: FAIL\n");
+      LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s", FAILED_DELETING_FILE,
+          info->volume, blockname);
+      ret = -1;
+      goto out;
+    }
+    GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
+        ret, errMsg, out, "ENTRYDELETE: SUCCESS\n");
+    ret = glusterBlockDeleteMetaFile(glfs, info->volume, blockname);
+    if (ret) {
+      LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s",
+          FAILED_DELETING_META, info->volume, blockname);
+      goto out;
     }
   }
 
@@ -3057,12 +3019,7 @@ glusterBlockAuditRequest(struct glfs *glfs,
   int ret = -1;
   size_t i;
   size_t successcnt = 0;
-  size_t failcnt = 0;
-  size_t spent;
-  size_t spare;
-  size_t morereq;
   MetaInfo *info;
-  static bool needcleanup = FALSE;   /* partial failure on subset of nodes */
 
 
   if (GB_ALLOC(info) < 0) {
@@ -3080,9 +3037,6 @@ glusterBlockAuditRequest(struct glfs *glfs,
     case GB_AUTH_ENFORCED:
       successcnt++;
       break;
-    case GB_CONFIG_INPROGRESS:
-    case GB_CONFIG_FAIL:
-      failcnt++;
     }
   }
 
@@ -3091,62 +3045,12 @@ glusterBlockAuditRequest(struct glfs *glfs,
     LOG("mgmt", GB_LOG_INFO, "Block create request satisfied for target:"
         " %s on volume %s with given hosts %s",
           blk->block_name, blk->volume, blk->block_hosts);
-    ret = 0;
-    goto out;
-  }
-
-  spent = successcnt + failcnt;  /* total spent */
-  spare = list->nhosts  - spent;  /* spare after spent */
-  morereq = blk->mpath  - successcnt;  /* needed nodes to complete req */
-
-  if (spare == 0) {
-    LOG("mgmt", GB_LOG_WARNING,
-        "No Spare nodes to create (%s): rollingback creation of target"
-        " on volume %s with given hosts %s",
-        blk->block_name, blk->volume, blk->block_hosts);
-    glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, TRUE, (*reply)->obj);
-    needcleanup = FALSE;   /* already clean attempted */
-    ret = -1;
-    goto out;
-  }
-
-  if (spare < morereq) {
-    LOG("mgmt", GB_LOG_WARNING,
-        "Not enough Spare nodes for (%s): rollingback creation of target"
-        " on volume %s with given hosts %s",
-        blk->block_name, blk->volume, blk->block_hosts);
-    glusterBlockCleanUp(glfs, blk->block_name, TRUE, FALSE, TRUE, (*reply)->obj);
-    needcleanup = FALSE;   /* already clean attempted */
-    ret = -1;
-    goto out;
-  }
-
-  /* create on spare */
-  LOG("mgmt", GB_LOG_INFO,
-      "Trying to serve request for (%s)  on volume %s from spare machines",
-      blk->block_name, blk->volume);
-  ret = glusterBlockCreateRemoteAsync(list, spent, morereq,
-                                      glfs, cobj, reply);
-  if (ret) {
-    LOG("mgmt", GB_LOG_WARNING, "glusterBlockCreateRemoteAsync: return %d"
-        " %s for block %s on volume %s with hosts %s", ret,
-        FAILED_REMOTE_AYNC_CREATE, blk->block_name,
-        blk->volume, blk->block_hosts);
-  }
-  /* we could ideally moved this into #CreateRemoteAsync fail {} */
-  needcleanup = TRUE;
-
-  ret = glusterBlockAuditRequest(glfs, blk, cobj, list, reply);
-  if (ret) {
-    LOG("mgmt", GB_LOG_ERROR, "glusterBlockAuditRequest: return %d"
-        " volume: %s hosts: %s blockname %s", ret,
-        blk->volume, blk->block_hosts, blk->block_name);
+    blockFreeMetaInfo(info);
+    return 0;
   }
 
  out:
-  if (needcleanup) {
-      glusterBlockCleanUp(glfs, blk->block_name, FALSE, FALSE, TRUE, (*reply)->obj);
-  }
+  glusterBlockCleanUp(glfs, blk->block_name, FALSE, TRUE, (*reply)->obj);
 
   blockFreeMetaInfo(info);
   return ret;
@@ -4066,7 +3970,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
                           errCode, errMsg, exist, "PASSWORD: %s\n", passwd);
   }
 
-  errCode = glusterBlockCreateRemoteAsync(list, 0, blk->mpath,
+  errCode = glusterBlockCreateRemoteAsync(list, blk->mpath,
                                           glfs, &cobj, &savereply);
   if (errCode) {
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockCreateRemoteAsync: return %d"
@@ -4820,7 +4724,7 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
     }
   }
 
-  errCode = glusterBlockCleanUp(glfs, blk->block_name, TRUE, blk->force, blk->unlink, savereply);
+  errCode = glusterBlockCleanUp(glfs, blk->block_name, blk->force, blk->unlink, savereply);
   if (errCode) {
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockCleanUp: return %d "
         "on block %s for volume %s", errCode, blk->block_name, blk->volume);

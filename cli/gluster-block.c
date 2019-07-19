@@ -13,6 +13,7 @@
 # include  "block.h"
 # include  "config.h"
 
+# include <arpa/inet.h>
 
 # define  GB_CREATE_HELP_STR  "gluster-block create <volname/blockname> "      \
                                 "[ha <count>] [auth <enable|disable>] "        \
@@ -363,7 +364,7 @@ glusterBlockIsVolListAcceptable(char *name)
     return FALSE;
   }
 
-  delim[0] = GB_VOLS_DELIMITER;
+  delim[0] = GB_DELIMITER;
   tok = strtok(tmp, delim);
   while (tok != NULL) {
     if (!glusterBlockIsNameAcceptable(tok)) {
@@ -381,32 +382,61 @@ static bool
 glusterBlockIsAddrAcceptable(char *addr)
 {
   int i = 0;
+  struct in_addr buf;
+  struct in6_addr buf6;
 
 
   if (!addr || strlen(addr) == 0 || strlen(addr) > 255) {
     return FALSE;
   }
+
   for (i = 0; i < strlen(addr); i++) {
     if (!isdigit(addr[i]) && (addr[i] != '.'))
       return FALSE;
   }
+
+  if ((inet_pton(AF_INET, addr, &buf) != 1) &&
+      (inet_pton(AF_INET6, addr, &buf6) != 1)) {
+    return FALSE;
+  }
+
   return TRUE;
 }
 
-static bool
-glusterBlockIsAddrListAcceptable(char *addr_list)
+/* Checks if the block servers passed at commandline are ip's and match HA count
+ * ret > 0 -> ip's and HA requested is mismatching
+ * ret = 0 -> address list is acceptable
+ * ret < 0 -> hostname is passed or unknown delimers
+ */
+static int
+glusterBlockIsAddrListAcceptable(size_t count, char *addr_list)
 {
-  int i = 0;
+  char *tok, *tmp;
+  char delim[2] = {'\0', };
+  unsigned int ncommas = 0;
 
 
-  if (!addr_list || strlen(addr_list) == 0) {
-    return FALSE;
+  if (!addr_list || strlen(addr_list) == 0 || GB_STRDUP(tmp, addr_list) < 0) {
+    return -1;
   }
-  for (i = 0; i < strlen(addr_list); i++) {
-    if (!isdigit(addr_list[i]) && (addr_list[i] != '.') && (addr_list[i] != ','))
-      return FALSE;
+
+  delim[0] = GB_DELIMITER;
+  tok = strtok(tmp, delim);
+  while (tok != NULL) {
+    if (!glusterBlockIsAddrAcceptable(tok)) {
+      GB_FREE(tmp);
+      return -1;
+    }
+    tok = strtok(NULL, delim);
+    ncommas++;
   }
-  return TRUE;
+  GB_FREE(tmp);
+
+  if (ncommas != count) {
+    return ncommas;  /* number of ip's */
+  }
+
+  return 0;
 }
 
 static int
@@ -735,12 +765,18 @@ glusterBlockCreate(int argcount, char **options, int json)
   }
 
   /* defend on the use of hostnames */
-  if (!glusterBlockIsAddrListAcceptable(cobj.block_hosts)) {
-    MSG(stderr, "hostnames are not supported with gluster-block");
-    MSG(stderr, "Hint: please use ip addresses only");
+  ret = glusterBlockIsAddrListAcceptable(cobj.mpath, cobj.block_hosts);
+  if (ret < 0) {
+    MSG(stderr, "hostnames are not supported with gluster-block, use ips only");
+    MSG(stderr, "Hint: if you are already using ips, make sure there are no typos");
+  } else if (ret > 0) {
+    MSG(stderr, "number of ip's in the list passed are not matching HA count requested");
+  }
+  if (ret) {
     LOG("cli", GB_LOG_ERROR,
         "failed while parsing the host-list for create block %s on volume %s with hosts %s",
         cobj.block_name, cobj.volume, cobj.block_hosts);
+    ret = -1;
     goto out;
   }
 
@@ -966,7 +1002,7 @@ glusterBlockGenConfig(int argcount, char **options, int json)
 
   if (!glusterBlockIsVolListAcceptable(options[optind])) {
     MSG(stderr, "volume list(%s) should be delimited by '%c' character only\n%s",
-        options[optind], GB_VOLS_DELIMITER, GB_GENCONF_HELP_STR);
+        options[optind], GB_DELIMITER, GB_GENCONF_HELP_STR);
     goto out;
   }
 

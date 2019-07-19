@@ -15,7 +15,7 @@
 # include "utils.h"
 # include "block.h"
 
-# define   GB_VOLS_DELIMITER    ','
+# define   GB_DELIMITER         ','
 # define   CLI_TIMEOUT_DEF      300
 
 
