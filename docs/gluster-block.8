@@ -149,10 +149,6 @@ To create a block device of size 1GiB with multi-path(replica) 3
 To create a block device of size 1GiB and expect response in json format
 .B # gluster-block create blockVol/sampleBlock ${HOST} 1GiB --json
 
-You can pass more no. of nodes than ha count, this will actually help create in recovering from
-failures, incase creation of block fails on any of scheduled(always first in list) ha count nodes.
-.B # gluster-block create blockVol/sampleBlock ha 3 ${HOST1},${HOST2},${HOST3},${HOST4},${HOST5} 1GiB
-
 To disable auth on a block device
 .B # gluster-block modify blockVol/sampleBlock auth disable
 
