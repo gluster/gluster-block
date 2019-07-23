@@ -938,7 +938,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
       blk->rb_size, blk->blk_size);
 
   if (GB_ALLOC(reply) < 0) {
-    return NULL;
+    goto optfail;
   }
   reply->exit = -1;
 
@@ -1051,6 +1051,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
 
     len = sizeof(struct gbXdata) + sizeof(struct gbCreate3);
     if (GB_ALLOC_N(xdata, len) < 0) {
+        errCode = ENOMEM;
         goto exist;
     }
 
@@ -1096,14 +1097,10 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
     blockIncPrioAttr(glfs, blk->volume, cobj.prio_path);
   }
 
-  LOG("mgmt", GB_LOG_INFO, "create cli returns success, block volume: %s/%s",
-      blk->volume, blk->block_name);
-
  exist:
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
  out:
-
   if (lkfd && glfs_close(lkfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s for "
         "block %s failed[%s]", GB_TXLOCKFILE, blk->volume,
@@ -1111,8 +1108,13 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   }
 
  optfail:
+  LOG("mgmt", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO),
+      "create cli return %s, volume=%s blockname=%s",
+      errCode ? "failure" : "success", blk->volume, blk->block_name);
+
   blockCreateCliFormatResponse(glfs, blk, &cobj, errCode, errMsg, savereply, reply);
-  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s", reply->out);
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s",
+      reply ? reply->out : "*Nil*");
   GB_FREE(errMsg);
   blockServerDefFree(list);
   blockCreateParsedRespFree(savereply);

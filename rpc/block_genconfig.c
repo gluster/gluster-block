@@ -394,7 +394,7 @@ static blockResponse *
 block_gen_config_cli_1_svc_st(blockGenConfigCli *blk, struct svc_req *rqstp)
 {
   blockResponse *reply = NULL;
-  int errCode = 0;
+  int errCode = -1;
   char *errMsg = NULL;
 
 
@@ -402,20 +402,25 @@ block_gen_config_cli_1_svc_st(blockGenConfigCli *blk, struct svc_req *rqstp)
       "genconfig cli request, volume[s]=%s addr=%s", blk->volume, blk->addr);
 
   if (GB_ALLOC(reply) < 0) {
-    return NULL;
+    goto out;
   }
   reply->exit = -1;
 
-  errCode = glusterBlockGenConfigSvc(blk, reply, &errMsg, &errCode);
-  if (errCode) {
+  errCode = 0;
+  if (glusterBlockGenConfigSvc(blk, reply, &errMsg, &errCode)) {
     LOG("mgmt", GB_LOG_ERROR, "glusterBlockGenConfigSvc(): on volume[s] %s failed with %s",
         blk->volume, errMsg?errMsg:"");
     goto out;
   }
 
-  LOG("mgmt", GB_LOG_INFO, "genconfig cli return success, volume[s]=%s", blk->volume);
-
  out:
+  LOG("mgmt", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO),
+      "genconfig cli return %s, volume=%s",
+      errCode ? "failure" : "success", blk->volume);
+
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s",
+      reply ? reply->out : "*Nil*");
+
   GB_FREE(errMsg);
   return reply;
 }

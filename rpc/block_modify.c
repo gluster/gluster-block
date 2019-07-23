@@ -463,13 +463,13 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
   char passwd[UUID_BUF_SIZE];
   int asyncret = 0;
   bool rollback = false;
-  int errCode = 0;
+  int errCode = -1;
   char *errMsg = NULL;
   blockServerDefPtr list = NULL;
 
 
   LOG("mgmt", GB_LOG_INFO,
-      "modify cli request, volume=%s blockname=%s authmode=%d",
+      "modify auth cli request, volume=%s blockname=%s authmode=%d",
       blk->volume, blk->block_name, blk->auth_mode);
 
   if ((GB_ALLOC(reply) < 0) || (GB_ALLOC(savereply) < 0) ||
@@ -477,9 +477,10 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
     GB_FREE (reply);
     GB_FREE (savereply);
     GB_FREE (info);
-    return NULL;
+    goto initfail;
   }
 
+  errCode = 0;
   glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR,
@@ -495,7 +496,7 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
     goto nolock;
   }
 
-  GB_METALOCK_OR_GOTO(lkfd, blk->volume, ret, errMsg, nolock);
+  GB_METALOCK_OR_GOTO(lkfd, blk->volume, errCode, errMsg, nolock);
   LOG("cmdlog", GB_LOG_INFO, "%s", blk->cmd);
 
   if (glfs_access(glfs, blk->block_name, F_OK)) {
@@ -517,6 +518,7 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
 
   ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
   if (ret) {
+    errCode = ret;
     goto out;
   }
 
@@ -554,7 +556,7 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
       uuid_generate(uuid);
       uuid_unparse(uuid, passwd);
       GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
-                            ret, errMsg, out, "PASSWORD: %s\n", passwd);
+                            errCode, errMsg, out, "PASSWORD: %s\n", passwd);
       GB_STRCPYSTATIC(mobj.passwd, passwd);
     } else {
       GB_STRCPYSTATIC(mobj.passwd, info->passwd);
@@ -562,7 +564,7 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
     mobj.auth_mode = 1;
   } else {
     GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
-                          ret, errMsg, out, "PASSWORD: \n");
+                          errCode, errMsg, out, "PASSWORD: \n");
     mobj.auth_mode = 0;
   }
 
@@ -577,16 +579,18 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
     /* Unwind by removing authentication */
     if (blk->auth_mode) {
       GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
-                          ret, errMsg, out, "PASSWORD: \n");
+                            errCode, errMsg, out, "PASSWORD: \n");
     }
 
     /* Collect new Meta status */
     blockFreeMetaInfo(info);
     if (GB_ALLOC(info) < 0) {
+      errCode = ENOMEM;
       goto out;
     }
     ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
     if (ret) {
+      errCode = ret;
       goto out;
     }
 
@@ -597,7 +601,7 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
 
     /* undo */
     ret = glusterBlockModifyRemoteAsync(info, glfs, &mobj,
-                                             &savereply, rollback);
+                                        &savereply, rollback);
     if (ret) {
       LOG("mgmt", GB_LOG_WARNING,
           "glusterBlockModifyRemoteAsync(auth=%d): on rollback return %d %s "
@@ -609,17 +613,15 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
     }
   }
 
-  errCode = 0;
-
-  LOG("mgmt", GB_LOG_INFO,
-      "modify auth cli return success, volume=%s blockname=%s",
-      blk->volume, blk->block_name);
-
  out:
-  GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
+  GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
   blockServerDefFree(list);
 
  nolock:
+  LOG("mgmt", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO),
+      "modify auth cli return %s, volume=%s blockname=%s",
+      errCode ? "failure" : "success", blk->volume, blk->block_name);
+
   if (lkfd && glfs_close(lkfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR,
         "glfs_close(%s): for block %s on volume %s failed[%s]",
@@ -629,7 +631,8 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
  initfail:
   blockModifyCliFormatResponse (blk, &mobj, asyncret?asyncret:errCode,
                                 errMsg, savereply, info, reply, rollback);
-  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s", reply->out);
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s",
+      reply ? reply->out : "*Nil*");
   blockFreeMetaInfo(info);
 
   if (savereply) {
@@ -762,7 +765,7 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
   struct glfs_fd *lkfd = NULL;
   MetaInfo *info = NULL;
   int asyncret = 0;
-  int errCode = 0;
+  int errCode = -1;
   char *errMsg = NULL;
   char *cSize = NULL;
   char *rSize = NULL;
@@ -778,9 +781,10 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
     GB_FREE (reply);
     GB_FREE (savereply);
     GB_FREE (info);
-    return NULL;
+    goto initfail;
   }
 
+  errCode = 0;
   glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR,
@@ -796,7 +800,7 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
     goto nolock;
   }
 
-  GB_METALOCK_OR_GOTO(lkfd, blk->volume, ret, errMsg, nolock);
+  GB_METALOCK_OR_GOTO(lkfd, blk->volume, errCode, errMsg, nolock);
   LOG("cmdlog", GB_LOG_INFO, "%s",  blk->cmd);
 
   if (glfs_access(glfs, blk->block_name, F_OK)) {
@@ -818,6 +822,7 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
 
   ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
   if (ret) {
+    errCode = ret;
     goto out;
   }
 
@@ -827,6 +832,7 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
     LOG("mgmt", GB_LOG_ERROR,
         "size (%lu) is incorrect, it should be aligned to block size (%lu)",
         blk->size, info->blk_size);
+    errCode = EINVAL;
     goto out;
   }
 
@@ -878,6 +884,7 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
 
   ret = glusterBlockResizeEntry(glfs, &mobj, &errCode, &errMsg);
   if (ret) {
+    errCode = ret;
     LOG("mgmt", GB_LOG_ERROR, "%s block: %s volume: %s file: %s size: %zu",
         FAILED_MODIFY_SIZE, mobj.block_name, mobj.volume, mobj.gbid, mobj.size);
     goto out;
@@ -892,19 +899,18 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
     goto out;
   } else {
     GB_METAUPDATE_OR_GOTO(lock, glfs, mobj.block_name, mobj.volume,
-                          ret, errMsg, out, "SIZE: %zu\n",  mobj.size);
+                          errCode, errMsg, out, "SIZE: %zu\n",  mobj.size);
   }
 
-  errCode = 0;
-  LOG("mgmt", GB_LOG_INFO,
-      "modify size cli return success, volume=%s blockname=%s",
-      blk->volume, blk->block_name);
-
  out:
-  GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
+  GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
   blockServerDefFree(list);
 
  nolock:
+  LOG("mgmt", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO),
+      "modify size cli return %s, volume=%s blockname=%s",
+      errCode ? "failure" : "success", blk->volume, blk->block_name);
+
   if (lkfd && glfs_close(lkfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR,
         "glfs_close(%s): for block %s on volume %s failed[%s]",
@@ -914,7 +920,8 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
  initfail:
   blockModifySizeCliFormatResponse(blk, &mobj, asyncret?asyncret:errCode,
                                    errMsg, savereply, info, reply);
-  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s", reply->out);
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s",
+      reply ? reply->out : "*Nil*");
   blockFreeMetaInfo(info);
 
   blockRemoteRespFree(savereply);
