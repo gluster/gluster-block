@@ -15,7 +15,7 @@
 static blockResponse *
 block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
 {
-  blockResponse *reply;
+  blockResponse *reply = NULL;
   struct glfs *glfs;
   struct glfs_fd *lkfd = NULL;
   struct glfs_fd *tgmdfd = NULL;
@@ -24,14 +24,14 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
   char *filelist = NULL;
   json_object *json_obj = NULL;
   json_object *json_array = NULL;
-  int errCode = 0;
+  int errCode = -1;
   char *errMsg = NULL;
 
 
   LOG("mgmt", GB_LOG_INFO, "list cli request, volume=%s", blk->volume);
 
   if (GB_ALLOC(reply) < 0) {
-    return NULL;
+    goto optfail;
   }
 
   if (blk->json_resp) {
@@ -39,6 +39,7 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
     json_array = json_object_new_array();
   }
 
+  errCode = 0;
   glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR,
@@ -86,8 +87,6 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
 
   errCode = 0;
 
-  LOG("mgmt", GB_LOG_INFO, "list cli returns success, volume=%s", blk->volume);
-
   if (blk->json_resp) {
     json_object_object_add(json_obj, "blocks", json_array);
   }
@@ -96,6 +95,10 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
  optfail:
+  LOG("mgmt", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO),
+      "info cli return %s, volume=%s",
+      errCode ? "failure" : "success", blk->volume);
+
   if (tgmdfd && glfs_closedir (tgmdfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR, "glfs_closedir(%s): on volume %s failed[%s]",
         GB_METADIR, blk->volume, strerror(errno));
@@ -104,32 +107,37 @@ block_list_cli_1_svc_st(blockListCli *blk, struct svc_req *rqstp)
   if (errCode < 0) {
     errCode = GB_DEFAULT_ERRCODE;
   }
-  reply->exit = errCode;
 
-  if (blk->json_resp) {
-    if (errCode) {
-      json_object_object_add(json_obj, "RESULT", GB_JSON_OBJ_TO_STR("FAIL"));
-      json_object_object_add(json_obj, "errCode", json_object_new_int(errCode));
-      json_object_object_add(json_obj, "errMsg",  GB_JSON_OBJ_TO_STR(errMsg));
-    } else {
-      json_object_object_add(json_obj, "RESULT", GB_JSON_OBJ_TO_STR("SUCCESS"));
-    }
-    GB_ASPRINTF(&reply->out, "%s\n",
-                json_object_to_json_string_ext(json_obj,
-                                mapJsonFlagToJsonCstring(blk->json_resp)));
-    json_object_put(json_obj);
-  } else {
-    if (errCode) {
-      if (errMsg) {
-        GB_ASPRINTF (&reply->out, "%s\n", errMsg);
+  if (reply) {
+    reply->exit = errCode;
+
+    if (blk->json_resp) {
+      if (errCode) {
+        json_object_object_add(json_obj, "RESULT", GB_JSON_OBJ_TO_STR("FAIL"));
+        json_object_object_add(json_obj, "errCode", json_object_new_int(errCode));
+        json_object_object_add(json_obj, "errMsg",  GB_JSON_OBJ_TO_STR(errMsg));
       } else {
-        GB_ASPRINTF (&reply->out, "Not able to complete operation "
-                     "successfully\n");
+        json_object_object_add(json_obj, "RESULT", GB_JSON_OBJ_TO_STR("SUCCESS"));
       }
+      GB_ASPRINTF(&reply->out, "%s\n",
+                  json_object_to_json_string_ext(json_obj,
+                                  mapJsonFlagToJsonCstring(blk->json_resp)));
+      json_object_put(json_obj);
     } else {
-      reply->out = filelist? filelist:strdup("*Nil*\n");
+      if (errCode) {
+        if (errMsg) {
+          GB_ASPRINTF (&reply->out, "%s\n", errMsg);
+        } else {
+          GB_ASPRINTF (&reply->out, "Not able to complete operation "
+                       "successfully\n");
+        }
+      } else {
+        reply->out = filelist? filelist:strdup("*Nil*\n");
+      }
     }
   }
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s",
+      reply ? reply->out : "*Nil*");
 
   if (lkfd && glfs_close(lkfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR, "glfs_close(%s): on volume %s failed[%s]",

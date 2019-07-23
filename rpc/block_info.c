@@ -160,12 +160,11 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
 static blockResponse *
 block_info_cli_1_svc_st(blockInfoCli *blk, struct svc_req *rqstp)
 {
-  blockResponse *reply;
+  blockResponse *reply = NULL;
   struct glfs *glfs;
   struct glfs_fd *lkfd = NULL;
   MetaInfo *info = NULL;
-  int ret = -1;
-  int errCode = 0;
+  int errCode = -1;
   char *errMsg = NULL;
 
 
@@ -175,9 +174,10 @@ block_info_cli_1_svc_st(blockInfoCli *blk, struct svc_req *rqstp)
   if ((GB_ALLOC(reply) < 0) || (GB_ALLOC(info) < 0)) {
     GB_FREE (reply);
     GB_FREE (info);
-    return NULL;
+    goto optfail;
   }
 
+  errCode = 0;
   glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR,
@@ -195,8 +195,7 @@ block_info_cli_1_svc_st(blockInfoCli *blk, struct svc_req *rqstp)
 
   GB_METALOCK_OR_GOTO(lkfd, blk->volume, errCode, errMsg, optfail);
 
-  ret = blockGetMetaInfo(glfs, blk->block_name, info, &errCode);
-  if (ret) {
+  if (blockGetMetaInfo(glfs, blk->block_name, info, &errCode)) {
     if (errCode == ENOENT) {
       GB_ASPRINTF (&errMsg, "block %s/%s doesn't exist", blk->volume,
                    blk->block_name);
@@ -207,13 +206,14 @@ block_info_cli_1_svc_st(blockInfoCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  LOG("mgmt", GB_LOG_INFO,
-      "info cli returns success, volume=%s blockname=%s", blk->volume, blk->block_name);
-
  out:
-  GB_METAUNLOCK(lkfd, blk->volume, ret, errMsg);
+  GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
 
  optfail:
+  LOG("mgmt", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO),
+      "info cli return %s, volume=%s blockname=%s",
+      errCode ? "failure" : "success", blk->volume, blk->block_name);
+
   if (lkfd && glfs_close(lkfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR,
         "glfs_close(%s): on volume %s for block %s failed[%s]",
@@ -222,6 +222,8 @@ block_info_cli_1_svc_st(blockInfoCli *blk, struct svc_req *rqstp)
 
 
   blockInfoCliFormatResponse(blk, errCode, errMsg, info, reply);
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s",
+      reply ? reply->out : "*Nil*");
   GB_FREE(errMsg);
   blockFreeMetaInfo(info);
 

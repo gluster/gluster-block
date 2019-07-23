@@ -630,7 +630,7 @@ block_replace_cli_1_svc_st(blockReplaceCli *blk, struct svc_req *rqstp)
   blockResponse *reply = NULL;
   struct glfs *glfs;
   struct glfs_fd *lkfd = NULL;
-  int errCode = 0;
+  int errCode = -1;
   char *errMsg = NULL;
   int ret;
   blockServerDefPtr list = NULL;
@@ -642,10 +642,11 @@ block_replace_cli_1_svc_st(blockReplaceCli *blk, struct svc_req *rqstp)
       blk->volume, blk->block_name, blk->old_node, blk->new_node, blk->force);
 
   if (GB_ALLOC(reply) < 0) {
-    return NULL;
+    goto optfail;
   }
   reply->exit = -1;
 
+  errCode = 0;
   glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR,
@@ -696,9 +697,12 @@ block_replace_cli_1_svc_st(blockReplaceCli *blk, struct svc_req *rqstp)
   }
 
   if (GB_ALLOC(info) < 0) {
+    errCode = ENOMEM;
     goto out;
   }
-  if (blockGetMetaInfo(glfs, blk->block_name, info, NULL)) {
+  ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
+  if (ret) {
+    errCode = ret;
     goto out;
   }
 
@@ -728,19 +732,20 @@ block_replace_cli_1_svc_st(blockReplaceCli *blk, struct svc_req *rqstp)
         errCode, errMsg, out, "PRIOPATH: %s\n", blk->new_node);
   }
 
-  errCode = 0;
-
-  LOG("mgmt", GB_LOG_INFO, "replace cli returns success, volume=%s", blk->volume);
-
  out:
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
   blockReplaceNodeCliFormatResponse(blk, errCode, errMsg, savereply, reply);
-  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s", reply->out);
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s",
+      reply ? reply->out : "*Nil*");
   blockServerDefFree(list);
   blockRemoteReplaceRespFree(savereply);
   blockFreeMetaInfo(info);
 
 optfail:
+  LOG("mgmt", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO),
+      "replace cli return %s, volume=%s",
+      errCode ? "failure" : "success", blk->volume);
+
   if (lkfd && glfs_close(lkfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR,
         "glfs_close(%s): on volume %s for block %s failed[%s]",

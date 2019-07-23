@@ -290,17 +290,17 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
   /* delete metafile and block file */
   if (forcedel || !asyncret) {
     GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
-        ret, errMsg, out, "ENTRYDELETE: INPROGRESS\n");
+                          ret, errMsg, out, "ENTRYDELETE: INPROGRESS\n");
     if (unlink && glusterBlockDeleteEntry(glfs, info->volume, info->gbid)) {
       GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
-          ret, errMsg, out, "ENTRYDELETE: FAIL\n");
+                            ret, errMsg, out, "ENTRYDELETE: FAIL\n");
       LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s", FAILED_DELETING_FILE,
           info->volume, blockname);
       ret = -1;
       goto out;
     }
     GB_METAUPDATE_OR_GOTO(lock, glfs, blockname, info->volume,
-        ret, errMsg, out, "ENTRYDELETE: SUCCESS\n");
+                          ret, errMsg, out, "ENTRYDELETE: SUCCESS\n");
     ret = glusterBlockDeleteMetaFile(glfs, info->volume, blockname);
     if (ret) {
       LOG("mgmt", GB_LOG_ERROR, "%s %s for block %s",
@@ -331,7 +331,7 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
   struct glfs *glfs;
   struct glfs_fd *lkfd = NULL;
   char *errMsg = NULL;
-  int errCode = 0;
+  int errCode = -1;
   int ret;
   blockServerDefPtr list = NULL;
 
@@ -340,14 +340,15 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
                            blk->volume, blk->block_name);
 
   if (GB_ALLOC(reply) < 0) {
-    return NULL;
+    goto optfail;
   }
 
   if (GB_ALLOC(savereply) < 0) {
     GB_FREE(reply);
-    return NULL;
+    goto optfail;
   }
 
+  errCode = 0;
   glfs = glusterBlockVolumeInit(blk->volume, &errCode, &errMsg);
   if (!glfs) {
     LOG("mgmt", GB_LOG_ERROR,
@@ -384,11 +385,13 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
   }
 
   if (GB_ALLOC(info) < 0) {
+    errCode = ENOMEM;
     goto out;
   }
 
   ret = blockGetMetaInfo(glfs, blk->block_name, info, NULL);
   if (ret) {
+    errCode = ret;
     goto out;
   }
 
@@ -416,23 +419,25 @@ block_delete_cli_1_svc_st(blockDeleteCli *blk, struct svc_req *rqstp)
     blockDecPrioAttr(glfs, blk->volume, info->prio_path);
   }
 
-  LOG("mgmt", GB_LOG_INFO, "delete cli returns success, block volume: %s/%s",
-      blk->volume, blk->block_name);
  out:
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
   blockServerDefFree(list);
   GB_FREE(info);
 
  optfail:
+  LOG("mgmt", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO),
+      "delete cli return %s, volume=%s blockname=%s",
+      errCode ? "failure" : "success", blk->volume, blk->block_name);
+
   if (lkfd && glfs_close(lkfd) != 0) {
     LOG("mgmt", GB_LOG_ERROR,
         "glfs_close(%s): for block %s on volume %s failed[%s]",
         GB_TXLOCKFILE, blk->block_name, blk->volume, strerror(errno));
   }
 
-
   blockDeleteCliFormatResponse(blk, errCode, errMsg, savereply, reply);
-  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s", reply->out);
+  LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s",
+      reply ? reply->out : "*Nil*");
 
   if (savereply) {
     GB_FREE(savereply->d_attempt);
