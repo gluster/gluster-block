@@ -125,7 +125,7 @@ glusterBlockZeroFill(struct glfs_fd *tgfd, off_t offset, size_t size)
 {
   struct iovec iov[4];
   char *zerodata = NULL;
-  size_t len;
+  ssize_t len;
   size_t rest;
   int ret = -1;
   int i;
@@ -593,6 +593,10 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
   size_t i;
 
 
+  if (!opt) {
+    goto out;
+  }
+
   switch (blockMetaKeyEnumParse(opt)) {
   case GB_META_VOLUME:
     GB_STRCPYSTATIC(info->volume, strchr(line, ' ') + 1);
@@ -795,6 +799,9 @@ blockGetMetaInfo(struct glfs* glfs, char* metafile, MetaInfo *info,
 
   while ((ret = glfs_read (tgmfd, line, sizeof(line), 0)) > 0) {
     tmp = strtok(line,"\n");
+    if (!tmp) {
+      continue;
+    }
     count += strlen(tmp) + 1;
     ret = blockStuffMetaInfo(info, tmp);
     if (ret) {

@@ -75,7 +75,11 @@ main(int argc, char *argv[])
     fprintf (stderr, "glfs_creat() failed: %s", strerror(errno));
     goto out;
   }
-  glfs_close(tgfd);
+
+  if (glfs_close(tgfd) != 0) {
+    fprintf (stderr, "glfs_close() failed: %s", strerror(errno));
+    goto out;
+  }
 
   tgfd = glfs_open(fs, GB_TEST_FILE, O_RDONLY);
   if (!tgfd) {
@@ -89,10 +93,16 @@ main(int argc, char *argv[])
 
 out:
   if (tgfd) {
-    glfs_close(tgfd);
-    glfs_unlink(fs, GB_TEST_FILE);
+    if (glfs_close(tgfd) != 0) {
+      fprintf (stderr, "glfs_close() failed: %s", strerror(errno));
+    }
+    if (glfs_unlink(fs, GB_TEST_FILE) < 0) {
+      fprintf (stderr, "glfs_unlink() failed: %s", strerror(errno));
+    }
   }
-  glfs_fini(fs);
+  if (glfs_fini(fs) < 0) {
+    fprintf (stderr, "glfs_fini() failed: %s", strerror(errno));
+  }
 
 fail:
   if (ret) {
