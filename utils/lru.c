@@ -33,6 +33,8 @@ glusterBlockUpdateLruLogdir(const char *logPath)
 {
   struct list_head *pos, *q;
   Entry *tmp;
+  char *logs = NULL;
+  char *onelog = NULL;
 
 
   LOCK(lru_lock);
@@ -44,11 +46,23 @@ glusterBlockUpdateLruLogdir(const char *logPath)
   list_for_each_safe(pos, q, &Cache){
     tmp = list_entry(pos, Entry, list);
     if (glfs_set_logging(tmp->glfs, logPath, GFAPI_LOG_LEVEL)) {
-      LOG("mgmt", GB_LOG_WARNING, "glfs_set_logging(%s, %d) on %s failed[%s]",
-          logPath, GFAPI_LOG_LEVEL, ((Entry *)tmp)->volume, strerror(errno));
+
+      /* using LOG() will lead to Thread dead lock here, as lru_lock is acquired
+       * and now calling LOG() will try acquiring lock on gbConf.lock
+       */
+      GB_ASPRINTF(&logs, "%sglfs_set_logging(%s, %d) on %s failed[%s]\n",
+                  onelog ? onelog : "", logPath, GFAPI_LOG_LEVEL,
+                  ((Entry *)tmp)->volume, strerror(errno));
+      GB_FREE(onelog);
+      onelog = logs;
     }
   }
   UNLOCK(lru_lock);
+
+  if (logs) {
+    LOG("mgmt", GB_LOG_WARNING, "%s", logs);
+    GB_FREE(logs);
+  }
 }
 
 

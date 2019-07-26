@@ -698,7 +698,9 @@ fail:
   GB_FREE(buf);
 
  out:
-  pclose(fp);
+  if (fp) {
+    pclose(fp);
+  }
   return buf;
 }
 

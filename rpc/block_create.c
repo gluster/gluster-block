@@ -415,7 +415,9 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list, size_t mpath,
 
  out:
   for (i = 0; i < mpath; i++) {
-    GB_FREE(args[i].reply);
+    if (args) {
+      GB_FREE(args[i].reply);
+    }
   }
   GB_FREE(args);
   GB_FREE(tid);
