@@ -101,6 +101,10 @@
 # define  FAILED_DELETING_FILE      "failed while deleting block file from gluster volume"
 # define  FAILED_DELETING_META      "failed while deleting block meta file from volume"
 
+/* Target Reload */
+# define  FAILED_RELOAD             "failed in reload"
+# define  FAILED_REMOTE_RELOAD      "failed in remote reload"
+
 /* Target Replace */
 # define  FAILED_REPLACE            "failed in replace"
 # define  FAILED_REMOTE_REPLACE     "failed in remote replace portal"
@@ -429,6 +433,7 @@ typedef enum gbCliCmdlineOption {
   GB_CLI_DELETE,
   GB_CLI_MODIFY,
   GB_CLI_REPLACE,
+  GB_CLI_RELOAD,
   GB_CLI_GENCONFIG,
   GB_CLI_HELP,
   GB_CLI_HYPHEN_HELP,
@@ -449,6 +454,7 @@ static const char *const gbCliCmdlineOptLookup[] = {
   [GB_CLI_DELETE]         = "delete",
   [GB_CLI_MODIFY]         = "modify",
   [GB_CLI_REPLACE]        = "replace",
+  [GB_CLI_RELOAD]         = "reload",
   [GB_CLI_GENCONFIG]      = "genconfig",
   [GB_CLI_HELP]           = "help",
   [GB_CLI_HYPHEN_HELP]    = "--help",

@@ -110,6 +110,24 @@ blockCheckBlockLoadedStatus(char *block_name, char *gbid, blockResponse *reply)
     GB_ASPRINTF(&reply->out, "Block '%s' may be not loaded.", block_name);
     LOG("mgmt", GB_LOG_ERROR, "%s", reply->out);
   }
+  GB_FREE(exec);
+
+  if (!ret) {
+    if (GB_ASPRINTF(&exec, GB_TGCLI_ISCSI_CHECK, GB_TGCLI_IQN_PREFIX, gbid) == -1) {
+      goto out;
+    }
+
+    ret = gbRunner(exec);
+    if (ret == -1) {
+      GB_ASPRINTF(&reply->out, "command exit abnormally for '%s'.", block_name);
+      LOG("mgmt", GB_LOG_ERROR, "%s", reply->out);
+      goto out;
+    } else if (ret == 1) {
+      is_loaded = false;
+      GB_ASPRINTF(&reply->out, "Target for '%s' may be not loaded.", block_name);
+      LOG("mgmt", GB_LOG_ERROR, "%s", reply->out);
+    }
+  }
 
   /* if block is loaded, skip the rest */
   if (!ret) {
@@ -280,6 +298,14 @@ glusterBlockCallRPC_1(char *host, void *cobj,
     if (block_modify_size_1((blockModifySize *)cobj, &reply, clnt) != RPC_SUCCESS) {
       LOG("mgmt", GB_LOG_ERROR, "%son host %s",
           clnt_sperror(clnt, "block remote modify size call failed"), host);
+      goto out;
+    }
+    break;
+  case RELOAD_SRV:
+    *rpc_sent = TRUE;
+    if (block_reload_1((blockReload *)cobj, &reply, clnt) != RPC_SUCCESS) {
+      LOG("mgmt", GB_LOG_ERROR, "%son host %s",
+          clnt_sperror(clnt, "block remote reload call failed"), host);
       goto out;
     }
     break;
@@ -508,6 +534,7 @@ blockValidateCommandOutput(const char *out, int opt, void *data)
   blockModify *mblk = data;
   blockModifySize *msblk = data;
   blockReplace *rblk = data;
+  blockReload *rlblk = data;
   int ret = -1;
 
 
@@ -639,6 +666,13 @@ blockValidateCommandOutput(const char *out, int opt, void *data)
     /* get tpg of the portal */
     GB_OUT_VALIDATE_OR_GOTO(out, out, "failed to get tpg number for portal : %s",
                             rblk, rblk->ripaddr, "tpg");
+    ret = 0;
+    break;
+
+  case RELOAD_SRV:
+    /* get tpg of the portal */
+    GB_OUT_VALIDATE_OR_GOTO(out, out, "failed to reload block volume: %s",
+                            rlblk, rlblk->block_name, "Configuration restored");
     ret = 0;
     break;
   }

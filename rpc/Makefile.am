@@ -5,7 +5,7 @@ noinst_LTLIBRARIES = libgbrpc.la
 libgbrpc_la_SOURCES = block_svc_routines.c block_info.c block_list.c           \
                       block_create.c block_delete.c block_modify.c             \
                       block_replace.c block_version.c block_genconfig.c        \
-                      block_common.h glfs-operations.c
+                      block_reload.c block_common.h glfs-operations.c
 
 noinst_HEADERS = glfs-operations.h
 

@@ -91,6 +91,18 @@ struct blockDelete {
   char      gbid[127];
 };
 
+struct blockReloadCli {
+  char      block_name[255];
+  char      volume[255];
+  string    cmd<>;
+  enum JsonResponseFormat     json_resp;
+};
+
+struct blockReload {
+  char      block_name[255];
+  char      gbid[127];
+};
+
 struct blockInfoCli {
   char      block_name[255];
   char      volume[255];
@@ -153,6 +165,7 @@ program GLUSTER_BLOCK {
     blockResponse BLOCK_MODIFY_SIZE(blockModifySize) = 6;
 
     blockResponse BLOCK_CREATE_V2(blockCreate2) = 7;
+    blockResponse BLOCK_RELOAD(blockReload) = 8;
   } = 1;
 } = 21215311; /* B2 L12 O15 C3 K11 */
 
@@ -166,5 +179,6 @@ program GLUSTER_BLOCK_CLI {
     blockResponse BLOCK_REPLACE_CLI(blockReplaceCli) = 6;
     blockResponse BLOCK_MODIFY_SIZE_CLI(blockModifySizeCli) = 7;
     blockResponse BLOCK_GEN_CONFIG_CLI(blockGenConfigCli) = 8;
+    blockResponse BLOCK_RELOAD_CLI(blockReloadCli) = 9;
   } = 1;
 } = 212153113; /* B2 L12 O15 C3 K11 C3 */
