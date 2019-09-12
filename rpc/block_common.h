@@ -31,6 +31,8 @@
 # define   GB_TGCLI_GLFS        "targetcli " GB_TGCLI_GLFS_PATH
 # define   GB_TGCLI_CHECK       GB_TGCLI_GLFS " ls | grep ' %s ' | grep '/%s ' > " DEVNULLPATH
 # define   GB_TGCLI_ISCSI_PATH  "/iscsi"
+# define   GB_TGCLI_ISCSI       "targetcli " GB_TGCLI_ISCSI_PATH
+# define   GB_TGCLI_ISCSI_CHECK GB_TGCLI_ISCSI " ls | grep ' %s%s ' > " DEVNULLPATH
 # define   GB_TGCLI_GLFS_SAVE   GB_TGCLI_GLFS_PATH "/%s saveconfig"
 # define   GB_TGCLI_ATTRIBUTES  "generate_node_acls=1 demo_mode_write_protect=0"
 # define   GB_TGCLI_IQN_PREFIX  "iqn.2016-12.org.gluster-block:"
@@ -64,7 +66,8 @@ typedef enum operations {
   LIST_SRV,
   INFO_SRV,
   VERSION_SRV,
-  GENCONFIG_SRV
+  GENCONFIG_SRV,
+  RELOAD_SRV
 } operations;
 
 

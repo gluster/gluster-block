@@ -23,6 +23,7 @@
                                 "<HOST1[,HOST2,...]> [size] [--json*]"
 # define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> "      \
                                 "[unlink-storage <yes|no>] [force] [--json*]"
+# define  GB_RELOAD_HELP_STR  "gluster-block reload <volname/blockname> [--json*]"
 # define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "      \
                                 "[auth <enable|disable>] [size <size> "       \
                                 "[force]] [--json*]"
@@ -57,7 +58,8 @@ typedef enum clioperations {
   MODIFY_CLI = 5,
   MODIFY_SIZE_CLI = 6,
   REPLACE_CLI = 7,
-  GENCONF_CLI = 8
+  GENCONF_CLI = 8,
+  RELOAD_CLI = 9
 } clioperations;
 
 
@@ -104,6 +106,7 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
   struct sockaddr_un saun = {0,};
   blockCreateCli *create_obj;
   blockDeleteCli *delete_obj;
+  blockReloadCli *reload_obj;
   blockInfoCli *info_obj;
   blockListCli *list_obj;
   blockModifyCli *modify_obj;
@@ -190,6 +193,15 @@ glusterBlockCliRPC_1(void *cobj, clioperations opt)
       LOG("cli", GB_LOG_ERROR, "%s block %s delete on volume %s failed",
           clnt_sperror(clnt, "block_delete_cli_1"),
           delete_obj->block_name, delete_obj->volume);
+      goto out;
+    }
+    break;
+  case RELOAD_CLI:
+    reload_obj = cobj;
+    if (block_reload_cli_1(reload_obj, &reply, clnt) != RPC_SUCCESS) {
+      LOG("cli", GB_LOG_ERROR, "%s block %s reload on volume %s failed",
+          clnt_sperror(clnt, "block_reload_cli_1"),
+          reload_obj->block_name, reload_obj->volume);
       goto out;
     }
     break;
@@ -317,6 +329,9 @@ glusterBlockHelp(void)
       "\n"
       "  replace <volname/blockname> <old-node> <new-node> [force]\n"
       "        replace operations.\n"
+      "\n"
+      "  reload <volname/blockname>\n"
+      "        reload a block device.\n"
       "\n"
       "  genconfig <volname[,volume2,volume3,...]> enable-tpg <host>\n"
       "        generate the block volumes target configuration.\n"
@@ -896,6 +911,35 @@ glusterBlockDelete(int argcount, char **options, int json)
   return ret;
 }
 
+static int
+glusterBlockReload(int argcount, char **options, int json)
+{
+  blockReloadCli robj = {{0},};
+  int ret = -1;
+
+
+  GB_ARGCHECK_OR_RETURN(argcount, 2, "reload", GB_RELOAD_HELP_STR);
+  robj.json_resp = json;
+
+  if (glusterBlockParseVolumeBlock (options[1], robj.volume, robj.block_name,
+                                    sizeof(robj.volume), sizeof(robj.block_name),
+                                    GB_RELOAD_HELP_STR, "reload")) {
+    goto out;
+  }
+
+  getCommandString(&robj.cmd, argcount, options);
+
+  ret = glusterBlockCliRPC_1(&robj, RELOAD_CLI);
+  if (ret) {
+    LOG("cli", GB_LOG_ERROR,
+        "failed reload of block %s on volume %s",
+        robj.block_name, robj.volume);
+  }
+
+ out:
+
+  return ret;
+}
 
 static int
 glusterBlockInfo(int argcount, char **options, int json)
@@ -1086,6 +1130,13 @@ glusterBlockParseArgs(int count, char **options, size_t opt, int json)
       ret = glusterBlockDelete(count, options, json);
       if (ret) {
         LOG("cli", GB_LOG_ERROR, FAILED_DELETE);
+      }
+      goto out;
+
+    case GB_CLI_RELOAD:
+      ret = glusterBlockReload(count, options, json);
+      if (ret) {
+        LOG("cli", GB_LOG_ERROR, FAILED_RELOAD);
       }
       goto out;
 
