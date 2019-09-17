@@ -685,11 +685,11 @@ glusterBlockCreate(int argcount, char **options, int json)
     case GB_CLI_CREATE_RBSIZE:
       if (isNumber(options[optind])) {
         sscanf(options[optind++], "%u", &cobj.rb_size);
-        if (cobj.rb_size < 1 || cobj.rb_size > 64) {
-          MSG(stderr, "'ring-buffer' should be in range [1MB - 64MB]");
+        if (cobj.rb_size < 1 || cobj.rb_size > 1024) {
+          MSG(stderr, "'ring-buffer' should be in range [1MB - 1024MB]");
           MSG(stderr, GB_CREATE_HELP_STR);
           LOG("cli", GB_LOG_ERROR,
-              "failed while parsing ring-buffer range [1MB - 64MB] for block <%s/%s>",
+              "failed while parsing ring-buffer range [1MB - 1024MB] for block <%s/%s>",
               cobj.volume, cobj.block_name);
         goto out;
         }
