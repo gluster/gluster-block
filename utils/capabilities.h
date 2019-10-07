@@ -48,6 +48,8 @@ enum gbCapabilities {
 
   GB_CREATE_BLOCK_SIZE_CAP,
 
+  GB_RELOAD_CAP,
+
   GB_CAP_MAX
 };
 
@@ -71,6 +73,8 @@ static const char *const gbCapabilitiesLookup[] = {
   [GB_REPLACE_CAP]             = "replace",
 
   [GB_JSON_CAP]                = "json",
+
+  [GB_RELOAD_CAP]              = "reload",
 
   [GB_CAP_MAX]                 = NULL
 };

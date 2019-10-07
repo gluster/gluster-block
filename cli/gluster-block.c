@@ -23,7 +23,8 @@
                                 "<HOST1[,HOST2,...]> [size] [--json*]"
 # define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> "      \
                                 "[unlink-storage <yes|no>] [force] [--json*]"
-# define  GB_RELOAD_HELP_STR  "gluster-block reload <volname/blockname> [--json*]"
+# define  GB_RELOAD_HELP_STR  "gluster-block reload <volname/blockname> " \
+                              "[force] [--json*]"
 # define  GB_MODIFY_HELP_STR  "gluster-block modify <volname/blockname> "      \
                                 "[auth <enable|disable>] [size <size> "       \
                                 "[force]] [--json*]"
@@ -330,7 +331,7 @@ glusterBlockHelp(void)
       "  replace <volname/blockname> <old-node> <new-node> [force]\n"
       "        replace operations.\n"
       "\n"
-      "  reload <volname/blockname>\n"
+      "  reload <volname/blockname> [force]\n"
       "        reload a block device.\n"
       "\n"
       "  genconfig <volname[,volume2,volume3,...]> enable-tpg <host>\n"
@@ -918,13 +919,26 @@ glusterBlockReload(int argcount, char **options, int json)
   int ret = -1;
 
 
-  GB_ARGCHECK_OR_RETURN(argcount, 2, "reload", GB_RELOAD_HELP_STR);
+  if (argcount < 2 || argcount > 3) {
+    MSG(stderr, "Inadequate arguments for replace:\n%s", GB_RELOAD_HELP_STR);
+    return -1;
+  }
+
   robj.json_resp = json;
 
   if (glusterBlockParseVolumeBlock (options[1], robj.volume, robj.block_name,
                                     sizeof(robj.volume), sizeof(robj.block_name),
                                     GB_RELOAD_HELP_STR, "reload")) {
     goto out;
+  }
+
+  if (argcount == 3) {
+    if (strcmp(options[2], "force")) {
+      MSG(stderr, "unknown option '%s' for reload:\n%s", options[2], GB_RELOAD_HELP_STR);
+      return -1;
+    } else {
+      robj.force = true;
+    }
   }
 
   getCommandString(&robj.cmd, argcount, options);

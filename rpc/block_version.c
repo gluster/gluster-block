@@ -20,6 +20,7 @@ glusterBlockBuildMinCaps(void *data, operations opt)
   blockModifyCli *mblk = NULL;
   blockModifySizeCli *msblk = NULL;
   blockReplaceCli *rblk = NULL;
+  blockReloadCli *rlblk = NULL;
   bool *minCaps = NULL;
 
 
@@ -86,6 +87,14 @@ glusterBlockBuildMinCaps(void *data, operations opt)
 
     minCaps[GB_REPLACE_CAP] = true;
     if (rblk->json_resp) {
+      minCaps[GB_JSON_CAP] = true;
+    }
+    break;
+  case RELOAD_SRV:
+    rlblk = (blockReloadCli *)data;
+
+    minCaps[GB_RELOAD_CAP] = true;
+    if (rlblk->json_resp) {
       minCaps[GB_JSON_CAP] = true;
     }
     break;

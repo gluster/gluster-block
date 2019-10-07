@@ -87,6 +87,7 @@ static int
 glusterBlockReloadRemoteAsync(MetaInfo *info,
                               struct glfs *glfs,
                               blockReload *robj,
+                              bool force,
                               blockRemoteDeleteResp **savereply)
 {
   pthread_t  *tid = NULL;
@@ -141,6 +142,13 @@ glusterBlockReloadRemoteAsync(MetaInfo *info,
     }
     GB_FREE(s_tmp);
     s_tmp = local->d_success;
+  }
+
+
+  /* Ignore failures with force option */
+  if (force) {
+    ret = 0;
+    goto out;
   }
 
   ret = 0;
@@ -235,7 +243,7 @@ block_reload_cli_1_svc_st(blockReloadCli *blk, struct svc_req *rqstp)
   char *errMsg = NULL;
   int errCode = -1;
   int ret;
-//  blockServerDefPtr list = NULL;
+  blockServerDefPtr list = NULL;
   blockReload robj = {{0},};
 
   LOG("mgmt", GB_LOG_INFO, "reload cli request, volume=%s blockname=%s",
@@ -297,15 +305,14 @@ block_reload_cli_1_svc_st(blockReloadCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-/*
-  if (!blk->force) {
-    list = glusterBlockGetListFromInfo(info);
-    if (!list) {
-      errCode = ENOMEM;
-      goto out;
-    }
+  list = glusterBlockGetListFromInfo(info);
+  if (!list) {
+    errCode = ENOMEM;
+    goto out;
+  }
 
-    errCode = glusterBlockCheckCapabilities((void *)blk, DELETE_SRV, list, NULL, &errMsg);
+  if (!blk->force) {
+    errCode = glusterBlockCheckCapabilities((void *)blk, RELOAD_SRV, list, NULL, &errMsg);
     if (errCode) {
       LOG("mgmt", GB_LOG_ERROR,
           "glusterBlockCheckCapabilities() for block %s on volume %s failed",
@@ -313,12 +320,11 @@ block_reload_cli_1_svc_st(blockReloadCli *blk, struct svc_req *rqstp)
       goto out;
     }
   }
-*/
 
   GB_STRCPYSTATIC(robj.block_name, blk->block_name);
   GB_STRCPYSTATIC(robj.gbid, info->gbid);
 
-  errCode = glusterBlockReloadRemoteAsync(info, glfs, &robj, &savereply);
+  errCode = glusterBlockReloadRemoteAsync(info, glfs, &robj, blk->force, &savereply);
   if (errCode) {
     LOG("mgmt", GB_LOG_WARNING, "glusterBlockReloadRemoteAsync: return %d "
         "on block %s for volume %s", errCode, blk->block_name, blk->volume);
@@ -327,7 +333,7 @@ block_reload_cli_1_svc_st(blockReloadCli *blk, struct svc_req *rqstp)
  out:
   GB_METAUNLOCK(lkfd, blk->volume, errCode, errMsg);
   blockFreeMetaInfo(info);
-//  blockServerDefFree(list);
+  blockServerDefFree(list);
 
  optfail:
   LOG("mgmt", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO),

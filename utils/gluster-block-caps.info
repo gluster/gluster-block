@@ -149,3 +149,14 @@ create_load_balance: true
 # Since: 0.5
 ##
 create_block_size: true
+
+##
+# Nature: cli command
+#
+# Label: 'reload'
+#
+# Description: capability to reload the block volume
+#
+# Since: 0.5
+##
+reload: true
