@@ -94,6 +94,7 @@ struct blockDelete {
 struct blockReloadCli {
   char      block_name[255];
   char      volume[255];
+  bool      force;
   string    cmd<>;
   enum JsonResponseFormat     json_resp;
 };
