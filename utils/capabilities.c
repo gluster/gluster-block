@@ -53,6 +53,31 @@ gbBlockSizeDependenciesVersionCheck(void)
 }
 
 
+static bool
+gbBlockReloadDependenciesVersionCheck(void)
+{
+  char *out = NULL;
+  int ret = true;
+
+
+  out = gbRunnerGetOutput("python -c 'from rtslib_fb import __version__; print(__version__)'");
+  if (!gbDependencyVersionCompare(RTSLIB_RELOAD, out)) {
+    ret = false;
+    goto out;
+  }
+  GB_FREE(out);
+
+  out = gbRunnerGetOutput("targetcli --version 2>&1 | awk -F' ' '{printf $NF}'");
+  if (!gbDependencyVersionCompare(TARGETCLI_RELOAD, out)) {
+    ret = false;
+  }
+
+ out:
+  GB_FREE(out);
+  return ret;
+}
+
+
 void
 gbSetCapabilties(void)
 {
@@ -103,9 +128,19 @@ gbSetCapabilties(void)
        */
       if (ret == GB_CREATE_BLOCK_SIZE_CAP) {
           if (!gbBlockSizeDependenciesVersionCheck()) {
-            LOG ("mgmt", GB_LOG_INFO,
-                 "the 'hw_block_size' needs atleast rtslib >= %s, so disable its capability",
+            LOG ("mgmt", GB_LOG_WARNING,
+                 "the 'hw_block_size' needs atleast rtslib >= %s, so disabling its capability",
                  GB_MIN_RTSLIB_BLKSIZE_VERSION);
+            caps[count].status = 0;
+            count++;
+            GB_FREE(line);
+            continue;
+          }
+      } else if (ret == GB_RELOAD_CAP) {
+          if (!gbBlockReloadDependenciesVersionCheck()) {
+            LOG ("mgmt", GB_LOG_WARNING,
+                 "reload needs atleast targetcli >=%s and rtslib >= %s, so disabling its capability",
+                 GB_MIN_TARGETCLI_RELOAD_VERSION, GB_MIN_RTSLIB_RELOAD_VERSION);
             caps[count].status = 0;
             count++;
             GB_FREE(line);
