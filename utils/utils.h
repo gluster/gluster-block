@@ -663,6 +663,8 @@ typedef enum gbDependencies {
   TCMURUNNER       = 1,
   TARGETCLI        = 2,
   RTSLIB_BLKSIZE   = 3,
+  TARGETCLI_RELOAD = 4,
+  RTSLIB_RELOAD    = 5,
 } gbDependencies;
 
 int initGbConfig(void);

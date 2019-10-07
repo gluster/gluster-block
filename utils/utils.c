@@ -406,6 +406,17 @@ gbDependencyVersionCompare(int dependencyName, char *version)
       ret = true;
     }
     break;
+  case TARGETCLI_RELOAD:
+    if (DEPENDENCY_VERSION(vNum[0], vNum[1], vNum[2]) >= GB_MIN_TARGETCLI_RELOAD_VERSION_CODE) {
+      ret = true;
+    }
+    break;
+  case RTSLIB_RELOAD:
+    if (DEPENDENCY_VERSION(vNum[0], vNum[1], vNum[2]) >= GB_MIN_RTSLIB_RELOAD_VERSION_CODE) {
+      ret = true;
+    }
+    break;
+
   }
 
   GB_FREE(verStr);
