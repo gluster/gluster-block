@@ -22,7 +22,11 @@ getTpgObj(char *block, MetaInfo *info, blockGenConfigCli *blk, char *portal, int
   uuid_t uuid;
   char alias[UUID_BUF_SIZE];
   char alias_10[11] = {'\0', };
-  char lun_so[256] = {'\0', };
+  /*
+   * 256 + extra 32 bytes for string "/backstores/user/" to
+   * suppress the truncated warning when compiling.
+   */
+  char lun_so[288] = {'\0', };
 
   struct json_object *tpg_obj = json_object_new_object();
   struct json_object *tpg_attr_obj = json_object_new_object();
@@ -63,7 +67,7 @@ getTpgObj(char *block, MetaInfo *info, blockGenConfigCli *blk, char *portal, int
   uuid_unparse(uuid, alias);
   snprintf(alias_10, 11, "%.10s", alias+24);
   json_object_object_add(tpg_lun_obj, "alias", GB_JSON_OBJ_TO_STR(alias_10[0]?alias_10:NULL));
-  snprintf(lun_so, 256, "/backstores/user/%s", block);
+  snprintf(lun_so, 288, "/backstores/user/%s", block);
   if (info->prio_path[0]) {
     if (!strcmp(info->prio_path, portal)) {
       json_object_object_add(tpg_lun_obj, "alua_tg_pt_gp_name",
