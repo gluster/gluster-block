@@ -89,6 +89,11 @@ replace block device.
 .PP
 
 .SS
+\fBreload\fR <volname/blockname> [force]
+reload a block device.
+.PP
+
+.SS
 \fBgenconfig\fR <VOLNAME1[,VOLNAME2,VOLNAME3,...]> enable-tpg <host>
 generate the block volumes target configuration.
 .TP
@@ -172,6 +177,9 @@ To delete a block device, but let backend file persist in blockVol(for later use
 
 To replace a block device from ${NODE1} to ${NODE2}
 .B # gluster-block replace blockVol/sampleBlock ${NODE1} ${NODE2}
+
+To reload a block device in all the HA nodes
+.B # gluster-block reload blockVol/sampleBlock
 
 To simply generate the block volumes target configuration.
 .B # gluster-block genconfig blockVol1[,blockVol2,blockVol3,...] enable-tpg ${HOST} | tee new_saveconfig.json

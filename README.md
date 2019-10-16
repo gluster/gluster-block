@@ -94,6 +94,9 @@ commands:
   replace <volname/blockname> <old-node> <new-node> [force]
         replace operations.
 
+  reload <volname/blockname> [force]
+        reload a block device.
+
   genconfig <volname[,volume2,volume3,...]> enable-tpg <host>
         generate the block volumes target configuration.
 
