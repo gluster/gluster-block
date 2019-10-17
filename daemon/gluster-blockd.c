@@ -430,7 +430,7 @@ gbDependenciesVersionCheck(void)
   char *out = NULL;
 
 
-  out = gbRunnerGetOutput("tcmu-runner --version 2>&1 | awk -F' ' '{printf $NF}'");
+  out = gbRunnerGetOutput(TCMU_VERSION);
   if (!gbDependencyVersionCompare(TCMURUNNER, out)) {
     LOG ("mgmt", GB_LOG_ERROR,
          "current tcmu-runner version is %s, gluster-block need atleast - %s",
@@ -440,7 +440,7 @@ gbDependenciesVersionCheck(void)
   LOG("mgmt", GB_LOG_INFO, "starting with tcmu-runner version - %s", out);
   GB_FREE(out);
 
-  out = gbRunnerGetOutput("targetcli --version 2>&1 | awk -F' ' '{printf $NF}'");
+  out = gbRunnerGetOutput(TARGETCLI_VERSION);
   if (!gbDependencyVersionCompare(TARGETCLI, out)) {
     LOG ("mgmt", GB_LOG_ERROR,
          "current targetcli version is %s, gluster-block need atleast - %s",
@@ -450,7 +450,7 @@ gbDependenciesVersionCheck(void)
   LOG("mgmt", GB_LOG_INFO, "starting with targetcli version - %s", out);
   GB_FREE(out);
 
-  out = gbRunnerGetOutput("python -c 'from rtslib_fb import __version__; print(__version__)'");
+  out = gbRunnerGetOutput(RTSLIB_VERSION);
   if (!strcmp(out, "GIT_VERSION")) {
     LOG("mgmt", GB_LOG_INFO, "starting with rtslib version <= 2.1.69");
   } else {

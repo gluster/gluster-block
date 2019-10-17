@@ -43,7 +43,7 @@ gbBlockSizeDependenciesVersionCheck(void)
   int ret = true;
 
 
-  out = gbRunnerGetOutput("python -c 'from rtslib_fb import __version__; print(__version__)'");
+  out = gbRunnerGetOutput(RTSLIB_VERSION);
   if (!gbDependencyVersionCompare(RTSLIB_BLKSIZE, out)) {
     ret = false;
   }
@@ -60,14 +60,14 @@ gbBlockReloadDependenciesVersionCheck(void)
   int ret = true;
 
 
-  out = gbRunnerGetOutput("python -c 'from rtslib_fb import __version__; print(__version__)'");
+  out = gbRunnerGetOutput(RTSLIB_VERSION);
   if (!gbDependencyVersionCompare(RTSLIB_RELOAD, out)) {
     ret = false;
     goto out;
   }
   GB_FREE(out);
 
-  out = gbRunnerGetOutput("targetcli --version 2>&1 | awk -F' ' '{printf $NF}'");
+  out = gbRunnerGetOutput(TARGETCLI_VERSION);
   if (!gbDependencyVersionCompare(TARGETCLI_RELOAD, out)) {
     ret = false;
   }
