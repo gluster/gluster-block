@@ -176,7 +176,7 @@ struct gbXdata {
   char data[];
 };
 
-struct gbCreate3 {
+struct gbCreate {
   char volServer[HOST_NAME_MAX];
   size_t blk_size;
   size_t io_timeout;
