@@ -733,16 +733,16 @@ block_create_v2_1_svc_st(blockCreate2 *blk, struct svc_req *rqstp)
   size_t blk_size = 0;
   size_t io_timeout = 0;
   struct gbXdata *xdata_val = (struct gbXdata*)blk->xdata.xdata_val;
-  struct gbCreate3 *gbCreate3 = (struct gbCreate3 *)xdata_val->data;
+  struct gbCreate *gbCreate = (struct gbCreate *)xdata_val->data;
   int n = 0;
 
   if (len > 0 && xdata_val && GB_XDATA_IS_MAGIC(xdata_val->magic)) {
     switch (GB_XDATA_GET_MAGIC_VER(xdata_val->magic)) {
     case 4:
-      io_timeout = gbCreate3->io_timeout;
+      io_timeout = gbCreate->io_timeout;
     case 3:
-      blk_size = gbCreate3->blk_size;
-      volServer = gbCreate3->volServer;
+      blk_size = gbCreate->blk_size;
+      volServer = gbCreate->volServer;
       break;
     default:
       LOG("mgmt", GB_LOG_ERROR, "Shouldn't be here and getting unknown verion number!");
@@ -1081,36 +1081,36 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
 
   if (!resultCaps[GB_CREATE_IO_TIMEOUT_CAP]) { // Create V4
     unsigned int len;
-    struct gbCreate3 *gbCreate3;
+    struct gbCreate *gbCreate;
 
-    len = sizeof(struct gbXdata) + sizeof(struct gbCreate3);
+    len = sizeof(struct gbXdata) + sizeof(struct gbCreate);
     if (GB_ALLOC_N(xdata, len) < 0) {
       errCode = ENOMEM;
       goto exist;
     }
 
     xdata->magic = GB_XDATA_GEN_MAGIC(4);
-    gbCreate3 = (struct gbCreate3 *)(&xdata->data);
-    GB_STRCPY(gbCreate3->volServer, (char *)gbConf->volServer, sizeof(gbConf->volServer));
-    gbCreate3->blk_size = blk->blk_size;
-    gbCreate3->io_timeout = blk->io_timeout;
+    gbCreate = (struct gbCreate *)(&xdata->data);
+    GB_STRCPY(gbCreate->volServer, (char *)gbConf->volServer, sizeof(gbConf->volServer));
+    gbCreate->blk_size = blk->blk_size;
+    gbCreate->io_timeout = blk->io_timeout;
 
     cobj.xdata.xdata_len = len;
     cobj.xdata.xdata_val = (char *)xdata;
   } else if (blk->blk_size) { // Create V3
     unsigned int len;
-    struct gbCreate3 *gbCreate3;
+    struct gbCreate *gbCreate;
 
-    len = sizeof(struct gbXdata) + sizeof(struct gbCreate3);
+    len = sizeof(struct gbXdata) + sizeof(struct gbCreate);
     if (GB_ALLOC_N(xdata, len) < 0) {
       errCode = ENOMEM;
       goto exist;
     }
 
     xdata->magic = GB_XDATA_GEN_MAGIC(3);
-    gbCreate3 = (struct gbCreate3 *)(&xdata->data);
-    GB_STRCPY(gbCreate3->volServer, (char *)gbConf->volServer, sizeof(gbConf->volServer));
-    gbCreate3->blk_size = blk->blk_size;
+    gbCreate = (struct gbCreate *)(&xdata->data);
+    GB_STRCPY(gbCreate->volServer, (char *)gbConf->volServer, sizeof(gbConf->volServer));
+    gbCreate->blk_size = blk->blk_size;
 
     cobj.xdata.xdata_len = len;
     cobj.xdata.xdata_val = (char *)xdata;
