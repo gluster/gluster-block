@@ -416,7 +416,16 @@ gbDependencyVersionCompare(int dependencyName, char *version)
       ret = true;
     }
     break;
-
+  case CONFIGSHELL_SEMICOLON:
+    if (DEPENDENCY_VERSION(vNum[0], vNum[1], vNum[2]) >= GB_MIN_CONFIGSHELL_SEM_VERSION_CODE) {
+      ret = true;
+    }
+    break;
+  case TCMURUNNER_IO_TIMEOUT:
+    if (DEPENDENCY_VERSION(vNum[0], vNum[1], vNum[2]) >= GB_MIN_TCMURUNNER_IO_TIMEOUT_VERSION_CODE) {
+      ret = true;
+    }
+    break;
   }
 
   GB_FREE(verStr);

@@ -125,6 +125,10 @@ TEST gluster-block delete ${VOLNAME}/${BLKNAME}
 TEST gluster-block create ${VOLNAME}/${BLKNAME} ring-buffer 32 ${HOST} 1MiB
 TEST gluster-block delete ${VOLNAME}/${BLKNAME}
 
+# Block create with 'io-timeout' set/delete
+TEST gluster-block create ${VOLNAME}/${BLKNAME} io-timeout 44 ${HOST} 1MiB
+TEST gluster-block delete ${VOLNAME}/${BLKNAME}
+
 # Block create with 'block-size' set/delete
 TEST gluster-block create ${VOLNAME}/${BLKNAME} block-size 1024 ${HOST} 1MiB
 TEST gluster-block delete ${VOLNAME}/${BLKNAME}

@@ -34,6 +34,7 @@ typedef struct MetaInfo {
   size_t size;
   size_t rb_size;
   size_t blk_size;
+  size_t io_timeout;
   char   prio_path[255];
   size_t mpath;
   char   entry[16];  /* possible strings for ENTRYCREATE: INPROGRESS|SUCCESS|FAIL */

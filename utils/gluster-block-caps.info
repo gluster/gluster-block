@@ -160,3 +160,14 @@ create_block_size: true
 # Since: 0.5
 ##
 reload: true
+
+##
+# Nature: cli sub-command
+#
+# Label: 'io-timeout'
+#
+# Description: capability to create block with given cmds timeout value in tcmu-runner
+#
+# Since: 0.5
+##
+create_io_timeout: true

@@ -458,6 +458,14 @@ gbDependenciesVersionCheck(void)
   }
   GB_FREE(out);
 
+  out = gbRunnerGetOutput(CONFIGSHELL_VERSION);
+  if (!out[0]) {
+    LOG("mgmt", GB_LOG_INFO, "starting with configshell version < 1.1.25");
+  } else {
+    LOG("mgmt", GB_LOG_INFO, "starting with configshell version - %s", out);
+  }
+  GB_FREE(out);
+
   return;
 
  out:

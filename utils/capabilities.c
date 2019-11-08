@@ -36,6 +36,31 @@ gbCapabilitiesEnumParse(const char *cap)
 }
 
 
+bool
+gbIoTimeoutDependenciesVersionCheck(void)
+{
+  char *out = NULL;
+  int ret = true;
+
+
+  out = gbRunnerGetOutput(CONFIGSHELL_VERSION);
+  if (!gbDependencyVersionCompare(CONFIGSHELL_SEMICOLON, out)) {
+    ret = false;
+    goto out;
+  }
+
+  GB_FREE(out);
+  out = gbRunnerGetOutput(TCMU_VERSION);
+  if (!gbDependencyVersionCompare(TCMURUNNER_IO_TIMEOUT, out)) {
+    ret = false;
+  }
+
+out:
+  GB_FREE(out);
+  return ret;
+}
+
+
 static bool
 gbBlockSizeDependenciesVersionCheck(void)
 {
@@ -141,6 +166,16 @@ gbSetCapabilties(void)
             LOG ("mgmt", GB_LOG_WARNING,
                  "reload needs atleast targetcli >=%s and rtslib >= %s, so disabling its capability",
                  GB_MIN_TARGETCLI_RELOAD_VERSION, GB_MIN_RTSLIB_RELOAD_VERSION);
+            caps[count].status = 0;
+            count++;
+            GB_FREE(line);
+            continue;
+          }
+      } else if (ret == GB_CREATE_IO_TIMEOUT_CAP) {
+          if (!gbIoTimeoutDependenciesVersionCheck()) {
+            LOG ("mgmt", GB_LOG_WARNING,
+                 "io timeout needs atleast configshell >=%s and tcmu-runner >= %s, so disabling its capability",
+                 GB_MIN_CONFIGSHELL_SEM_VERSION, GB_MIN_TCMURUNNER_IO_TIMEOUT_VERSION);
             caps[count].status = 0;
             count++;
             GB_FREE(line);

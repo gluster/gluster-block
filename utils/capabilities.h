@@ -50,6 +50,8 @@ enum gbCapabilities {
 
   GB_RELOAD_CAP,
 
+  GB_CREATE_IO_TIMEOUT_CAP,
+
   GB_CAP_MAX
 };
 
@@ -62,6 +64,7 @@ static const char *const gbCapabilitiesLookup[] = {
   [GB_CREATE_RING_BUFFER_CAP]  = "create_ring_buffer",
   [GB_CREATE_LOAD_BALANCE_CAP] = "create_load_balance",
   [GB_CREATE_BLOCK_SIZE_CAP]   = "create_block_size",
+  [GB_CREATE_IO_TIMEOUT_CAP]   = "create_io_timeout",
 
   [GB_DELETE_CAP]              = "delete",
   [GB_DELETE_FORCE_CAP]        = "delete_force",
@@ -85,3 +88,4 @@ extern gbCapObj *globalCapabilities;
 
 int gbCapabilitiesEnumParse(const char *cap);
 void gbSetCapabilties(void);
+bool gbIoTimeoutDependenciesVersionCheck(void);

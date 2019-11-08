@@ -26,6 +26,7 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
   char         *out         = NULL;
   int          i            = 0;
   char         *hr_size     = NULL;           /* Human Readable size */
+  char         *timeout     = NULL;
 
   if (!reply) {
     return;
@@ -67,6 +68,13 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     }
   }
 
+  if (GB_ASPRINTF(&timeout, "%lu Seconds", info->io_timeout) < 0) {
+      GB_ASPRINTF (&errMsg, "failed in blockInfoCliFormatResponse");
+      blockFormatErrorResponse(INFO_SRV, blk->json_resp, ENOMEM,
+                               errMsg, reply);
+      goto out;
+  }
+
   if (blk->json_resp) {
     json_obj = json_object_new_object();
     json_object_object_add(json_obj, "NAME", GB_JSON_OBJ_TO_STR(blk->block_name));
@@ -74,6 +82,7 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     json_object_object_add(json_obj, "GBID", GB_JSON_OBJ_TO_STR(info->gbid));
     json_object_object_add(json_obj, "SIZE", GB_JSON_OBJ_TO_STR(hr_size));
     json_object_object_add(json_obj, "HA", json_object_new_int(info->mpath));
+    json_object_object_add(json_obj, "IOTIMEOUT", GB_JSON_OBJ_TO_STR(timeout));
     json_object_object_add(json_obj, "PASSWORD", GB_JSON_OBJ_TO_STR(info->passwd));
 
     json_array1 = json_object_new_array();
@@ -105,9 +114,9 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     json_object_put(json_obj);
   } else {
     if (GB_ASPRINTF(&tmp, "NAME: %s\nVOLUME: %s\nGBID: %s\nSIZE: %s\n"
-                    "HA: %zu\nPASSWORD: %s\nEXPORTED ON:",
+                    "HA: %zu\nIOTIMEOUT: %s\nPASSWORD: %s\nEXPORTED ON:",
                     blk->block_name, info->volume, info->gbid, hr_size,
-                    info->mpath, info->passwd) == -1) {
+                    info->mpath, timeout, info->passwd) == -1) {
       goto out;
     }
     for (i = 0; i < info->nhosts; i++) {
@@ -150,7 +159,8 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
     blockFormatErrorResponse(INFO_SRV, blk->json_resp, errCode,
                              GB_DEFAULT_ERRMSG, reply);
   }
-  GB_FREE(hr_size);
+  GB_FREE (hr_size);
+  GB_FREE (timeout);
   GB_FREE (tmp);
   GB_FREE (tmp2);
   GB_FREE (tmp3);

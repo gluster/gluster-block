@@ -75,9 +75,11 @@ commands:
                               [storage <filename>]
                               [ring-buffer <size-in-MB-units>]
                               [block-size <size-in-Byte-units>]
+                              [io-timeout <N-in-Second>]
                               <host1[,host2,...]> [size]
         create block device [defaults: ha 1, auth disable, prealloc full, size in bytes,
-                             ring-buffer and block-size default size dependends on kernel]
+                             ring-buffer and block-size default size dependends on kernel,
+                             io-timeout 43s]
 
   list    <volname>
         list available block devices.
