@@ -138,8 +138,9 @@ getTgObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
 static struct json_object *
 getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
 {
-  char cfgstr[1024] = {'\0', };
+  char cfgstr[2048] = {'\0', };
   char control[1024] = {'\0', };
+  char io_timeout[128] = {'\0', };
   struct json_object *so_obj = json_object_new_object();
   struct json_object *so_obj_alua_ao_tpg;
   struct json_object *so_obj_alua_ano_tpg;
@@ -187,10 +188,16 @@ getSoObj(char *block, MetaInfo *info, blockGenConfigCli *blk)
   json_object_object_add(so_obj, "attributes", so_obj_attr);
   // }
 
+  if (info->io_timeout) {
+    snprintf(io_timeout, 128, ";%s=%lu", GB_IO_TIMEOUT_STR, info->io_timeout);
+  }
+
   if (!strcmp(gbConf->volServer, "localhost")) {
-    snprintf(cfgstr, 1024, "glfs/%s@%s/block-store/%s", info->volume, blk->addr, info->gbid);
+    snprintf(cfgstr, 2048, "glfs/%s@%s/block-store/%s%s", info->volume,
+             blk->addr, info->gbid, io_timeout[0]?io_timeout:"");
   } else {
-    snprintf(cfgstr, 1024, "glfs/%s@%s/block-store/%s", info->volume, gbConf->volServer, info->gbid);
+    snprintf(cfgstr, 2048, "glfs/%s@%s/block-store/%s%s", info->volume,
+             gbConf->volServer, info->gbid, io_timeout[0]?io_timeout:"");
   }
   json_object_object_add(so_obj, "config", GB_JSON_OBJ_TO_STR(cfgstr[0]?cfgstr:NULL));
   if (info->rb_size) {

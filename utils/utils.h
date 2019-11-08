@@ -42,6 +42,8 @@
 # define  GB_TCP_PORT            24010
 # define  GB_TCP_PORT_STR        "24010"
 
+# define  GB_IO_TIMEOUT_DEF      43
+
 # define  GFAPI_LOG_LEVEL        7
 
 # define   DEVNULLPATH           "/dev/null"
@@ -177,6 +179,7 @@ struct gbXdata {
 struct gbCreate3 {
   char volServer[HOST_NAME_MAX];
   size_t blk_size;
+  size_t io_timeout;
 };
 
 extern struct gbConf *gbConf;
@@ -467,25 +470,27 @@ static const char *const gbCliCmdlineOptLookup[] = {
 };
 
 typedef enum gbCliCreateOptions {
-  GB_CLI_CREATE_UNKNOWN   = 0,
-  GB_CLI_CREATE_HA        = 1,
-  GB_CLI_CREATE_AUTH      = 2,
-  GB_CLI_CREATE_PREALLOC  = 3,
-  GB_CLI_CREATE_STORAGE   = 4,
-  GB_CLI_CREATE_RBSIZE    = 5,
-  GB_CLI_CREATE_BLKSIZE   = 6,
+  GB_CLI_CREATE_UNKNOWN    = 0,
+  GB_CLI_CREATE_HA         = 1,
+  GB_CLI_CREATE_AUTH       = 2,
+  GB_CLI_CREATE_PREALLOC   = 3,
+  GB_CLI_CREATE_STORAGE    = 4,
+  GB_CLI_CREATE_RBSIZE     = 5,
+  GB_CLI_CREATE_BLKSIZE    = 6,
+  GB_CLI_CREATE_IO_TIMEOUT = 7,
 
   GB_CLI_CREATE_OPT_MAX
 } gbCliCreateOptions;
 
 static const char *const gbCliCreateOptLookup[] = {
-  [GB_CLI_CREATE_UNKNOWN]  = "NONE",
-  [GB_CLI_CREATE_HA]       = "ha",
-  [GB_CLI_CREATE_AUTH]     = "auth",
-  [GB_CLI_CREATE_PREALLOC] = "prealloc",
-  [GB_CLI_CREATE_STORAGE]  = "storage",
-  [GB_CLI_CREATE_RBSIZE]   = "ring-buffer",
-  [GB_CLI_CREATE_BLKSIZE]  = "block-size",
+  [GB_CLI_CREATE_UNKNOWN]    = "NONE",
+  [GB_CLI_CREATE_HA]         = "ha",
+  [GB_CLI_CREATE_AUTH]       = "auth",
+  [GB_CLI_CREATE_PREALLOC]   = "prealloc",
+  [GB_CLI_CREATE_STORAGE]    = "storage",
+  [GB_CLI_CREATE_RBSIZE]     = "ring-buffer",
+  [GB_CLI_CREATE_BLKSIZE]    = "block-size",
+  [GB_CLI_CREATE_IO_TIMEOUT] = "io-timeout",
 
   [GB_CLI_CREATE_OPT_MAX]  = NULL,
 };
@@ -559,6 +564,7 @@ typedef enum Metakey {
   GB_META_RINGBUFFER  = 7,
   GB_META_PRIOPATH    = 8,
   GB_META_BLKSIZE     = 9,
+  GB_META_IO_TIMEOUT  = 10,
 
   GB_METAKEY_MAX
 } Metakey;
@@ -574,6 +580,7 @@ static const char *const MetakeyLookup[] = {
   [GB_META_RINGBUFFER]  = "RINGBUFFER",
   [GB_META_PRIOPATH]    = "PRIOPATH",
   [GB_META_BLKSIZE]     = "BLKSIZE",
+  [GB_META_IO_TIMEOUT]  = "IOTIMEOUT",
 
   [GB_METAKEY_MAX]      = NULL
 };
@@ -660,11 +667,13 @@ typedef struct gbConfig {
 } gbConfig;
 
 typedef enum gbDependencies {
-  TCMURUNNER       = 1,
-  TARGETCLI        = 2,
-  RTSLIB_BLKSIZE   = 3,
-  TARGETCLI_RELOAD = 4,
-  RTSLIB_RELOAD    = 5,
+  TCMURUNNER              = 1,
+  TARGETCLI               = 2,
+  RTSLIB_BLKSIZE          = 3,
+  TARGETCLI_RELOAD        = 4,
+  RTSLIB_RELOAD           = 5,
+  CONFIGSHELL_SEMICOLON   = 6,
+  TCMURUNNER_IO_TIMEOUT   = 7,
 } gbDependencies;
 
 int initGbConfig(void);

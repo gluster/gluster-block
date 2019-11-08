@@ -52,6 +52,9 @@ glusterBlockBuildMinCaps(void *data, operations opt)
     if (cblk->json_resp) {
       minCaps[GB_JSON_CAP] = true;
     }
+    if (cblk->io_timeout) {
+      minCaps[GB_CREATE_IO_TIMEOUT_CAP] = true;
+    }
     break;
   case DELETE_SRV:
     dblk = (blockDeleteCli *)data;

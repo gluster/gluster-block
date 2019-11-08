@@ -17,9 +17,10 @@
 
 # define  DEPENDENCY_VERSION   KERNEL_VERSION
 
-# define  TARGETCLI_VERSION  "targetcli --version 2>&1 | awk -F' ' '{printf $NF}'"
-# define  RTSLIB_VERSION     "python -c 'from rtslib_fb import __version__; print(__version__)'"
-# define  TCMU_VERSION       "tcmu-runner --version 2>&1 | awk -F' ' '{printf $NF}'"
+# define  TARGETCLI_VERSION   "targetcli --version 2>&1 | awk -F' ' '{printf $NF}'"
+# define  RTSLIB_VERSION      "python -c 'from rtslib_fb import __version__; print(__version__)'"
+# define  TCMU_VERSION        "tcmu-runner --version 2>&1 | awk -F' ' '{printf $NF}'"
+# define  CONFIGSHELL_VERSION "python -c 'from configshell_fb import __version__; print(__version__)'"
 
 # define  GLUSTER_BLOCK_VERSION                "0.4"
 
@@ -31,11 +32,15 @@
 # define  GB_MIN_RTSLIB_BLKSIZE_VERSION        "2.1.69"
 # define  GB_MIN_TARGETCLI_RELOAD_VERSION      "2.1.fb50"
 # define  GB_MIN_RTSLIB_RELOAD_VERSION         "2.1.71"
+# define  GB_MIN_CONFIGSHELL_SEM_VERSION       "1.1.25"
+# define  GB_MIN_TCMURUNNER_IO_TIMEOUT_VERSION "1.5.0"
 
-# define  GB_MIN_TCMURUNNER_VERSION_CODE       DEPENDENCY_VERSION(1, 1, 3)
-# define  GB_MIN_TARGETCLI_VERSION_CODE        DEPENDENCY_VERSION(2, 1, 49)
-# define  GB_MIN_RTSLIB_BLKSIZE_VERSION_CODE   DEPENDENCY_VERSION(2, 1, 69)
-# define  GB_MIN_TARGETCLI_RELOAD_VERSION_CODE DEPENDENCY_VERSION(2, 1, 50)
-# define  GB_MIN_RTSLIB_RELOAD_VERSION_CODE    DEPENDENCY_VERSION(2, 1, 71)
+# define  GB_MIN_TCMURUNNER_VERSION_CODE            DEPENDENCY_VERSION(1, 1, 3)
+# define  GB_MIN_TARGETCLI_VERSION_CODE             DEPENDENCY_VERSION(2, 1, 49)
+# define  GB_MIN_RTSLIB_BLKSIZE_VERSION_CODE        DEPENDENCY_VERSION(2, 1, 69)
+# define  GB_MIN_TARGETCLI_RELOAD_VERSION_CODE      DEPENDENCY_VERSION(2, 1, 50)
+# define  GB_MIN_RTSLIB_RELOAD_VERSION_CODE         DEPENDENCY_VERSION(2, 1, 71)
+# define  GB_MIN_CONFIGSHELL_SEM_VERSION_CODE       DEPENDENCY_VERSION(1, 1, 25)
+# define  GB_MIN_TCMURUNNER_IO_TIMEOUT_VERSION_CODE DEPENDENCY_VERSION(1, 5, 0)
 
 # endif /* _VERSION_H */

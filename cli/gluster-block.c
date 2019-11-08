@@ -19,7 +19,8 @@
                                 "[ha <count>] [auth <enable|disable>] "        \
                                 "[prealloc <full|no>] [storage <filename>] "   \
                                 "[ring-buffer <size-in-MB-units>] "            \
-                                "[block-size <size-in-Byte-units>] "            \
+                                "[block-size <size-in-Byte-units>] "           \
+                                "[io-timeout <N-in-Second>] "                  \
                                 "<HOST1[,HOST2,...]> [size] [--json*]"
 # define  GB_DELETE_HELP_STR  "gluster-block delete <volname/blockname> "      \
                                 "[unlink-storage <yes|no>] [force] [--json*]"
@@ -312,9 +313,11 @@ glusterBlockHelp(void)
       "                              [storage <filename>]\n"
       "                              [ring-buffer <size-in-MB-units>]\n"
       "                              [block-size <size-in-Byte-units>]\n"
+      "                              [io-timeout <N-in-Second>]\n"
       "                              <host1[,host2,...]> [size]\n"
       "        create block device [defaults: ha 1, auth disable, prealloc full, size in bytes,\n"
-      "                             ring-buffer and block-size default size dependends on kernel]\n"
+      "                             ring-buffer and block-size default size dependends on kernel,\n"
+      "                             io-timeout 43s]\n"
       "\n"
       "  list    <volname>\n"
       "        list available block devices.\n"
@@ -640,6 +643,7 @@ glusterBlockCreate(int argcount, char **options, int json)
   cobj.json_resp = json;
   cobj.mpath = 1;
   cobj.prealloc = 1;
+  cobj.io_timeout = GB_IO_TIMEOUT_DEF;
 
   if (glusterBlockParseVolumeBlock(options[optind++], cobj.volume, cobj.block_name,
                                     sizeof(cobj.volume), sizeof(cobj.block_name),
@@ -697,6 +701,25 @@ glusterBlockCreate(int argcount, char **options, int json)
     case GB_CLI_CREATE_STORAGE:
       GB_STRCPYSTATIC(cobj.storage, options[optind++]);
       TAKE_SIZE=false;
+      break;
+    case GB_CLI_CREATE_IO_TIMEOUT:
+      if (isNumber(options[optind])) {
+        sscanf(options[optind++], "%u", &cobj.io_timeout);
+        if (cobj.io_timeout < 1) {
+          MSG(stderr, "'io-timeout' should equal or larger than 1 second");
+          MSG(stderr, GB_CREATE_HELP_STR);
+          LOG("cli", GB_LOG_ERROR,
+              "failed while parsing io-timeout for block <%s/%s>",
+              cobj.volume, cobj.block_name);
+        goto out;
+        }
+      } else {
+        MSG(stderr, "'io-timeout' option is incorrect, hint: should be uint type");
+        MSG(stderr, GB_CREATE_HELP_STR);
+        LOG("cli", GB_LOG_ERROR, "failed while parsing io-timeout for block <%s/%s>",
+            cobj.volume, cobj.block_name);
+        goto out;
+      }
       break;
     case GB_CLI_CREATE_RBSIZE:
       if (isNumber(options[optind])) {

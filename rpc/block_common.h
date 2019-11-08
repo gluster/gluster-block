@@ -29,7 +29,7 @@
 
 # define   GB_TGCLI_GLFS_PATH   "/backstores/user:glfs"
 # define   GB_TGCLI_GLFS        "targetcli " GB_TGCLI_GLFS_PATH
-# define   GB_TGCLI_CHECK       GB_TGCLI_GLFS " ls | grep ' %s ' | grep '/%s ' > " DEVNULLPATH
+# define   GB_TGCLI_CHECK       GB_TGCLI_GLFS " ls | grep ' %s ' | grep '/%s' > " DEVNULLPATH
 # define   GB_TGCLI_ISCSI_PATH  "/iscsi"
 # define   GB_TGCLI_ISCSI       "targetcli " GB_TGCLI_ISCSI_PATH
 # define   GB_TGCLI_ISCSI_CHECK GB_TGCLI_ISCSI " ls | grep ' %s%s ' > " DEVNULLPATH
@@ -39,6 +39,7 @@
 
 # define   GB_RING_BUFFER_STR   "max_data_area_mb"
 # define   GB_BLOCK_SIZE_STR    "hw_block_size"
+# define   GB_IO_TIMEOUT_STR    "tcmur_cmd_time_out"
 
 #define    GB_CMD_TIME_OUT      130
 

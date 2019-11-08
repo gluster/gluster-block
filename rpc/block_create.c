@@ -427,10 +427,12 @@ glusterBlockCreateRemoteAsync(blockServerDefPtr list, size_t mpath,
 
 
 static blockResponse *
-block_create_common(blockCreate *blk, char *control, char *volServer, char *prio_path)
+block_create_common(blockCreate *blk, char *control, char *volServer,
+                    char *prio_path, size_t io_timeout)
 {
   char *tmp = NULL;
   char *backstore = NULL;
+  char *io_timeout_str = NULL;
   char *backstore_attr = NULL;
   char *iqn = NULL;
   char *tpg = NULL;
@@ -452,9 +454,10 @@ block_create_common(blockCreate *blk, char *control, char *volServer, char *prio
 
   LOG("mgmt", GB_LOG_INFO,
       "create request, volume=%s volserver=%s blockname=%s blockhosts=%s "
-      "filename=%s authmode=%d passwd=%s size=%lu", blk->volume,
-      volServer?volServer:blk->ipaddr, blk->block_name, blk->block_hosts,
-      blk->gbid, blk->auth_mode, blk->auth_mode?blk->passwd:"", blk->size);
+      "filename=%s authmode=%d passwd=%s size=%lu control=%s "
+      "io_timeout=%lu", blk->volume, volServer?volServer:blk->ipaddr,
+      blk->block_name, blk->block_hosts, blk->gbid, blk->auth_mode,
+      blk->auth_mode?blk->passwd:"", blk->size, control, io_timeout);
 
   if (GB_ALLOC(reply) < 0) {
     goto out;
@@ -483,10 +486,18 @@ block_create_common(blockCreate *blk, char *control, char *volServer, char *prio
     prioCap = true;
   }
 
-  if (GB_ASPRINTF(&backstore, "%s %s name=%s size=%zu cfgstring=%s@%s%s/%s%s wwn=%s",
+  if (io_timeout) {
+    if (GB_ASPRINTF(&io_timeout_str, ";tcmur_cmd_time_out=%lu",
+                    io_timeout) == -1) {
+      goto out;
+    }
+  }
+
+  if (GB_ASPRINTF(&backstore, "%s %s name=%s size=%zu cfgstring=%s@%s%s/%s%s%s wwn=%s",
                   GB_TGCLI_GLFS_PATH, GB_CREATE, blk->block_name, blk->size,
                   blk->volume, volServer?volServer:blk->ipaddr, GB_STOREDIR,
-                  blk->gbid, control ? control : "", blk->gbid) == -1) {
+                  blk->gbid, io_timeout_str ? io_timeout_str : "",
+                  control ? control : "", blk->gbid) == -1) {
     goto out;
   }
 
@@ -698,6 +709,7 @@ block_create_common(blockCreate *blk, char *control, char *volServer, char *prio
   GB_FREE(backstore_attr);
   blockServerDefFree(list);
   GB_FREE(glfs_alua_sup);
+  GB_FREE(io_timeout_str);
 
   return reply;
 }
@@ -706,7 +718,7 @@ block_create_common(blockCreate *blk, char *control, char *volServer, char *prio
 static blockResponse *
 block_create_1_svc_st(blockCreate *blk, struct svc_req *rqstp)
 {
-  return block_create_common(blk, NULL, NULL, NULL);
+  return block_create_common(blk, NULL, NULL, NULL, 0);
 }
 
 
@@ -719,14 +731,22 @@ block_create_v2_1_svc_st(blockCreate2 *blk, struct svc_req *rqstp)
   char *volServer = NULL;
   size_t len = blk->xdata.xdata_len;
   size_t blk_size = 0;
+  size_t io_timeout = 0;
   struct gbXdata *xdata_val = (struct gbXdata*)blk->xdata.xdata_val;
   struct gbCreate3 *gbCreate3 = (struct gbCreate3 *)xdata_val->data;
   int n = 0;
 
   if (len > 0 && xdata_val && GB_XDATA_IS_MAGIC(xdata_val->magic)) {
-    if (GB_XDATA_GET_MAGIC_VER(xdata_val->magic) == 3) {
+    switch (GB_XDATA_GET_MAGIC_VER(xdata_val->magic)) {
+    case 4:
+      io_timeout = gbCreate3->io_timeout;
+    case 3:
       blk_size = gbCreate3->blk_size;
       volServer = gbCreate3->volServer;
+      break;
+    default:
+      LOG("mgmt", GB_LOG_ERROR, "Shouldn't be here and getting unknown verion number!");
+      break;
     }
   } else if (len > 0 && len <= HOST_NAME_MAX) {
     volServer = (char *)blk->xdata.xdata_val;
@@ -753,7 +773,8 @@ block_create_v2_1_svc_st(blockCreate2 *blk, struct svc_req *rqstp)
 
   convertTypeCreate2ToCreate(blk, &blk_v1);
 
-  return block_create_common(&blk_v1, control, volServer, blk->prio_path);
+  return block_create_common(&blk_v1, control, volServer, blk->prio_path,
+                             io_timeout);
 }
 
 static void
@@ -935,9 +956,10 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
 
   LOG("mgmt", GB_LOG_INFO,
       "create cli request, volume=%s blockname=%s mpath=%d blockhosts=%s "
-      "authmode=%d size=%lu, rbsize=%d, blksize=%d", blk->volume,
-      blk->block_name, blk->mpath, blk->block_hosts, blk->auth_mode, blk->size,
-      blk->rb_size, blk->blk_size);
+      "authmode=%d size=%lu rbsize=%d blksize=%d io_timeout=%d",
+      blk->volume, blk->block_name, blk->mpath, blk->block_hosts,
+      blk->auth_mode, blk->size, blk->rb_size, blk->blk_size,
+      blk->io_timeout);
 
   if (GB_ALLOC(reply) < 0) {
     goto optfail;
@@ -1035,10 +1057,20 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
     goto exist;
   }
 
-  GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
-                        errCode, errMsg, exist,
-                        "SIZE: %zu\nRINGBUFFER: %u\nBLKSIZE: %u\nENTRYCREATE: SUCCESS\n",
-                        blk->size, blk->rb_size, blk->blk_size);
+  if (!resultCaps[GB_CREATE_IO_TIMEOUT_CAP]) {
+    GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
+                          errCode, errMsg, exist,
+                          "SIZE: %zu\nRINGBUFFER: %u\nBLKSIZE: %u\n"
+                          "IOTIMEOUT: %u\nENTRYCREATE: SUCCESS\n",
+                          blk->size, blk->rb_size, blk->blk_size,
+                          blk->io_timeout);
+  } else {
+    GB_METAUPDATE_OR_GOTO(lock, glfs, blk->block_name, blk->volume,
+                          errCode, errMsg, exist,
+                          "SIZE: %zu\nRINGBUFFER: %u\nBLKSIZE: %u\n"
+                          "ENTRYCREATE: SUCCESS\n",
+                          blk->size, blk->rb_size, blk->blk_size);
+  }
 
   GB_STRCPYSTATIC(cobj.volume, blk->volume);
   GB_STRCPYSTATIC(cobj.block_name, blk->block_name);
@@ -1047,14 +1079,32 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   GB_STRCPYSTATIC(cobj.gbid, gbid);
   GB_STRDUP(cobj.block_hosts,  blk->block_hosts);
 
-  if (blk->blk_size) { // Create V3
+  if (!resultCaps[GB_CREATE_IO_TIMEOUT_CAP]) { // Create V4
     unsigned int len;
     struct gbCreate3 *gbCreate3;
 
     len = sizeof(struct gbXdata) + sizeof(struct gbCreate3);
     if (GB_ALLOC_N(xdata, len) < 0) {
-        errCode = ENOMEM;
-        goto exist;
+      errCode = ENOMEM;
+      goto exist;
+    }
+
+    xdata->magic = GB_XDATA_GEN_MAGIC(4);
+    gbCreate3 = (struct gbCreate3 *)(&xdata->data);
+    GB_STRCPY(gbCreate3->volServer, (char *)gbConf->volServer, sizeof(gbConf->volServer));
+    gbCreate3->blk_size = blk->blk_size;
+    gbCreate3->io_timeout = blk->io_timeout;
+
+    cobj.xdata.xdata_len = len;
+    cobj.xdata.xdata_val = (char *)xdata;
+  } else if (blk->blk_size) { // Create V3
+    unsigned int len;
+    struct gbCreate3 *gbCreate3;
+
+    len = sizeof(struct gbXdata) + sizeof(struct gbCreate3);
+    if (GB_ALLOC_N(xdata, len) < 0) {
+      errCode = ENOMEM;
+      goto exist;
     }
 
     xdata->magic = GB_XDATA_GEN_MAGIC(3);

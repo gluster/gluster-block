@@ -122,7 +122,24 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
     goto out;
   }
 
-  if (info->blk_size) { // Create V3
+  if (info->io_timeout) { // Create V4
+    unsigned int len;
+    struct gbCreate3 *gbCreate3;
+
+    len = sizeof(struct gbXdata) + sizeof(struct gbCreate3);
+    if (GB_ALLOC_N(xdata, len) < 0) {
+	goto out;
+    }
+
+    xdata->magic = GB_XDATA_GEN_MAGIC(4);
+    gbCreate3 = (struct gbCreate3 *)(&xdata->data);
+    GB_STRCPY(gbCreate3->volServer, (char *)gbConf->volServer, sizeof(gbConf->volServer));
+    gbCreate3->blk_size = info->blk_size;
+    gbCreate3->io_timeout = info->io_timeout;
+
+    cobj->xdata.xdata_len = len;
+    cobj->xdata.xdata_val = (char *)xdata;
+  } else if (info->blk_size) { // Create V3
     unsigned int len;
     struct gbCreate3 *gbCreate3;
 
