@@ -1074,7 +1074,7 @@ glusterBlockReplace(int argcount, char **options, int json)
 static int
 glusterBlockGenConfig(int argcount, char **options, int json)
 {
-  blockGenConfigCli robj = {{0},};
+  blockGenConfigCli robj = {0,};
   int ret = -1;
   int optind = 1;
 
@@ -1087,7 +1087,7 @@ glusterBlockGenConfig(int argcount, char **options, int json)
     goto out;
   }
 
-  GB_STRCPYSTATIC(robj.volume, options[optind++]);
+  GB_STRDUP(robj.volume, options[optind++]);
 
   if (!strcmp(options[optind++], "enable-tpg")) {
     if (!glusterBlockIsAddrAcceptable(options[optind])) {
@@ -1098,7 +1098,7 @@ glusterBlockGenConfig(int argcount, char **options, int json)
     GB_STRCPYSTATIC(robj.addr, options[optind]);
   } else {
       MSG(stderr, "unknown option '%s' for genconfig:\n%s", options[optind -1], GB_GENCONF_HELP_STR);
-      return -1;
+      goto out;
   }
   robj.json_resp = json;
 
@@ -1108,6 +1108,7 @@ glusterBlockGenConfig(int argcount, char **options, int json)
   }
 
  out:
+  GB_FREE(robj.volume);
 
   return ret;
 }
