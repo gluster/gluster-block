@@ -145,7 +145,7 @@ struct blockReplaceCli {
 };
 
 struct blockGenConfigCli {
-  char      volume[255];
+  string    volume<>;
   char      addr[255];
   enum JsonResponseFormat     json_resp;
 };
