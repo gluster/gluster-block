@@ -165,6 +165,7 @@ glusterBlockReplaceNodeRemoteAsync(struct glfs *glfs, blockReplaceCli *blk,
   GB_STRCPYSTATIC(cobj->gbid, info->gbid);
   cobj->size = info->size;
   cobj->rb_size = info->rb_size;
+  cobj->auth_mode = !!info->passwd[0];
   GB_STRCPYSTATIC(cobj->passwd, info->passwd);
   GB_STRCPYSTATIC(cobj->block_name, block);
   if (info->prio_path[0]) {
