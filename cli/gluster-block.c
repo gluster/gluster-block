@@ -643,7 +643,6 @@ glusterBlockCreate(int argcount, char **options, int json)
   cobj.json_resp = json;
   cobj.mpath = 1;
   cobj.prealloc = 1;
-  cobj.io_timeout = GB_IO_TIMEOUT_DEF;
 
   if (glusterBlockParseVolumeBlock(options[optind++], cobj.volume, cobj.block_name,
                                     sizeof(cobj.volume), sizeof(cobj.block_name),

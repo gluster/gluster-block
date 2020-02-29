@@ -486,6 +486,10 @@ block_create_common(blockCreate *blk, char *control, char *volServer,
     prioCap = true;
   }
 
+  if (!io_timeout && globalCapabilities[GB_CREATE_IO_TIMEOUT_CAP].status) {
+    io_timeout = GB_IO_TIMEOUT_DEF;
+  }
+
   if (io_timeout) {
     if (GB_ASPRINTF(&io_timeout_str, ";tcmur_cmd_time_out=%lu",
                     io_timeout) == -1) {
