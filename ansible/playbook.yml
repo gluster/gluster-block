@@ -45,11 +45,59 @@
         - gluster vol start blockHostingVol
 
     - name: Create a 1GiB block volume
-      register: output
+      register: create_out
       command: "{{ gluster_block }} {{ command_args }}"
-
     - debug:
         msg:
           - "# {{ gluster_block }} {{ command_args }}"
-          - "{{ output.stdout_lines }}"
-          - "{{ output.stderr_lines }}"
+          - "{{ create_out.stdout_lines }}"
+          - "{{ create_out.stderr_lines }}"
+
+- hosts: initiators
+  become: true
+  any_errors_fatal: true
+  vars:
+    - portal1_ip: "{{ hostvars[groups.servers[0]].ansible_eth1.ipv4.address }}"
+  tasks:
+
+    - name: Get the IQN
+      shell: "{{ item }}"
+      register: got_iqn
+      with_items:
+          - echo {{ hostvars['server1']['create_out']['stdout_lines'] }} | cut -d',' -f2 | awk -F":" '{printf "%s:%s", $2, $3}'
+
+    - name: Login to blockVol1
+      command: "{{ item }}"
+      register: login_out
+      with_items:
+          - iscsiadm -m discovery -t st -p {{ portal1_ip }}
+          - iscsiadm -m node -T {{ got_iqn.results[0].stdout }} -l
+    - debug:
+        msg:
+          - "# iscsiadm -m discovery -t st -p {{ portal1_ip }} "
+          - "{{ login_out.results[0].stdout_lines }}"
+          - "{{ login_out.results[0].stderr_lines }}"
+          - "# iscsiadm -m node -T {{ got_iqn.results[0].stdout }} -l"
+          - "{{ login_out.results[1].stdout_lines }}"
+          - "{{ login_out.results[1].stderr_lines }}"
+
+    - name: Show the multipath device
+      command: lsblk
+      register: lsblk_out
+    - debug:
+        msg:
+          - "# lsblk"
+          - "{{ lsblk_out.stdout_lines }}"
+          - "{{ lsblk_out.stderr_lines }}"
+
+    - name: Format the block device with xfs
+      command: mkfs.xfs /dev/mapper/mpatha
+      register: mkfs_out
+    - debug:
+        msg:
+          - "# mkfs.xfs /dev/mapper/mpatha"
+          - "{{ mkfs_out.stdout_lines }}"
+          - "{{ mkfs_out.stderr_lines }}"
+
+    - debug:
+        msg: "Yay!! Block device '/dev/mapper/mpatha' is all ready to be mounted and used, go now!!"
