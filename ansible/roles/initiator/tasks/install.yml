@@ -1,0 +1,8 @@
+---
+# tasks file for dependency packages installation on initiator
+
+- name: Add initiator packages
+  yum:
+    state: installed
+    allow_downgrade: true
+    name: "{{ initiator_packages }}"

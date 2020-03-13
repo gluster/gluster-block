@@ -1,0 +1,11 @@
+---
+# tasks file for service bringup on initiator
+
+- name: Start and enable iscsid multipathd services
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  with_items:
+    - iscsid
+    - multipathd

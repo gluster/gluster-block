@@ -1,0 +1,14 @@
+#---
+# tasks file for service bringup on servers
+
+- name: Start and enable glusterd.service
+  systemd:
+    name: glusterd
+    state: started
+    enabled: true
+
+- name: Start and enable gluster-blockd.service
+  systemd:
+    name: gluster-blockd
+    state: started
+    enabled: true

@@ -1,0 +1,34 @@
+---
+# vars file for servers
+
+glusterfs_packages:
+  - glusterfs-server
+  - glusterfs-cli
+
+glusterBlock_packages:
+  - git
+  - libtool
+  - libuuid-devel
+  - glusterfs-api-devel
+  - automake
+  - autoconf
+  - make
+  - gcc
+  - glib2-devel
+  - kmod-devel
+  - libnl3-devel
+  - zlib-devel
+  - cmake
+  - gperftools-devel
+  - libtirpc-devel
+  - json-c-devel
+  - python*-gobject
+  - python*-kmod
+  - python*-pip
+  - python*-setuptools
+
+glusterBlock_fedora_packages:
+  - rpcgen
+
+#glusterBlock_centos_packages:
+#  - PACKAGE-NAME
