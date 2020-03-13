@@ -22,13 +22,11 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "initiator" do |node|
     node.vm.hostname = "initiator"
-    node.vm.network "private_network", ip: "192.168.100.#{50+SERVERS+1}"
   end
 
   (1..SERVERS).each do |i|
     config.vm.define "server#{i}" do |node|
       node.vm.hostname = "server#{i}"
-      node.vm.network "private_network", ip: "192.168.100.#{50+i}"
 
       # Only execute the Ansible provisioner once,
       # when all the machines are up and ready.
