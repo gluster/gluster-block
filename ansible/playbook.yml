@@ -29,6 +29,9 @@
     - server2_ip: "{{ hostvars[groups.servers[1]].ansible_eth1.ipv4.address }}"
     - server3_ip: "{{ hostvars[groups.servers[2]].ansible_eth1.ipv4.address }}"
     - bricks: "{{ server1_ip }}:/brick1 {{ server2_ip }}:/brick2 {{ server3_ip }}:/brick3"
+    - servers_csv: "{{ server1_ip }},{{ server2_ip }},{{ server3_ip }}"
+    - gluster_block: "/usr/local/sbin/gluster-block"
+    - command_args: "create blockHostingVol/blockVol1 ha 3 prealloc full {{ servers_csv }} 1GiB --json-pretty"
   tasks:
     - name: Peer probe all nodes
       command: "gluster peer probe {{ hostvars[item].ansible_eth1.ipv4.address }}"
@@ -40,3 +43,13 @@
         - gluster vol create blockHostingVol replica 3 {{ bricks }} force
         - gluster vol set blockHostingVol group gluster-block
         - gluster vol start blockHostingVol
+
+    - name: Create a 1GiB block volume
+      register: output
+      command: "{{ gluster_block }} {{ command_args }}"
+
+    - debug:
+        msg:
+          - "# {{ gluster_block }} {{ command_args }}"
+          - "{{ output.stdout_lines }}"
+          - "{{ output.stderr_lines }}"
