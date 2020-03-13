@@ -315,6 +315,49 @@ managing the command ring buffers
 > Think it like a shell which makes life easy in configuring LIO core
 
 ------
+### How to quickly bringup gluster-block environment locally ?
+<pre>
+Fedora:
+# dnf -y install qemu libvirt libvirt-devel ruby-devel gcc vagrant ansible
+
+CentOS:
+# yum -y install qemu libvirt libvirt-devel ruby-devel gcc qemu-kvm ansible
+
+Note: Please download and install vagrant package for CentOS from:
+https://www.vagrantup.com/downloads.html
+
+
+Start and enable libvirtd service
+# systemctl start libvirtd
+# systemctl enable libvirtd
+
+Now install vagrant libvirt plugin
+# vagrant plugin install vagrant-libvirt
+
+Make sure you are in gluster-block root directory
+# vagrant up
+</pre>
+
+### Managing the vagrant Vm's
+<pre>
+
+To check VMs status
+# vagrant status
+
+To ssh and get access to a VM
+# vagrant ssh {name}
+
+To stop the VMs
+# vagrant halt
+
+To destroy the VMs
+# vagrant destroy
+
+Check more commands with
+# vagrant list-commands
+</pre>
+
+------
 
 ## License
 gluster-block is licensed to you under your choice of the GNU Lesser General Public License, version 3 or any later version ([LGPLv3](https://opensource.org/licenses/lgpl-3.0.html) or later), or the GNU General Public License, version 2 ([GPLv2](https://opensource.org/licenses/GPL-2.0)), in all cases as published by the Free Software Foundation.
