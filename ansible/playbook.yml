@@ -20,3 +20,23 @@
   any_errors_fatal: true
   roles:
     - initiator
+
+- hosts: servers[0]
+  become: true
+  any_errors_fatal: true
+  vars:
+    - server1_ip: "{{ hostvars[groups.servers[0]].ansible_eth1.ipv4.address }}"
+    - server2_ip: "{{ hostvars[groups.servers[1]].ansible_eth1.ipv4.address }}"
+    - server3_ip: "{{ hostvars[groups.servers[2]].ansible_eth1.ipv4.address }}"
+    - bricks: "{{ server1_ip }}:/brick1 {{ server2_ip }}:/brick2 {{ server3_ip }}:/brick3"
+  tasks:
+    - name: Peer probe all nodes
+      command: "gluster peer probe {{ hostvars[item].ansible_eth1.ipv4.address }}"
+      with_items: "{{ groups.servers[1:] }}"
+
+    - name: Create the block hosting volume
+      command: "{{ item }}"
+      with_items:
+        - gluster vol create blockHostingVol replica 3 {{ bricks }} force
+        - gluster vol set blockHostingVol group gluster-block
+        - gluster vol start blockHostingVol
