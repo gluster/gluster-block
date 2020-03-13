@@ -33,6 +33,12 @@
 #    allow_downgrade: true
 #  when: ansible_facts['distribution']|lower == "centos"
 
+- name: Setup default git config
+  git_config:
+    name: user.email
+    scope: global
+    value: 'root@{{ ansible_fqdn }}'
+
 - name: Clone configshell-fb repo
   git:
     repo: https://github.com/open-iscsi/configshell-fb
@@ -62,6 +68,7 @@
 - name: Build and install targetcli-fb
   command: "{{ item }} chdir=/root/targetcli-fb"
   with_items:
+    - git revert 3db75315b7e436e57943efb132f7b331a7a7744c --no-edit
     - python setup.py install
 
 - name : Create target directory
