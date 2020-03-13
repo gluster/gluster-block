@@ -40,7 +40,7 @@ Vagrant.configure("2") do |config|
           }
           # Disable default limit to connect to all the machines
           ansible.limit = "all"
-          ansible.playbook = "playbook.yml"
+          ansible.playbook = "ansible/playbook.yml"
         end
       end
     end

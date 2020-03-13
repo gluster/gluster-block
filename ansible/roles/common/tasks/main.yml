@@ -1,0 +1,27 @@
+---
+# tasks file for common
+
+- name: Upgrade system
+  yum:
+    name: "*"
+    state: latest
+  register: upgrade
+
+- name: Reboot if packages were upgraded
+  shell: sleep 2 && systemctl reboot
+  async: 1
+  poll: 0
+  when: upgrade.changed == true
+
+- name: Wait for host to be available after reboot
+  wait_for_connection:
+    delay: 15
+  when: upgrade.changed == true
+
+- name: Stop Firewall
+  systemd:
+    name: firewalld
+    state: stopped
+
+- name: Flush iptables
+  command: "iptables -F"

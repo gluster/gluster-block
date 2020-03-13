@@ -1,0 +1,95 @@
+#---
+# tasks file for dependency packages installation on servers
+
+- name: Add glusterfs repo for CentOs
+  yum:
+    name: centos-release-gluster
+    state: installed
+  when: ansible_facts['distribution']|lower == "centos"
+
+- name: Install glusterfs packages
+  yum:
+    name: "{{ glusterfs_packages }}"
+    state: installed
+    allow_downgrade: true
+
+- name: Install gluster-block build dependencies
+  yum:
+    name: "{{ glusterBlock_packages }}"
+    state: installed
+    allow_downgrade: true
+
+- name: Install gluster-block dependencies for Fedora
+  yum:
+    name: "{{ glusterBlock_fedora_packages }}"
+    state: installed
+    allow_downgrade: true
+  when: ansible_facts['distribution']|lower == "fedora"
+
+#- name: Add gluster-block dependency packages for Centos
+#  yum:
+#    name: "{{ glusterBlock_centos_packages }}"
+#    state: installed
+#    allow_downgrade: true
+#  when: ansible_facts['distribution']|lower == "centos"
+
+- name: Clone configshell-fb repo
+  git:
+    repo: https://github.com/open-iscsi/configshell-fb
+    dest: /root/configshell-fb
+
+- name: Build and install configshell
+  command: python setup.py install
+  args:
+    chdir: /root/configshell-fb
+
+- name: Clone rtslib-fb repo
+  git:
+    repo: https://github.com/open-iscsi/rtslib-fb
+    dest: /root/rtslib-fb
+
+- name: Build and install rtslib-fb
+  command: "{{ item }} chdir=/root/rtslib-fb"
+  with_items:
+    - python setup.py install
+    - cp systemd/target.service /usr/lib/systemd/system/
+
+- name: Clone targetcli-fb repo
+  git:
+    repo: https://github.com/open-iscsi/targetcli-fb
+    dest: /root/targetcli-fb
+
+- name: Build and install targetcli-fb
+  command: "{{ item }} chdir=/root/targetcli-fb"
+  with_items:
+    - python setup.py install
+
+- name : Create target directory
+  file:
+    path: /etc/target/
+    state: directory
+
+- name: Clone tcmu-runner repo
+  git:
+    repo: https://github.com/open-iscsi/tcmu-runner
+    dest: /root/tcmu-runner
+
+- name: Build and install tcmu-runner
+  command: "{{ item }} chdir=/root/tcmu-runner"
+  with_items:
+    - cmake -DCMAKE_INSTALL_PREFIX=/usr -Dwith-rbd=false -Dwith-qcow=false -Dwith-zbc=false -Dwith-fbo=false -DSUPPORT_SYSTEMD=ON -DCMAKE_BUILD_TYPE=Debug
+    - make install
+
+- name: Clone gluster-block repo
+  git:
+    repo: https://github.com/gluster/gluster-block
+    dest: /root/gluster-block
+
+- name: Build and install gluster-block
+  vars:
+    query: "{{ 'no' if ansible_facts['distribution']|lower == 'centos' else 'yes' }}"
+  command: "{{ item }} chdir=/root/gluster-block"
+  with_items:
+    - ./autogen.sh
+    - ./configure --enable-tirpc={{ query }}
+    - make install

@@ -1,0 +1,22 @@
+---
+##############################
+# This playbook is called by Vagrant for initial VM provisioning.
+# Bringup the gluster-block environment
+
+- hosts: all
+  become: true
+  any_errors_fatal: true
+  roles:
+    - common
+
+- hosts: servers
+  become: true
+  any_errors_fatal: true
+  roles:
+    - servers
+
+- hosts: initiators
+  become: true
+  any_errors_fatal: true
+  roles:
+    - initiator
