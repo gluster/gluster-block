@@ -42,3 +42,5 @@ rpc/rpcl/block_svc.c
 rpc/rpcl/block_xdr.c
 
 tests/gfapi-test
+
+.vagrant
