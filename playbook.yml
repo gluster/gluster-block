@@ -1,0 +1,23 @@
+---
+##############################
+# This playbook is called by Vagrant for initial VM provisioning.
+# It installs the basic packages
+
+- hosts: all
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Install httpd
+      raw: yum install -y httpd
+
+
+- hosts: all
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: start httpd
+      systemd:
+        name: httpd
+        state: started
