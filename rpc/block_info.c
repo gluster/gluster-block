@@ -46,33 +46,20 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
   if (!info)
     goto out;
 
-  for (i = 0; i < info->nhosts; i++) {
-    switch (blockMetaStatusEnumParse(info->list[i]->status)) {
-    case GB_RS_INPROGRESS:
-    case GB_RS_FAIL:
-      GB_STRDUP(hr_size, "-");
-      break;
-    }
-    if (hr_size) {
-      break;
-    }
-  }
+  hr_size = glusterBlockFormatSize("mgmt", info->size);
   if (!hr_size) {
-    hr_size = glusterBlockFormatSize("mgmt", info->size);
-    if (!hr_size) {
-      GB_ASPRINTF (&errMsg, "failed in glusterBlockFormatSize");
-      blockFormatErrorResponse(INFO_SRV, blk->json_resp, ENOMEM,
-                               errMsg, reply);
-      GB_FREE(errMsg);
-      goto out;
-    }
+    GB_ASPRINTF (&errMsg, "failed in glusterBlockFormatSize");
+    blockFormatErrorResponse(INFO_SRV, blk->json_resp, ENOMEM,
+                             errMsg, reply);
+    GB_FREE(errMsg);
+    goto out;
   }
 
   if (GB_ASPRINTF(&timeout, "%lu Seconds", info->io_timeout) < 0) {
-      GB_ASPRINTF (&errMsg, "failed in blockInfoCliFormatResponse");
-      blockFormatErrorResponse(INFO_SRV, blk->json_resp, ENOMEM,
-                               errMsg, reply);
-      goto out;
+    GB_ASPRINTF (&errMsg, "failed in blockInfoCliFormatResponse");
+    blockFormatErrorResponse(INFO_SRV, blk->json_resp, ENOMEM,
+                             errMsg, reply);
+    goto out;
   }
 
   if (blk->json_resp) {

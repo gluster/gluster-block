@@ -890,6 +890,9 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
+  GB_METAUPDATE_OR_GOTO(lock, glfs, mobj.block_name, mobj.volume,
+                        errCode, errMsg, out, "SIZE: %zu\n",  mobj.size);
+
   asyncret = glusterBlockModifySizeRemoteAsync(info, glfs, &mobj, &savereply);
   if (asyncret) {   /* asyncret decides result is success/fail */
     errCode = asyncret;
@@ -897,9 +900,6 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
         "glusterBlockModifySizeRemoteAsync(size=%zu): return %d %s for block %s on volume %s",
         blk->size, asyncret, FAILED_REMOTE_AYNC_MODIFY, blk->block_name, info->volume);
     goto out;
-  } else {
-    GB_METAUPDATE_OR_GOTO(lock, glfs, mobj.block_name, mobj.volume,
-                          errCode, errMsg, out, "SIZE: %zu\n",  mobj.size);
   }
 
  out:
