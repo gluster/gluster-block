@@ -68,7 +68,6 @@
 - name: Build and install targetcli-fb
   command: "{{ item }} chdir=/root/targetcli-fb"
   with_items:
-    - git revert 3db75315b7e436e57943efb132f7b331a7a7744c --no-edit
     - python setup.py install
 
 - name : Create target directory
