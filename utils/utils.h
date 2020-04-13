@@ -65,6 +65,8 @@
 # define  GB_DEF_CONFIGDIR       "/etc/sysconfig" /* the default config file directory */
 # define  GB_DEF_CONFIGPATH      GB_DEF_CONFIGDIR"/gluster-blockd" /* the default config file */
 
+# define  GB_RPM_PKG_VERSION     "rpm -qa | grep %s | awk -F- '{print $(NF-1)}'"
+
 # define  GB_TIME_STRING_BUFLEN  \
           (4 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 6 + 1 +   5)
      /*   Yr      Mon     Day     Hour    Min     Sec     Ms  NULL  Round-off(32)
@@ -713,6 +715,10 @@ int gbRunnerExitStatus(int exitStatus);
 int gbRunner(char *cmd);
 
 char* gbRunnerGetOutput(char *cmd);
+
+char* gbGetRpmPkgVersion(const char* pkgName);
+
+char* gbRunnerGetPkgVersion(const char * pkgName);
 
 int gbAlloc(void *ptrptr, size_t size,
             const char *filename, const char *funcname, size_t linenr);

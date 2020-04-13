@@ -730,6 +730,48 @@ fail:
 }
 
 
+char *
+gbGetRpmPkgVersion(const char* pkgName)
+{
+  char *exec;
+
+  if (GB_ASPRINTF(&exec, GB_RPM_PKG_VERSION, pkgName) == -1) {
+    return NULL;
+  }
+
+  return gbRunnerGetOutput(exec);
+}
+
+
+char *
+gbRunnerGetPkgVersion(const char * pkgName)
+{
+  char *cmd = NULL;
+  char *out;
+
+  if (!strcmp(pkgName, TARGETCLI_STR)) {
+    cmd = TARGETCLI_VERSION;
+  } else if (!strcmp(pkgName, RTSLIB_STR)) {
+    cmd = RTSLIB_VERSION;
+  } else if (!strcmp(pkgName, CONFIGSHELL_STR)) {
+    cmd = CONFIGSHELL_VERSION;
+  } else if (!strcmp(pkgName,TCMU_STR)) {
+    cmd = TCMU_VERSION;
+  }
+
+  if (!cmd) {
+    return NULL;
+  }
+
+  out = gbRunnerGetOutput(cmd);
+  if (!out[0] || !strcmp(out, "GIT_VERSION")) {
+      out = gbGetRpmPkgVersion(pkgName);
+  }
+
+  return out;
+}
+
+
 int
 gbAlloc(void *ptrptr, size_t size,
         const char *filename, const char *funcname, size_t linenr)

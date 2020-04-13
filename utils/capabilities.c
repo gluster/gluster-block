@@ -43,14 +43,14 @@ gbIoTimeoutDependenciesVersionCheck(void)
   int ret = true;
 
 
-  out = gbRunnerGetOutput(CONFIGSHELL_VERSION);
+  out = gbRunnerGetPkgVersion(CONFIGSHELL_STR);
   if (!gbDependencyVersionCompare(CONFIGSHELL_SEMICOLON, out)) {
     ret = false;
     goto out;
   }
 
   GB_FREE(out);
-  out = gbRunnerGetOutput(TCMU_VERSION);
+  out = gbRunnerGetPkgVersion(TCMU_STR);
   if (!gbDependencyVersionCompare(TCMURUNNER_IO_TIMEOUT, out)) {
     ret = false;
   }
@@ -68,7 +68,7 @@ gbBlockSizeDependenciesVersionCheck(void)
   int ret = true;
 
 
-  out = gbRunnerGetOutput(RTSLIB_VERSION);
+  out = gbRunnerGetPkgVersion(RTSLIB_STR);
   if (!gbDependencyVersionCompare(RTSLIB_BLKSIZE, out)) {
     ret = false;
   }
@@ -85,14 +85,14 @@ gbBlockReloadDependenciesVersionCheck(void)
   int ret = true;
 
 
-  out = gbRunnerGetOutput(RTSLIB_VERSION);
+  out = gbRunnerGetPkgVersion(RTSLIB_STR);
   if (!gbDependencyVersionCompare(RTSLIB_RELOAD, out)) {
     ret = false;
     goto out;
   }
   GB_FREE(out);
 
-  out = gbRunnerGetOutput(TARGETCLI_VERSION);
+  out = gbRunnerGetPkgVersion(TARGETCLI_STR);
   if (!gbDependencyVersionCompare(TARGETCLI_RELOAD, out)) {
     ret = false;
   }

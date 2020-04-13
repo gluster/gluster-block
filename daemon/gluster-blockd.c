@@ -430,7 +430,7 @@ gbDependenciesVersionCheck(void)
   char *out = NULL;
 
 
-  out = gbRunnerGetOutput(TCMU_VERSION);
+  out = gbRunnerGetPkgVersion(TCMU_STR);
   if (!gbDependencyVersionCompare(TCMURUNNER, out)) {
     LOG ("mgmt", GB_LOG_ERROR,
          "current tcmu-runner version is %s, gluster-block need atleast - %s",
@@ -440,7 +440,7 @@ gbDependenciesVersionCheck(void)
   LOG("mgmt", GB_LOG_INFO, "starting with tcmu-runner version - %s", out);
   GB_FREE(out);
 
-  out = gbRunnerGetOutput(TARGETCLI_VERSION);
+  out = gbRunnerGetPkgVersion(TARGETCLI_STR);
   if (!gbDependencyVersionCompare(TARGETCLI, out)) {
     LOG ("mgmt", GB_LOG_ERROR,
          "current targetcli version is %s, gluster-block need atleast - %s",
@@ -450,19 +450,19 @@ gbDependenciesVersionCheck(void)
   LOG("mgmt", GB_LOG_INFO, "starting with targetcli version - %s", out);
   GB_FREE(out);
 
-  out = gbRunnerGetOutput(RTSLIB_VERSION);
-  if (!strcmp(out, "GIT_VERSION")) {
-    LOG("mgmt", GB_LOG_INFO, "starting with rtslib version <= 2.1.69");
-  } else {
+  out = gbRunnerGetPkgVersion(RTSLIB_STR);
+  if (out[0]) {
     LOG("mgmt", GB_LOG_INFO, "starting with rtslib version - %s", out);
+  } else {
+    LOG("mgmt", GB_LOG_INFO, "starting with rtslib version <= 2.1.69");
   }
   GB_FREE(out);
 
-  out = gbRunnerGetOutput(CONFIGSHELL_VERSION);
-  if (!out[0]) {
-    LOG("mgmt", GB_LOG_INFO, "starting with configshell version < 1.1.25");
-  } else {
+  out = gbRunnerGetPkgVersion(CONFIGSHELL_STR);
+  if (out[0]) {
     LOG("mgmt", GB_LOG_INFO, "starting with configshell version - %s", out);
+  } else {
+    LOG("mgmt", GB_LOG_INFO, "starting with configshell version < 1.1.25");
   }
   GB_FREE(out);
 
@@ -519,7 +519,7 @@ blockNodeSanityCheck(void)
     return ENOMEM;
   }
 
-  tmp = gbRunnerGetOutput(TARGETCLI_VERSION);
+  tmp = gbRunnerGetPkgVersion(TARGETCLI_STR);
   if (!gbDependencyVersionCompare(TARGETCLI_DAEMON, tmp)) {
     use_targetclid = false;
     LOG("mgmt", GB_LOG_WARNING,

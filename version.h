@@ -17,6 +17,11 @@
 
 # define  DEPENDENCY_VERSION   KERNEL_VERSION
 
+# define  TARGETCLI_STR    "targetcli"
+# define  RTSLIB_STR       "rtslib"
+# define  CONFIGSHELL_STR  "configshell"
+# define  TCMU_STR         "tcmu-runner"
+
 # define  TARGETCLI_VERSION   "targetcli --version 2>&1 | awk -F' ' '{printf $NF}'"
 # define  RTSLIB_VERSION      "python -c 'from rtslib_fb import __version__; print(__version__)'"
 # define  TCMU_VERSION        "tcmu-runner --version 2>&1 | awk -F' ' '{printf $NF}'"
