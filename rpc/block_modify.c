@@ -735,7 +735,7 @@ blockModifySizeCliFormatResponse(blockModifySizeCli *blk, blockModifySize *mobj,
     if (savereply->skipped) {
       GB_FREE(tmp);
       tmp = tmp3;
-      GB_ASPRINTF(&tmp3, "%s\nSKIPPED ON:%s",tmp, savereply->skipped);
+      GB_ASPRINTF(&tmp3, "%sSKIPPED ON:%s\n",tmp, savereply->skipped);
     }
 
     GB_ASPRINTF(&reply->out, "%sRESULT: %s\n", tmp3, errCode?"FAIL":"SUCCESS");
@@ -751,6 +751,23 @@ blockModifySizeCliFormatResponse(blockModifySizeCli *blk, blockModifySize *mobj,
   }
 
   GB_FREE(hr_size);
+}
+
+
+static bool
+glusterBlockIsResizeFailed(MetaInfo *info)
+{
+  int i;
+
+  for (i = 0; i < info->nhosts; i++) {
+    switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+      case GB_RS_FAIL:
+      case GB_RS_INPROGRESS:
+        return true;
+    }
+  }
+
+  return false;
 }
 
 
@@ -836,7 +853,8 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
     goto out;
   }
 
-  if ((info->size > blk->size && !blk->force) || info->size == blk->size) {
+  if ((info->size > blk->size && !blk->force) ||
+      (info->size == blk->size && !glusterBlockIsResizeFailed(info))) {
     cSize = glusterBlockFormatSize("mgmt", info->size);
     rSize = glusterBlockFormatSize("mgmt", blk->size);
     if (info->size == blk->size) {
