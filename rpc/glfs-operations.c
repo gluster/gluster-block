@@ -551,14 +551,20 @@ glusterBlockDeleteMetaFile(struct glfs *glfs,
 void
 blockFreeMetaInfo(MetaInfo *info)
 {
-  int i;
+  int i, j;
 
 
   if (!info)
     return;
 
   for (i = 0; i < info->nhosts; i++) {
-    GB_FREE(info->list[i]);
+    if (info->list[i]) {
+      for (j = 0; j < info->list[i]->nenties; j++) {
+        GB_FREE(info->list[i]->st_journal[j]);
+      }
+      GB_FREE(info->list[i]->st_journal);
+      GB_FREE(info->list[i]);
+    }
   }
 
   GB_FREE(info->list);
@@ -606,6 +612,8 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
     break;
   case GB_META_SIZE:
     sscanf(strchr(line, ' '), "%zu", &info->size);
+    if (!info->initial_size)
+      info->initial_size = info->size;
     break;
   case GB_META_RINGBUFFER:
     sscanf(strchr(line, ' '), "%zu", &info->rb_size);
@@ -630,31 +638,38 @@ blockStuffMetaInfo(MetaInfo *info, char *line)
     break;
 
   default:
-    if(!info->list) {
-      if(GB_ALLOC(info->list) < 0)
-        goto out;
-      if(GB_ALLOC(info->list[0]) < 0)
-        goto out;
-      GB_STRCPYSTATIC(info->list[0]->addr, opt);
-      GB_STRCPYSTATIC(info->list[0]->status, strchr(line, ' ') + 1);
-      info->nhosts = 1;
-    } else {
+    if (info->list) {
       if(GB_REALLOC_N(info->list, info->nhosts+1) < 0)
         goto out;
       for (i = 0; i < info->nhosts; i++) {
         if(!strcmp(info->list[i]->addr, opt)) {
           GB_STRCPYSTATIC(info->list[i]->status, strchr(line, ' ') + 1);
+          if (GB_REALLOC_N(info->list[i]->st_journal, info->list[i]->nenties + 1) < 0)
+            goto out;
+          if (GB_STRDUP(info->list[i]->st_journal[info->list[i]->nenties], strchr(line, ' ') + 1) < 0)
+            goto out;
+          info->list[i]->nenties++;
           flag = 1;
           break;
         }
       }
-      if (!flag) {
-        if(GB_ALLOC(info->list[info->nhosts]) < 0)
-          goto out;
-        GB_STRCPYSTATIC(info->list[info->nhosts]->addr, opt);
-        GB_STRCPYSTATIC(info->list[info->nhosts]->status, strchr(line, ' ') + 1);
-        info->nhosts++;
-      }
+    } else {
+      if(GB_ALLOC(info->list) < 0)
+        goto out;
+    }
+
+    if (!flag) {
+      i = info->nhosts;
+      if(GB_ALLOC(info->list[i]) < 0)
+        goto out;
+      GB_STRCPYSTATIC(info->list[i]->addr, opt);
+      GB_STRCPYSTATIC(info->list[i]->status, strchr(line, ' ') + 1);
+      if(GB_ALLOC(info->list[i]->st_journal) < 0)
+        goto out;
+      if (GB_STRDUP(info->list[i]->st_journal[info->list[i]->nenties], strchr(line, ' ') + 1) < 0)
+        goto out;
+      info->list[i]->nenties++;
+      info->nhosts++;
     }
     break;
   }
