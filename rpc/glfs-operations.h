@@ -24,6 +24,8 @@
 
 typedef struct NodeInfo {
   char addr[255];
+  size_t nenties;
+  char **st_journal;   /* maintain state journal per node */
   char status[32];
   ssize_t size;
 } NodeInfo;
@@ -32,6 +34,7 @@ typedef struct MetaInfo {
   char   volume[255];
   char   gbid[38];
   size_t size;
+  size_t initial_size; /* initial size with which block volume got created */
   size_t rb_size;
   size_t blk_size;
   size_t io_timeout;

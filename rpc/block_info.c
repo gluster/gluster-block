@@ -12,19 +12,70 @@
 # include  "block_common.h"
 
 
+static char *
+blockInfoGetCurrentSizeOfNode(blockInfoCli *blk, MetaInfo *info, char *host)
+{
+  int i, j;
+  char *tok;
+  char *hr_size = NULL;
+  size_t size = 0;
+  bool noRsSuccess = true;
+
+  if (!host)
+    return NULL;
+
+  for (i = 0; i < info->nhosts; i++) {
+    if(strcmp(info->list[i]->addr, host)) {
+      continue;
+    }
+    for (j = info->list[i]->nenties-1; j >= 0; j--) {
+      if (!strstr(info->list[i]->st_journal[j], MetaStatusLookup[GB_RS_SUCCESS])) {
+        continue;
+      }
+      noRsSuccess = false;
+      tok = strstr(info->list[i]->st_journal[j], "-");
+      if (!tok) {
+        return NULL;
+      }
+      sscanf(tok+1, "%zu", &size);
+      goto success;
+    }
+  }
+
+  if (noRsSuccess) {
+    size = info->initial_size;
+    goto success;
+  }
+
+  return NULL;
+
+ success:
+  hr_size = glusterBlockFormatSize("mgmt", size);
+  if (!hr_size) {
+    LOG("mgmt", GB_LOG_WARNING,
+        "failed to get previous size of portal %s for volume=%s blockname=%s",
+        info->list[i]->addr, blk->volume, blk->block_name);
+    return NULL;
+  }
+  return hr_size;
+}
+
+
+
 static void
 blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
                            char *errMsg, MetaInfo *info,
                            blockResponse *reply)
 {
   json_object  *json_obj    = NULL;
+  json_object  *json_obj2   = NULL;
   json_object  *json_array1 = NULL;
   json_object  *json_array2 = NULL;
-  json_object  *json_array3 = NULL;
   char         *tmp         = NULL;
   char         *tmp2        = NULL;
   char         *tmp3        = NULL;
   char         *tmp4        = NULL;
+  char         *tmp5        = NULL;
   char         *out         = NULL;
   int          i            = 0;
   char         *hr_size     = NULL;           /* Human Readable size */
@@ -94,16 +145,18 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
       switch (blockMetaStatusEnumParse(info->list[i]->status)) {
       case GB_RS_FAIL:
       case GB_RS_INPROGRESS:
-        if (!json_array3) {
-          json_array3 = json_object_new_array();
+        GB_FREE(hr_size);
+        hr_size = blockInfoGetCurrentSizeOfNode(blk, info, info->list[i]->addr);
+        if (!json_obj2) {
+          json_obj2 = json_object_new_object();
         }
-        json_object_array_add(json_array3, GB_JSON_OBJ_TO_STR(info->list[i]->addr));
+        json_object_object_add(json_obj2, info->list[i]->addr, GB_JSON_OBJ_TO_STR(hr_size));
       }
     }
 
     json_object_object_add(json_obj, "EXPORTED ON", json_array1);
-    if (json_array3) {
-      json_object_object_add(json_obj, "RESIZE FAILED ON", json_array3);
+    if (json_obj2) {
+      json_object_object_add(json_obj, "RESIZE FAILED ON", json_obj2);
     }
     if (json_array2) {
       json_object_object_add(json_obj, "ENCOUNTERED FAILURES ON", json_array2);
@@ -145,11 +198,17 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
       switch (blockMetaStatusEnumParse(info->list[i]->status)) {
       case GB_RS_FAIL:
       case GB_RS_INPROGRESS:
-        if (GB_ASPRINTF(&rsf_nodes, "%s %s", tmp4?tmp4:"", info->list[i]->addr) == -1) {
-          GB_FREE (tmp4);
+        GB_FREE(hr_size);
+        hr_size = blockInfoGetCurrentSizeOfNode(blk, info, info->list[i]->addr);
+        if (GB_ASPRINTF (&tmp5, "[%s]", hr_size) < 0 ) {
+          goto out;
+        }
+        if (GB_ASPRINTF(&rsf_nodes, "%s %s:%s", tmp4?tmp4:"", info->list[i]->addr, tmp5?tmp5:"") == -1) {
+          GB_FREE (tmp5);
           goto out;
         }
         GB_FREE (tmp4);
+        GB_FREE (tmp5);
       }
     }
 
