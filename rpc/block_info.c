@@ -20,13 +20,16 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
   json_object  *json_obj    = NULL;
   json_object  *json_array1 = NULL;
   json_object  *json_array2 = NULL;
+  json_object  *json_array3 = NULL;
   char         *tmp         = NULL;
   char         *tmp2        = NULL;
   char         *tmp3        = NULL;
+  char         *tmp4        = NULL;
   char         *out         = NULL;
   int          i            = 0;
   char         *hr_size     = NULL;           /* Human Readable size */
   char         *timeout     = NULL;
+  char         *rsf_nodes   = NULL;
 
   if (!reply) {
     return;
@@ -88,9 +91,20 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
           break;
         }
       }
+      switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+      case GB_RS_FAIL:
+      case GB_RS_INPROGRESS:
+        if (!json_array3) {
+          json_array3 = json_object_new_array();
+        }
+        json_object_array_add(json_array3, GB_JSON_OBJ_TO_STR(info->list[i]->addr));
+      }
     }
 
     json_object_object_add(json_obj, "EXPORTED ON", json_array1);
+    if (json_array3) {
+      json_object_object_add(json_obj, "RESIZE FAILED ON", json_array3);
+    }
     if (json_array2) {
       json_object_object_add(json_obj, "ENCOUNTERED FAILURES ON", json_array2);
     }
@@ -127,11 +141,28 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
           break;
         }
       }
+      tmp4 = rsf_nodes;
+      switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+      case GB_RS_FAIL:
+      case GB_RS_INPROGRESS:
+        if (GB_ASPRINTF(&rsf_nodes, "%s %s", tmp4?tmp4:"", info->list[i]->addr) == -1) {
+          GB_FREE (tmp4);
+          goto out;
+        }
+        GB_FREE (tmp4);
+      }
+    }
+
+    if (rsf_nodes) {
+      tmp4 = tmp;
+      if (GB_ASPRINTF(&tmp, "%s\nRESIZE FAILED ON:%s", tmp4, rsf_nodes) == -1) {
+        goto out;
+      }
     }
 
     if (tmp2) {
       tmp3 = tmp;
-      if (GB_ASPRINTF(&tmp, "%s\nENCOUNTERED FAILURES ON:%s\n", tmp3, tmp2) == -1) {
+      if (GB_ASPRINTF(&tmp, "%s\nENCOUNTERED FAILURES ON:%s", tmp3, tmp2) == -1) {
         goto out;
       }
     }
@@ -148,9 +179,11 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
   }
   GB_FREE (hr_size);
   GB_FREE (timeout);
+  GB_FREE (rsf_nodes);
   GB_FREE (tmp);
   GB_FREE (tmp2);
   GB_FREE (tmp3);
+  GB_FREE (tmp4);
   return;
 }
 
