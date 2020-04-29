@@ -658,7 +658,8 @@ blockModifySizeCliFormatResponse(blockModifySizeCli *blk, blockModifySize *mobj,
   char        *tmp = NULL;
   char        *tmp2 = NULL;
   char        *tmp3 = NULL;
-  char         *hr_size    = NULL;           /* Human Readable size */
+  char        *hr_size = NULL;           /* Human Readable size */
+  int i;
 
   if (!reply) {
     return;
@@ -708,10 +709,6 @@ blockModifySizeCliFormatResponse(blockModifySizeCli *blk, blockModifySize *mobj,
     json_object_object_add(json_obj, "RESULT",
       errCode?GB_JSON_OBJ_TO_STR("FAIL"):GB_JSON_OBJ_TO_STR("SUCCESS"));
 
-    GB_ASPRINTF(&reply->out, "%s\n", json_object_to_json_string_ext(json_obj,
-                mapJsonFlagToJsonCstring(blk->json_resp)));
-
-    json_object_put(json_obj);
   } else {
     /* save 'failed on'*/
     if (savereply->attempt) {
@@ -745,11 +742,41 @@ blockModifySizeCliFormatResponse(blockModifySizeCli *blk, blockModifySize *mobj,
   GB_FREE(tmp3);
 
   /*catch all*/
-  if (!reply->out) {
-    blockFormatErrorResponse(MODIFY_SIZE_SRV, blk->json_resp, errCode,
-                             GB_DEFAULT_ERRMSG, reply);
+  if (errCode && !errMsg) {
+    GB_ASPRINTF (&errMsg, "block volume resize failed:");
+    for (i = 0; i < info->nhosts; i++) {
+      switch (blockMetaStatusEnumParse(info->list[i]->status)) {
+      case GB_RS_FAIL:
+      case GB_RS_INPROGRESS:
+        GB_FREE(hr_size);
+        hr_size = blockInfoGetCurrentSizeOfNode(blk->block_name, info, info->list[i]->addr);
+        if (!hr_size) {
+          LOG("mgmt", GB_LOG_WARNING,
+              "blockInfoGetCurrentSizeOfNode retuns null, block: %s/%s node: %s",
+              blk->volume, blk->block_name, info->list[i]->addr);
+        }
+        tmp = errMsg;
+        GB_ASPRINTF (&errMsg, "%s %s:[%s]", tmp?tmp:"",
+                     info->list[i]->addr, hr_size?hr_size:"null");
+        GB_FREE(tmp);
+      }
+    }
+  }
+  if (blk->json_resp) {
+    if (errCode) {
+      json_object_object_add(json_obj, "errCode", json_object_new_int(errCode));
+      json_object_object_add(json_obj, "errMsg", GB_JSON_OBJ_TO_STR(errMsg));
+    }
+    GB_ASPRINTF(&reply->out, "%s\n", json_object_to_json_string_ext(json_obj,
+                mapJsonFlagToJsonCstring(blk->json_resp)));
+    json_object_put(json_obj);
+  } else {
+    if (errCode) {
+      GB_ASPRINTF (&reply->out, "%s\n", (errMsg?errMsg:"null"));
+    }
   }
 
+  GB_FREE(errMsg);
   GB_FREE(hr_size);
 }
 
@@ -917,6 +944,13 @@ block_modify_size_cli_1_svc_st(blockModifySizeCli *blk, struct svc_req *rqstp)
     LOG("mgmt", GB_LOG_WARNING,
         "glusterBlockModifySizeRemoteAsync(size=%zu): return %d %s for block %s on volume %s",
         blk->size, asyncret, FAILED_REMOTE_AYNC_MODIFY, blk->block_name, info->volume);
+    /* Refresh for latest details */
+    blockFreeMetaInfo(info);
+    if (GB_ALLOC(info) < 0) {
+      errCode = ENOMEM;
+      goto out;
+    }
+    blockGetMetaInfo(glfs, blk->block_name, info, NULL);
     goto out;
   }
 

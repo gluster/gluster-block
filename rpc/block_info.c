@@ -12,56 +12,6 @@
 # include  "block_common.h"
 
 
-static char *
-blockInfoGetCurrentSizeOfNode(blockInfoCli *blk, MetaInfo *info, char *host)
-{
-  int i, j;
-  char *tok;
-  char *hr_size = NULL;
-  size_t size = 0;
-  bool noRsSuccess = true;
-
-  if (!host)
-    return NULL;
-
-  for (i = 0; i < info->nhosts; i++) {
-    if(strcmp(info->list[i]->addr, host)) {
-      continue;
-    }
-    for (j = info->list[i]->nenties-1; j >= 0; j--) {
-      if (!strstr(info->list[i]->st_journal[j], MetaStatusLookup[GB_RS_SUCCESS])) {
-        continue;
-      }
-      noRsSuccess = false;
-      tok = strstr(info->list[i]->st_journal[j], "-");
-      if (!tok) {
-        return NULL;
-      }
-      sscanf(tok+1, "%zu", &size);
-      goto success;
-    }
-  }
-
-  if (noRsSuccess) {
-    size = info->initial_size;
-    goto success;
-  }
-
-  return NULL;
-
- success:
-  hr_size = glusterBlockFormatSize("mgmt", size);
-  if (!hr_size) {
-    LOG("mgmt", GB_LOG_WARNING,
-        "failed to get previous size of portal %s for volume=%s blockname=%s",
-        info->list[i]->addr, blk->volume, blk->block_name);
-    return NULL;
-  }
-  return hr_size;
-}
-
-
-
 static void
 blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
                            char *errMsg, MetaInfo *info,
@@ -146,7 +96,12 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
       case GB_RS_FAIL:
       case GB_RS_INPROGRESS:
         GB_FREE(hr_size);
-        hr_size = blockInfoGetCurrentSizeOfNode(blk, info, info->list[i]->addr);
+        hr_size = blockInfoGetCurrentSizeOfNode(blk->block_name, info, info->list[i]->addr);
+        if (!hr_size) {
+          LOG("mgmt", GB_LOG_WARNING,
+              "blockInfoGetCurrentSizeOfNode retuns null, block: %s/%s node: %s",
+              blk->volume, blk->block_name, info->list[i]->addr);
+        }
         if (!json_obj2) {
           json_obj2 = json_object_new_object();
         }
@@ -199,8 +154,13 @@ blockInfoCliFormatResponse(blockInfoCli *blk, int errCode,
       case GB_RS_FAIL:
       case GB_RS_INPROGRESS:
         GB_FREE(hr_size);
-        hr_size = blockInfoGetCurrentSizeOfNode(blk, info, info->list[i]->addr);
-        if (GB_ASPRINTF (&tmp5, "[%s]", hr_size) < 0 ) {
+        hr_size = blockInfoGetCurrentSizeOfNode(blk->block_name, info, info->list[i]->addr);
+        if (!hr_size) {
+          LOG("mgmt", GB_LOG_WARNING,
+              "blockInfoGetCurrentSizeOfNode retuns null, block: %s/%s node: %s",
+              blk->volume, blk->block_name, info->list[i]->addr);
+        }
+        if (GB_ASPRINTF (&tmp5, "[%s]", hr_size?hr_size:"null") < 0 ) {
           goto out;
         }
         if (GB_ASPRINTF(&rsf_nodes, "%s %s:%s", tmp4?tmp4:"", info->list[i]->addr, tmp5?tmp5:"") == -1) {
