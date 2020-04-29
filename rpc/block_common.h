@@ -159,6 +159,9 @@ void blockRemoteRespFree(blockRemoteResp *resp);
 int blockCheckBlockLoadedStatus(char *block_name,
                                 char *gbid, blockResponse *reply);
 
+char *blockInfoGetCurrentSizeOfNode(char *block_name,
+                                    MetaInfo *info, char *host);
+
 int glusterBlockCallRPC_1(char *host, void *cobj, operations opt,
                           bool *rpc_sent, char **out);
 

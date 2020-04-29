@@ -172,6 +172,55 @@ blockCheckBlockLoadedStatus(char *block_name, char *gbid, blockResponse *reply)
 }
 
 
+char*
+blockInfoGetCurrentSizeOfNode(char *block_name, MetaInfo *info, char *host)
+{
+  int i, j;
+  char *tok;
+  char *hr_size = NULL;
+  size_t size = 0;
+  bool noRsSuccess = true;
+
+  if (!host)
+    return NULL;
+
+  for (i = 0; i < info->nhosts; i++) {
+    if(strcmp(info->list[i]->addr, host)) {
+      continue;
+    }
+    for (j = info->list[i]->nenties-1; j >= 0; j--) {
+      if (!strstr(info->list[i]->st_journal[j], MetaStatusLookup[GB_RS_SUCCESS])) {
+        continue;
+      }
+      noRsSuccess = false;
+      tok = strstr(info->list[i]->st_journal[j], "-");
+      if (!tok) {
+        return NULL;
+      }
+      sscanf(tok+1, "%zu", &size);
+      goto success;
+    }
+  }
+
+  if (noRsSuccess) {
+    size = info->initial_size;
+    goto success;
+  }
+
+  return NULL;
+
+ success:
+  hr_size = glusterBlockFormatSize("mgmt", size);
+  if (!hr_size) {
+    LOG("mgmt", GB_LOG_WARNING,
+        "failed to get previous size of portal %s for blockname=%s",
+        info->list[i]->addr, block_name);
+    return NULL;
+  }
+  return hr_size;
+}
+
+
 static struct addrinfo *
 glusterBlockGetSockaddr(char *host)
 {
