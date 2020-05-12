@@ -457,7 +457,7 @@ block_create_common(blockCreate *blk, char *control, char *volServer,
       "filename=%s authmode=%d passwd=%s size=%lu control=%s "
       "io_timeout=%lu", blk->volume, volServer?volServer:blk->ipaddr,
       blk->block_name, blk->block_hosts, blk->gbid, blk->auth_mode,
-      blk->auth_mode?blk->passwd:"", blk->size, control, io_timeout);
+      blk->auth_mode?blk->passwd:"", blk->size, control?control:"", io_timeout);
 
   if (GB_ALLOC(reply) < 0) {
     goto out;
