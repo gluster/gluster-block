@@ -539,9 +539,17 @@ blockNodeSanityCheck(void)
         return ENOMEM;
       }
     } else {
-      if (GB_ASPRINTF(&global_opts, "%s auto_use_daemon=true", tmp) == -1) {
-        GB_FREE(tmp);
-        return ENOMEM;
+      ret = gbRunner("targetcli set global | grep daemon_use_batch_mode");
+      if (!ret) {
+        if (GB_ASPRINTF(&global_opts, "%s auto_use_daemon=true daemon_use_batch_mode=true", tmp) == -1) {
+          GB_FREE(tmp);
+          return ENOMEM;
+        }
+      } else {
+        if (GB_ASPRINTF(&global_opts, "%s auto_use_daemon=true", tmp) == -1) {
+          GB_FREE(tmp);
+          return ENOMEM;
+        }
       }
     }
     GB_FREE(tmp);
