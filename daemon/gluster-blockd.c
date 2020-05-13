@@ -20,7 +20,6 @@
 # include  <linux/version.h>
 # include  <sys/wait.h>
 
-# include  "config.h"
 # include  "common.h"
 # include  "lru.h"
 # include  "block.h"

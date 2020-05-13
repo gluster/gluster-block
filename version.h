@@ -14,6 +14,8 @@
 
 # include  <linux/version.h>
 
+# include  "config.h"
+
 
 # define  DEPENDENCY_VERSION   KERNEL_VERSION
 
@@ -27,7 +29,7 @@
 # define  TCMU_VERSION        "tcmu-runner --version 2>&1 | awk -F' ' '{printf $NF}'"
 # define  CONFIGSHELL_VERSION "python -c 'from configshell_fb import __version__; print(__version__)'"
 
-# define  GLUSTER_BLOCK_VERSION                "0.4"
+# define  GLUSTER_BLOCK_VERSION                PACKAGE_VERSION
 
 # define  VERNUM_BUFLEN                        8
 
