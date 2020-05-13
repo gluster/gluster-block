@@ -18,7 +18,6 @@
 
 # include "utils.h"
 # include "lru.h"
-# include "config.h"
 # include "version.h"
 
 const char *argp_program_version = ""                                 \
