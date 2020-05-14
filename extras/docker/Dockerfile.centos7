@@ -16,6 +16,7 @@ RUN true \
  && yum -y install \
            git autoconf automake gcc libtool make file \
            glusterfs-api-devel libuuid-devel json-c-devel \
+           clang clang-analyzer \
  && true
 
 # build
@@ -28,3 +29,10 @@ RUN true \
  && make clean \
  && true
 
+# scan build
+RUN true \
+ && ./autogen.sh \
+ && ./configure --enable-tirpc=no \
+ && make clang-check \
+ && make clean \
+ && true

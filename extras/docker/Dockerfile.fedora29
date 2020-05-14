@@ -16,6 +16,7 @@ RUN true \
  && dnf -y install \
            git autoconf automake gcc libtool make file rpcgen \
            glusterfs-api-devel libuuid-devel json-c-devel libtirpc-devel \
+           clang clang-analyzer \
  && true
 
 # build
@@ -28,3 +29,10 @@ RUN true \
  && make clean \
  && true
 
+# scan build
+RUN true \
+ && ./autogen.sh \
+ && ./configure \
+ && make clang-check \
+ && make clean \
+ && true
