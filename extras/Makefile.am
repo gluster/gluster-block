@@ -1,5 +1,5 @@
 EXTRA_DIST = replace-node.sh wait-for-bricks.sh upgrade_activities.sh            \
-			 gluster-block.logrotate
+			 gluster-block.logrotate clang-checker.sh
 
 DISTCLEANFILES = Makefile.in
 

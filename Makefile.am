@@ -51,6 +51,9 @@ dist-hook: gen-ChangeLog gen-VERSION
 
 .PHONY: gen-ChangeLog gen-VERSION
 
+clang-check:
+	@$(top_srcdir)/extras/clang-checker.sh
+
 gen-ChangeLog:
 	(cd $(srcdir) && git diff && echo ===== git log ==== && git log) > $(distdir)/ChangeLog
 
