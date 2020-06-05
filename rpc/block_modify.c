@@ -466,6 +466,7 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
   int errCode = -1;
   char *errMsg = NULL;
   blockServerDefPtr list = NULL;
+  char *cmdlog = NULL;
 
 
   LOG("mgmt", GB_LOG_INFO,
@@ -631,8 +632,12 @@ block_modify_cli_1_svc_st(blockModifyCli *blk, struct svc_req *rqstp)
  initfail:
   blockModifyCliFormatResponse (blk, &mobj, asyncret?asyncret:errCode,
                                 errMsg, savereply, info, reply, rollback);
+  if (reply) {
+    cmdlog = gbClipoffSensitiveDetails(reply->out);
+  }
   LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s",
-      reply ? reply->out : "*Nil*");
+      cmdlog ? cmdlog : "*Nil*");
+  GB_FREE(cmdlog);
   blockFreeMetaInfo(info);
 
   if (savereply) {
@@ -998,9 +1003,8 @@ block_modify_1_svc_st(blockModify *blk, struct svc_req *rqstp)
 
 
   LOG("mgmt", GB_LOG_INFO,
-      "modify request, volume=%s blockname=%s filename=%s authmode=%d passwd=%s",
-      blk->volume, blk->block_name, blk->gbid, blk->auth_mode,
-      blk->auth_mode?blk->passwd:"");
+      "modify request, volume=%s blockname=%s filename=%s authmode=%d",
+      blk->volume, blk->block_name, blk->gbid, blk->auth_mode);
 
   if (GB_ALLOC(reply) < 0) {
     return NULL;

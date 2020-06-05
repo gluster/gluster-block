@@ -215,6 +215,7 @@ block_info_cli_1_svc_st(blockInfoCli *blk, struct svc_req *rqstp)
   MetaInfo *info = NULL;
   int errCode = -1;
   char *errMsg = NULL;
+  char *cmdlog = NULL;
 
 
   LOG("mgmt", GB_LOG_INFO,
@@ -271,8 +272,12 @@ block_info_cli_1_svc_st(blockInfoCli *blk, struct svc_req *rqstp)
 
 
   blockInfoCliFormatResponse(blk, errCode, errMsg, info, reply);
+  if (reply) {
+    cmdlog = gbClipoffSensitiveDetails(reply->out);
+  }
   LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s",
-      reply ? reply->out : "*Nil*");
+      cmdlog ? cmdlog : "*Nil*");
+  GB_FREE(cmdlog);
   GB_FREE(errMsg);
   blockFreeMetaInfo(info);
 

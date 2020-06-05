@@ -454,10 +454,10 @@ block_create_common(blockCreate *blk, char *control, char *volServer,
 
   LOG("mgmt", GB_LOG_INFO,
       "create request, volume=%s volserver=%s blockname=%s blockhosts=%s "
-      "filename=%s authmode=%d passwd=%s size=%lu control=%s "
-      "io_timeout=%lu", blk->volume, volServer?volServer:blk->ipaddr,
-      blk->block_name, blk->block_hosts, blk->gbid, blk->auth_mode,
-      blk->auth_mode?blk->passwd:"", blk->size, control?control:"", io_timeout);
+      "filename=%s authmode=%d size=%lu control=%s io_timeout=%lu",
+      blk->volume, volServer?volServer:blk->ipaddr, blk->block_name,
+      blk->block_hosts, blk->gbid, blk->auth_mode, blk->size,
+      control?control:"", io_timeout);
 
   if (GB_ALLOC(reply) < 0) {
     goto out;
@@ -956,6 +956,7 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
   blockCreate2 cobj = {{0},};
   bool *resultCaps = NULL;
   struct gbXdata *xdata = NULL;
+  char *cmdlog = NULL;
 
 
   LOG("mgmt", GB_LOG_INFO,
@@ -1169,8 +1170,12 @@ block_create_cli_1_svc_st(blockCreateCli *blk, struct svc_req *rqstp)
       errCode ? "failure" : "success", blk->volume, blk->block_name);
 
   blockCreateCliFormatResponse(glfs, blk, &cobj, errCode, errMsg, savereply, reply);
+  if (reply) {
+    cmdlog = gbClipoffSensitiveDetails(reply->out);
+  }
   LOG("cmdlog", ((!!errCode) ? GB_LOG_ERROR : GB_LOG_INFO), "%s",
-      reply ? reply->out : "*Nil*");
+      cmdlog ? cmdlog : "*Nil*");
+  GB_FREE(cmdlog);
   GB_FREE(errMsg);
   blockServerDefFree(list);
   blockCreateParsedRespFree(savereply);

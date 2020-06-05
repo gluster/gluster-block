@@ -643,6 +643,40 @@ out:
 }
 
 
+char *
+gbClipoffSensitiveDetails(char *buf)
+{
+  char *out;
+  char *ptr;
+
+
+  if (!buf) {
+    return NULL;
+  }
+
+  if (GB_STRDUP(out, buf) < 0) {
+    LOG("mgmt", GB_LOG_ERROR,
+        "clipoffSensitiveDetails: failed to strdup (%s)", strerror(errno));
+    return NULL;
+  }
+
+  ptr = strstr(out, "PASSWORD");
+  if (ptr) {
+    ptr = strchr(ptr, ':');
+    /* considering output from plain text, json and json-pretty .. */
+    while (ptr && (*ptr != ',' && *ptr != '\n')) {
+      /* UUID have alphabets, digits and '-' char */
+      if (isalnum(*ptr) || (*ptr == '-')) {
+        *ptr = '*';
+      }
+      ptr++;
+    }
+  }
+
+  return out;
+}
+
+
 int
 initLogging(void)
 {

@@ -708,6 +708,8 @@ bool gbDependencyVersionCompare(int dependencyName, char *version);
 
 bool glusterBlockSetLogDir(char *logDir);
 
+char *gbClipoffSensitiveDetails(char *buf);
+
 int initLogging(void);
 
 int gbRunnerExitStatus(int exitStatus);
