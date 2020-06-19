@@ -332,7 +332,18 @@ extern struct gbConf *gbConf;
           do {                                                         \
             FILE *_fp_;                                                  \
             char _tmp_[1024];                                            \
-            LOG("mgmt", GB_LOG_DEBUG, "command, %s", cmd);             \
+            char *_ptr_;                                                 \
+            /* Filter password from targetcli args when writing to log */ \
+            if (gbConf->logLevel >= GB_LOG_DEBUG) {                      \
+              if (opt == CREATE_SRV || opt == MODIFY_SRV) {              \
+                _ptr_ = strdup(cmd);                                     \
+                gbClipoffSensitiveDetailsAtExec(&_ptr_);                 \
+                LOG("mgmt", GB_LOG_DEBUG, "command: %s", _ptr_?_ptr_:"");\
+                GB_FREE(_ptr_);                                          \
+              } else {                                                   \
+                LOG("mgmt", GB_LOG_DEBUG, "command: %s", cmd);           \
+              }                                                          \
+            }                                                            \
             _fp_ = popen(cmd, "r");                                      \
             snprintf(_tmp_, 1024, "%s/%s", vol?vol:"", blk->block_name); \
             if (_fp_) {                                                  \
@@ -356,7 +367,17 @@ extern struct gbConf *gbConf;
                   "popen(): for %s executing command %s failed(%s)",   \
                   _tmp_, cmd, strerror(errno));                          \
             }                                                          \
-            LOG("mgmt", GB_LOG_DEBUG, "raw output, %s", sr->out);      \
+            /* Filter password from targetcli output when writing to log */ \
+            if (gbConf->logLevel >= GB_LOG_DEBUG) {                      \
+              if ((opt == CREATE_SRV || opt == MODIFY_SRV)) {            \
+                _ptr_ = strdup(sr->out);                                 \
+                gbClipoffSensitiveDetailsAtExec(&_ptr_);                 \
+                LOG("mgmt", GB_LOG_DEBUG, "raw output: %s", _ptr_?_ptr_:"");\
+                GB_FREE(_ptr_);                                          \
+              } else {                                                   \
+                LOG("mgmt", GB_LOG_DEBUG, "raw output: %s", sr->out);    \
+              }                                                          \
+            }                                                            \
             LOG("mgmt", GB_LOG_INFO, "command exit code, %d",          \
                  sr->exit);                                            \
           } while (0)
@@ -709,6 +730,8 @@ bool gbDependencyVersionCompare(int dependencyName, char *version);
 bool glusterBlockSetLogDir(char *logDir);
 
 char *gbClipoffSensitiveDetails(char *buf);
+
+void gbClipoffSensitiveDetailsAtExec(char **buf);
 
 int initLogging(void);
 

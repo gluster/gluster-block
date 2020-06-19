@@ -677,6 +677,62 @@ gbClipoffSensitiveDetails(char *buf)
 }
 
 
+void
+gbClipoffSensitiveDetailsAtExec(char **data)
+{
+  char *cmd = *data;
+  char *res = NULL;
+  char *line = NULL;
+  char *tmp = NULL;
+  char *ptr = NULL;
+  char *ptr2 = NULL;
+
+
+  if (!cmd) {
+    return;
+  }
+
+  /* Filter the password details in two cases
+   * 1. when dumping targetcli arguments supplied by gluster-block
+   * 2. Output from targetcli
+   */
+  if (strstr(cmd, "password=") || strstr(cmd, "Parameter password is now")) {
+    line = strtok(cmd, "\n");
+    while (line) {
+      ptr = strstr(line, "password=");
+      if (!ptr) {
+        ptr = strstr(line, "Parameter password is now");
+      }
+      if (!ptr) {
+        GB_ASPRINTF (&res, "%s\n%s", tmp?tmp:"", line);
+        GB_FREE(tmp);
+        tmp = res;
+      } else {
+        ptr2 = strchr(ptr, '=');
+        if (!ptr2) {
+          ptr2 = strchr(ptr, '\'');
+        }
+        ptr2++;
+        while(ptr2) {
+          if (*ptr2 == '\n' || *ptr2 == '\0' || *ptr2 == ' ' || *ptr2 == '\'' || *ptr2 == '.')
+            break;
+          if (isalnum(*ptr2) || (*ptr2 == '-')) {
+            *ptr2 = '*';
+          }
+          ptr2++;
+        }
+        GB_ASPRINTF (&res, "%s\n%s", tmp?tmp:"", line);
+        GB_FREE(tmp);
+        tmp = res;
+      }
+      line = strtok(NULL, "\n");
+    }
+    GB_FREE(*data);
+    *data = res;
+  }
+}
+
+
 int
 initLogging(void)
 {
