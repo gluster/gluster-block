@@ -15,6 +15,8 @@ Vagrant.configure("2") do |config|
   config.vm.provider "libvirt" do |lv|
     lv.cpus = "2"
     lv.memory = "2048"
+    # Always use system connection instead of QEMU session
+    lv.qemu_use_session = false
   end
 
   # disable default sync dir
