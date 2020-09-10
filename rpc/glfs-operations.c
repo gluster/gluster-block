@@ -471,9 +471,16 @@ glusterBlockDeleteEntry(struct glfs *glfs, char *volume, char *gbid)
   }
 
   ret = glfs_unlink(glfs, gbid);
-  if (ret && errno != ENOENT) {
-    LOG("gfapi", GB_LOG_ERROR, "glfs_unlink(%s) on volume %s failed[%s]",
+  if (ret) {
+    LOG("gfapi", GB_LOG_WARNING, "glfs_unlink(%s) on volume %s failed[%s]",
         gbid, volume, strerror(errno));
+    /* To defend a rare case like when the gluster bricks goes down/up randomly,
+     * there is a chance that, unlink of backend file return success but the
+     * writev to metadata file about 'ENTRYDELETE: SUCCESS' failed.
+     */
+    if (errno == ENOENT) {
+      ret = 0;
+    }
   }
 
  out:
