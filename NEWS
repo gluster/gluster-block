@@ -1,35 +1,30 @@
-gluster-block release 0.5 is tagged.
+gluster-block release 0.5.1 is tagged.
 
-This is the new stable version of gluster-block
+This is a security and bugfix release.
 
-Highlights:
-----------
-* Switch to targetclid daemon, this will improve management ops performance (62473a1)
-* Add ability to reload a single block volume (70165bd)
-* Add support to set custom hw-block size (698dbac)
-* Add ability to set custom io timeout option (d8fb2f2)
-* Fix replace node for missing auth on newly configured node (e224f42)
-* Fix genconfig failing with block hosting volumes list bigger than 5 (9767ece)
-* Add vagrant+ansible scripts which help developers quickly bringup setups (e680065)
-* Info will now list resize failed nodes with their effective size details (df1be39)
+An information-disclosure flaw was found in the way gluster-block logs
+sensitive information. This flaw allows an attacker with access to the
+gluster-block logs to read potentially sensitive information, such as
+the CHAP passwords for block volumes.
 
-Other Notable Fixes:
--------------------
-* resize: retry doesn't care about all nodes status (44ebd6b)
-* resize: update the size in metafile soon after ResizeEntry (ac88d6b)
-* version: fall back to rpm package nvr if needed (bdb34a4)
-* gluster-blockd: fix import error (d170e56)
-* ringbuffer: fix the max limited size to 1024M (c5bb230)
-* tests: fix error handling in gfapi test (08ebf97)
-* fix coverity issues reported on 0.5dev (master) (3b72a6a)
-* block_svc_routines: split the code into various new files (d617f15)
-* create: check the StorageObject's existence before creating (34b65ea)
-* delete: use gbid instead of block_name to do the saveconfig check (a438b0f)
-* upgrade_activities: always wait till the background daemon is terminated (cadf491)
-* alua: disable the useless ALUA state (d44f799)
-* misc: makesure to kill gluster-blockd on exit (419d752)
-* daemon: remove the tcmu-runner active check in systemd case (0aa12a2)
-* misc: fix bash path (92f4640)
+When tuned to debug log-level, gluster-block captutures the targetcli exec
+commands output at gluster-blockd.log which might contain sensitive details.
+Also block volume create/modify/info cli command outputs might contain
+sensitive information, as part of the audit logging these outputs will be
+captured at cmd_history.log and gluster-blockd.log (CVE-2020-10762)
+
+Administrators may want to check old logs for gluster-block passwords if they
+created block volumes with CHAP authentication enabled. Restrict access or
+remove old logs that retain the passwords.
+
+The flaw was discovered and fixed by Prasanna Kumar Kalever of Red Hat.
+Refer: https://access.redhat.com/security/cve/CVE-2020-10762
+
+Notable Fixes:
+--------------
+* Fix CVE-2020-10762
+* Fix delete failures when backend file is absent
+* Add logo for gluster-block project
 
 Read more at [1] and [2]
 
