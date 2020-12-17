@@ -279,12 +279,15 @@ glusterBlockCleanUp(struct glfs *glfs, char *blockname,
   GB_STRCPYSTATIC(dobj.gbid, info->gbid);
 
   count = glusterBlockDeleteFillArgs(info, NULL, NULL, NULL);
-  asyncret = glusterBlockDeleteRemoteAsync(blockname, info, glfs, &dobj, count,
-                                           &drobj);
-  if (asyncret) {
-    LOG("mgmt", GB_LOG_WARNING,
-        "glusterBlockDeleteRemoteAsync: return %d %s for block %s on volume %s",
-        asyncret, FAILED_REMOTE_AYNC_DELETE, blockname, info->volume);
+  /* skip deleting the target config when target nodes count=0 */
+  if (count > 0) {
+    asyncret = glusterBlockDeleteRemoteAsync(blockname, info, glfs, &dobj, count,
+                                             &drobj);
+    if (asyncret) {
+      LOG("mgmt", GB_LOG_WARNING,
+          "glusterBlockDeleteRemoteAsync: return %d %s for block %s on volume %s",
+          asyncret, FAILED_REMOTE_AYNC_DELETE, blockname, info->volume);
+    }
   }
 
   /* delete metafile and block file */
