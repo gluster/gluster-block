@@ -2,6 +2,15 @@
 gluster-block is a CLI utility, which aims at making Gluster backed block
 storage creation and maintenance as simple as possible.
 
+### Maintenance Status
+------
+
+⚠️ IMPORTANT - Please read this section carefully if you are currently using or plan to use gluster-block or want to contribute to the project. ⚠️
+
+As of gluster-block release v5.1 the project is considered to be in maintenance only status. This means that only major bugs, performance regressions, or security defects are being considered for inclusion by the project team. Please also expect slow replies to issues.
+
+Thank you for your understanding.
+
 ### Demo
 ------
 [![asciicast](https://asciinema.org/a/237565.svg)](https://asciinema.org/a/237565)
